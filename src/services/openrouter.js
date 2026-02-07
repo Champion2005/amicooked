@@ -19,7 +19,7 @@ export async function callOpenRouter(prompt, systemPrompt = '') {
         'X-Title': 'amicooked'
       },
       body: JSON.stringify({
-        model: 'openrouter/auto', // Auto-select model based on prompt
+        model: 'openrouter/free', // Auto-select model based on prompt
         messages: [
           ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
           { role: 'user', content: prompt }
