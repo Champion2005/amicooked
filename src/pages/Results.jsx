@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Flame, Github, User, GraduationCap, Target, TrendingUp } from 'lucide-react';
@@ -7,7 +7,7 @@ export default function Results() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  const { githubData, analysis, userContext } = location.state || {};
+  const { githubData, analysis, userProfile } = location.state || {};
 
   if (!githubData || !analysis) {
     navigate('/dashboard');
@@ -34,11 +34,31 @@ export default function Results() {
     return 'bg-red-500';
   };
 
-  // Generate contribution heatmap data (simplified)
+  // Generate contribution heatmap data from GitHub
   const generateHeatmap = () => {
-    const months = ['Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan'];
-    const days = ['Mon', 'Wed', 'Fri'];
-    return { months, days };
+    console.log('Full GitHub Data:', githubData);
+    console.log('Available keys:', Object.keys(githubData || {}));
+    console.log('Contribution Calendar:', githubData?.contributionCalendar);
+    
+    if (!githubData?.contributionCalendar?.weeks) {
+      console.warn('No contribution calendar data found - creating mock data for now');
+      // Generate mock data with some random contributions for visualization
+      const mockWeeks = Array.from({ length: 52 }, (_, weekIdx) => ({
+        contributionDays: Array.from({ length: 7 }, (_, dayIdx) => ({
+          contributionCount: Math.floor(Math.random() * 15),
+          date: new Date(Date.now() - (52 - weekIdx) * 7 * 24 * 60 * 60 * 1000 + dayIdx * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        }))
+      }));
+      return { weeks: mockWeeks, days: ['Mon', '', 'Wed', '', 'Fri', '', 'Sun'] };
+    }
+
+    const weeks = githubData.contributionCalendar.weeks;
+    const days = ['Mon', '', 'Wed', '', 'Fri', '', 'Sun'];
+    
+    console.log('Weeks data:', weeks);
+    console.log('First week:', weeks[0]);
+    
+    return { weeks, days };
   };
 
   const heatmap = generateHeatmap();
@@ -77,7 +97,7 @@ export default function Results() {
                     className="w-32 h-32 rounded-full mb-4 border-4 border-[#30363d]"
                   />
                   <h2 className="text-2xl font-bold text-white mb-1">{githubData.name || githubData.username}</h2>
-                  <p className="text-gray-400 text-sm mb-1">{githubData.username} - {userContext}</p>
+                  <p className="text-gray-400 text-sm mb-1">{githubData.username} - {userProfile?.education?.replace(/_/g, ' ') || 'Student'}</p>
                   <div className="mt-4">
                     <p className="text-sm text-gray-400 mb-2">Cooked Level:</p>
                     <p className={`text-3xl font-bold ${getCookedColor(analysis.cookedLevel)}`}>
@@ -90,24 +110,29 @@ export default function Results() {
                   <div className="flex items-center gap-3 text-gray-300">
                     <User className="w-4 h-4" />
                     <span className="text-gray-500">Age:</span>
+                    <span className="text-white ml-auto">{userProfile?.age || 'N/A'}</span>
                   </div>
                   <div className="flex items-center gap-3 text-gray-300">
                     <GraduationCap className="w-4 h-4" />
                     <span className="text-gray-500">Education:</span>
+                    <span className="text-white ml-auto text-xs">{userProfile?.education?.replace(/_/g, ' ') || 'N/A'}</span>
                   </div>
                   <div className="flex items-center gap-3 text-gray-300">
                     <Target className="w-4 h-4" />
-                    <span className="text-gray-500">End Goal:</span>
+                    <span className="text-gray-500">Goal:</span>
+                    <span className="text-white ml-auto text-xs">{userProfile?.careerGoal?.substring(0, 20) || 'N/A'}</span>
                   </div>
                   <div className="flex items-center gap-3 text-gray-300">
                     <TrendingUp className="w-4 h-4" />
-                    <span className="text-gray-500">Experience Level:</span>
+                    <span className="text-gray-500">Experience:</span>
+                    <span className="text-white ml-auto text-xs">{userProfile?.experienceYears?.replace(/_/g, ' ') || 'N/A'}</span>
                   </div>
                 </div>
 
                 <Button 
                   variant="outline"
                   className="w-full mt-6 border-[#30363d] text-white hover:bg-[#1c2128]"
+                  onClick={() => navigate('/profile', { state: { returnTo: '/results', resultsData: { githubData, analysis, userProfile } } })}
                 >
                   Edit Profile
                 </Button>
@@ -163,32 +188,63 @@ export default function Results() {
 
             {/* Activity Heatmap */}
             <Card className="bg-[#161b22] border-[#30363d]">
-              <CardContent className="pt-6">
+              <CardHeader>
+                <CardTitle className="text-white">Contribution Activity</CardTitle>
+                <CardDescription className="text-gray-400">Last 12 months of GitHub activity</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-2">
-                  <div className="flex gap-1 text-xs text-gray-400 mb-2">
-                    {heatmap.months.map((month, i) => (
-                      <div key={i} className="w-16 text-center">{month}</div>
-                    ))}
-                  </div>
-                  <div className="flex gap-1">
-                    <div className="flex flex-col gap-1 text-xs text-gray-400 mr-2">
-                      {heatmap.days.map((day, i) => (
-                        <div key={i} className="h-3">{day}</div>
-                      ))}
+                  {heatmap.weeks.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-400">No contribution data available</p>
+                      <p className="text-xs text-gray-500 mt-2">Check browser console for debug info</p>
                     </div>
-                    <div className="flex-1 grid grid-cols-52 gap-1">
-                      {Array.from({ length: 156 }).map((_, i) => {
-                        const intensity = Math.floor(Math.random() * 5);
-                        const colors = ['bg-[#161b22]', 'bg-green-900/30', 'bg-green-700/50', 'bg-green-600/70', 'bg-green-500'];
-                        return (
-                          <div
-                            key={i}
-                            className={`h-3 rounded-sm ${colors[intensity]} border border-[#30363d]`}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="flex gap-1">
+                        <div className="flex flex-col justify-between text-xs text-gray-400 mr-2 h-[84px]">
+                          {heatmap.days.map((day, i) => (
+                            <div key={i} className="h-3 leading-3">{day}</div>
+                          ))}
+                        </div>
+                        <div className="flex-1 overflow-x-auto">
+                          <div className="flex gap-1">
+                            {heatmap.weeks.map((week, weekIndex) => (
+                              <div key={weekIndex} className="flex flex-col gap-1">
+                                {week.contributionDays.map((day, dayIndex) => {
+                                  const getIntensity = (count) => {
+                                    if (count === 0) return 'bg-[#0d1117]';
+                                    if (count < 3) return 'bg-green-900/60';
+                                    if (count < 6) return 'bg-green-700/70';
+                                    if (count < 10) return 'bg-green-600/90';
+                                    return 'bg-green-500';
+                                  };
+                                  return (
+                                    <div
+                                      key={dayIndex}
+                                      className={`w-3 h-3 rounded-sm ${getIntensity(day.contributionCount)} border border-[#30363d]`}
+                                      title={`${day.contributionCount} contributions on ${day.date}`}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-4">
+                        <span>Less</span>
+                        <div className="flex gap-1">
+                          <div className="w-3 h-3 rounded-sm bg-[#0d1117] border border-[#30363d]"></div>
+                          <div className="w-3 h-3 rounded-sm bg-green-900/60 border border-[#30363d]"></div>
+                          <div className="w-3 h-3 rounded-sm bg-green-700/70 border border-[#30363d]"></div>
+                          <div className="w-3 h-3 rounded-sm bg-green-600/90 border border-[#30363d]"></div>
+                          <div className="w-3 h-3 rounded-sm bg-green-500 border border-[#30363d]"></div>
+                        </div>
+                        <span>More</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
