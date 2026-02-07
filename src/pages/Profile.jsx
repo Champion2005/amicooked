@@ -15,6 +15,7 @@ export default function Profile() {
 
   // Get return path from location state, default to dashboard
   const returnTo = location.state?.returnTo || '/dashboard';
+  const resultsData = location.state?.resultsData; // Preserve results data if coming from Results
 
   // Form state
   const [formData, setFormData] = useState({
@@ -76,7 +77,18 @@ export default function Profile() {
       setLoading(true);
       await saveUserProfile(user.uid, formData);
       alert(isEditing ? 'Profile updated successfully!' : 'Profile saved successfully!');
-      navigate(returnTo);
+      
+      // If we have results data, pass it back when navigating to results
+      if (resultsData && returnTo === '/results') {
+        navigate(returnTo, { 
+          state: { 
+            ...resultsData, 
+            userProfile: formData // Update with new profile data
+          } 
+        });
+      } else {
+        navigate(returnTo);
+      }
     } catch (error) {
       console.error('Error saving profile:', error);
       alert('Failed to save profile. Please try again.');
@@ -88,7 +100,12 @@ export default function Profile() {
   const handleCancel = () => {
     // Only allow cancel if they already have a profile
     if (isEditing) {
-      navigate(returnTo);
+      // Pass back results data if we have it
+      if (resultsData && returnTo === '/results') {
+        navigate(returnTo, { state: resultsData });
+      } else {
+        navigate(returnTo);
+      }
     }
   };
 

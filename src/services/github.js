@@ -152,6 +152,7 @@ function processGitHubData(viewer) {
     totalForks,
     languages: topLanguages,
     streak: currentStreak,
-    totalContributions: viewer.contributionsCollection.contributionCalendar.totalContributions
+    totalContributions: viewer.contributionsCollection.contributionCalendar.totalContributions,
+    contributionCalendar: viewer.contributionsCollection.contributionCalendar
   };
 }
