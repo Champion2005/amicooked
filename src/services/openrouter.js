@@ -1,6 +1,10 @@
 // OpenRouter API configuration
-const OPENROUTER_API_KEY = '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';
+const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+if (!OPENROUTER_API_KEY) {
+  console.error('Missing VITE_OPENROUTER_API_KEY environment variable');
+}
 
 /**
  * Call OpenRouter API with auto model selection

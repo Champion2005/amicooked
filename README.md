@@ -25,7 +25,20 @@
 npm install
 ```
 
-### 2. Configure GitHub OAuth (IMPORTANT)
+### 2. Configure Environment Variables
+
+Copy the example environment file and add your API key:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and add your OpenRouter API key:
+```
+VITE_OPENROUTER_API_KEY=your_actual_api_key_here
+```
+
+### 3. Configure GitHub OAuth (IMPORTANT)
 
 You need to add the **GitHub Client Secret** to Firebase:
 
@@ -42,7 +55,7 @@ You need to add the **GitHub Client Secret** to Firebase:
    https://amicooked-b65b3.firebaseapp.com/__/auth/handler
    ```
 
-### 3. Run Development Server
+### 4. Run Development Server
 
 ```bash
 npm run dev
@@ -87,11 +100,13 @@ amicooked/
 
 ## API Keys & Credentials
 
-All credentials are already configured in the codebase:
-- ✅ Firebase config (public keys)
+**Required Setup:**
+- ⚠️ **OpenRouter API Key** - Add to `.env` file (see Setup step 2)
+- ⚠️ **GitHub Client Secret** - Add to Firebase Console (see Setup step 3)
+
+**Already Configured:**
+- ✅ Firebase config (public keys in code)
 - ✅ GitHub OAuth Client ID
-- ✅ OpenRouter API key
-- ⚠️ **GitHub Client Secret** (add to Firebase console manually)
 
 ## Deployment
 
