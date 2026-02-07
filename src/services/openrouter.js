@@ -46,21 +46,36 @@ export async function callOpenRouter(prompt, systemPrompt = '') {
 /**
  * Generate "Cooked Level" and recommendations based on GitHub data
  * @param {Object} githubData - User's GitHub metrics
- * @param {string} userContext - User's education/career stage
+ * @param {Object} userProfile - User's profile data (age, education, interests, etc.)
  * @returns {Promise<Object>} - { cookedLevel, summary, recommendations }
  */
-export async function analyzeCookedLevel(githubData, userContext) {
+export async function analyzeCookedLevel(githubData, userProfile) {
   const systemPrompt = `You are an expert technical recruiter analyzing GitHub profiles to determine employability. 
 Your job is to be brutally honest and provide actionable feedback. The "Cooked Level" scale is:
 - Low Score (0-2): "Cooking" / Ahead of the curve
 - 3-4: "Cooked Rare" / Slightly behind
 - 5-6: "Cooked Medium Rare" / Concerning gaps
 - 7-8: "Cooked Medium Well" / Significant issues
-- 9-10: "Cooked Well Done" / Unemployable without major changes`;
+- 9-10: "Cooked Well Done" / Unemployable without major changes
 
-  const prompt = `Analyze this GitHub profile for a ${userContext}:
+Consider the user's context when making recommendations - tailor suggestions to their interests, experience level, and career goals.`;
 
-**Metrics:**
+  // Build context string from profile
+  const contextStr = `${userProfile.education?.replace(/_/g, ' ')} (${userProfile.age} years old)`;
+  const experienceStr = userProfile.experienceYears?.replace(/_/g, ' ') || 'Unknown';
+  
+  const prompt = `Analyze this GitHub profile for a ${contextStr}:
+
+**User Profile:**
+- Age: ${userProfile.age}
+- Education: ${userProfile.education?.replace(/_/g, ' ')}
+- Experience: ${experienceStr}
+- Current Status: ${userProfile.currentRole || 'Unknown'}
+- Career Goal: ${userProfile.careerGoal || 'Not specified'}
+- Technical Interests: ${userProfile.technicalInterests || 'Not specified'}
+${userProfile.hobbies ? `- Hobbies: ${userProfile.hobbies}` : ''}
+
+**GitHub Metrics:**
 - Total Repositories: ${githubData.totalRepos}
 - Total Commits (last year): ${githubData.totalCommits}
 - Pull Requests: ${githubData.totalPRs}
