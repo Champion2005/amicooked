@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { auth } from '@/config/firebase';
+import logo from '@/assets/amicooked_logo.png';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { fetchGitHubData } from '@/services/github';
@@ -93,9 +94,7 @@ export default function Dashboard() {
       <Card className="max-w-3xl w-full bg-[#161b22] border-[#30363d]">
         <CardHeader>
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center">
-              <Flame className="w-10 h-10 text-orange-500" />
-            </div>
+            <img src={logo} alt="AmICooked" className="w-16 h-16 rounded-full object-cover" />
           </div>
           <CardTitle className="text-3xl text-center text-white">
             Ready to Analyze!

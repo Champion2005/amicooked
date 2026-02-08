@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithPopup } from 'firebase/auth';
+import logo from '@/assets/amicooked_logo.png';
 import { auth, githubProvider } from '@/config/firebase';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -31,9 +32,7 @@ export default function Landing() {
       <nav className="border-b border-[#30363d] bg-[#020408]">
         <div className="max-w-full mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center">
-              <Flame className="w-5 h-5 text-orange-500" />
-            </div>
+            <img src={logo} alt="AmICooked" className="w-9 h-9 rounded-full object-cover" />
             <span className="text-xl font-bold">AmICooked?</span>
           </div>
           <Button
@@ -240,9 +239,7 @@ export default function Landing() {
       <footer className="border-t border-[#30363d] bg-[#020408]">
         <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center">
-              <Flame className="w-4 h-4 text-orange-500" />
-            </div>
+            <img src={logo} alt="AmICooked" className="w-7 h-7 rounded-full object-cover" />
             <span className="text-gray-500 text-sm">@AmICooked Copyright 2026</span>
           </div>
           <div className="text-gray-500 text-sm">

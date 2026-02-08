@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
+import logo from "@/assets/amicooked_logo.png";
 import {
   Card,
   CardHeader,
@@ -46,6 +47,7 @@ export default function Results() {
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [showRecommendations, setShowRecommendations] = useState(false);
   const profileMenuRef = useRef(null);
 
   // Close profile menu on outside click
@@ -149,9 +151,7 @@ export default function Results() {
         <header className="border-b border-[#30363d] bg-[#020408]">
           <div className="max-w-full mx-auto px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center">
-                <Flame className="w-6 h-6 text-orange-500" />
-              </div>
+              <img src={logo} alt="AmICooked" className="w-10 h-10 rounded-full object-cover" />
               <h1 className="text-2xl font-bold text-white">AmICooked?</h1>
             </div>
             <div className="flex-1 max-w-2xl mx-8 flex gap-2">
@@ -346,32 +346,43 @@ export default function Results() {
                 AI Summary
               </h2>
 
-              <Card className="bg-[#0d1117] pt-5 border-[#30363d]">
-                <CardContent className="grid grid-cols-[1fr_auto] gap-6 items-center">
+              <Card className="bg-[#0d1117] pt-5 border-[#30363d] overflow-hidden">
+                <CardContent className="grid grid-cols-[1fr_auto] gap-6 items-start">
                   <div className="min-w-0">
                     <p className="text-gray-300 mb-4 break-words">
                       {analysis.summary}
                     </p>
 
                     {analysis.recommendations && analysis.recommendations.length > 0 && (
-                      <div className="mb-4">
-                        <h3 className="text-sm font-semibold text-gray-400 mb-2">
-                          Recommended Actions:
-                        </h3>
-                        <ul className="space-y-2">
-                          {analysis.recommendations.map((rec, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-sm text-gray-300">
-                              <span className="text-[#58a6ff] mt-0.5">•</span>
-                              <span>{rec}</span>
-                            </li>
-                          ))}
-                        </ul>
+                      <div>
+                        <button
+                          onClick={() => setShowRecommendations((prev) => !prev)}
+                          className="flex items-center gap-1.5 text-sm font-semibold text-[#58a6ff] hover:text-[#79c0ff] transition-colors cursor-pointer mb-2"
+                        >
+                          {showRecommendations ? 'See less' : 'See more — Recommended Actions'}
+                          <ChevronDown
+                            className={`w-4 h-4 transition-transform duration-200 ${showRecommendations ? 'rotate-180' : ''}`}
+                          />
+                        </button>
+
+                        <div
+                          className={`transition-all duration-300 ease-in-out overflow-hidden ${showRecommendations ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
+                        >
+                          <ul className="space-y-2 pt-1 pb-2">
+                            {analysis.recommendations.map((rec, idx) => (
+                              <li key={idx} className="flex items-start gap-2 text-sm text-gray-300">
+                                <span className="text-[#58a6ff] mt-0.5">•</span>
+                                <span>{rec}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex items-center h-full">
-                    <div className="h-[90%] aspect-square rounded-full bg-[#1f2831]" />
+                  <div className="flex items-start">
+                    <div className="w-24 h-24 rounded-full bg-[#1f2831] shrink-0" />
                   </div>
                 </CardContent>
               </Card>
@@ -720,9 +731,7 @@ export default function Results() {
         <footer className="border-t border-[#30363d] bg-[#161b22] mt-12">
           <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center">
-                <Flame className="w-5 h-5 text-orange-500" />
-              </div>
+              <img src={logo} alt="AmICooked" className="w-8 h-8 rounded-full object-cover" />
               <span className="text-gray-400 text-sm">
                 @AmICooked Copyright 2026
               </span>

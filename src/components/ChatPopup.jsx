@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { auth } from '@/config/firebase';
+import logo from '@/assets/amicooked_logo.png';
 import { callOpenRouter } from '@/services/openrouter';
 import { createChat, addMessage, getUserChats } from '@/services/chat';
 import { 
@@ -249,9 +250,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
               <ChevronLeft className="w-5 h-5" />
             </button>
           )}
-          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center">
-            <Flame className="w-6 h-6 text-orange-500" />
-          </div>
+          <img src={logo} alt="AmICooked" className="w-10 h-10 rounded-full object-cover" />
           <div>
             <h1 className="text-xl font-bold text-white">AI Chat</h1>
             <p className="text-xs text-gray-400">Ask anything about your profile</p>

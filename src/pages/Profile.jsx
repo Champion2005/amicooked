@@ -4,6 +4,7 @@ import { auth } from '@/config/firebase';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { getUserProfile, saveUserProfile } from '@/services/userProfile';
+import logo from '@/assets/amicooked_logo.png';
 import { Loader2, User, ArrowLeft } from 'lucide-react';
 
 // Convert education level from lowercase underscore format to proper casing
@@ -143,9 +144,7 @@ export default function Profile() {
       <Card className="max-w-3xl w-full bg-[#161b22] border-[#30363d]">
         <CardHeader>
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center">
-              <User className="w-10 h-10 text-[#58a6ff]" />
-            </div>
+            <img src={logo} alt="AmICooked" className="w-16 h-16 rounded-full object-cover" />
           </div>
           <CardTitle className="text-3xl text-center text-white">
             {isEditing ? "Edit Your Profile" : "Complete Your Profile"}
