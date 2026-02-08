@@ -599,7 +599,8 @@ export default function Results() {
                         Frontend:
                       </h3>
                       <div className="space-y-3">
-                        {githubData.languages.slice(0, 4).map((lang, idx) => (
+                        {Array.isArray(githubData.frontend)
+                        ? githubData.frontend.slice(0, 4).map((lang, idx) => (
                           <div key={idx} className="flex items-center gap-3">
                             <div
                               className={`w-2 h-2 rounded-full ${getStatusColor(
@@ -611,7 +612,9 @@ export default function Results() {
                               – {getLanguageStatus(idx)}
                             </span>
                           </div>
-                        ))}
+                        ))
+                        : <p className="text-gray-400 text-sm">No language data available</p>
+                      }
                       </div>
                     </div>
                     <div>
@@ -619,7 +622,8 @@ export default function Results() {
                         Backend:
                       </h3>
                       <div className="space-y-3">
-                        {githubData.languages.slice(0, 4).map(
+                        {Array.isArray(githubData.backend)
+                        ? githubData.backend.slice(0, 4).map(
                           (lang, idx) => (
                             <div key={idx} className="flex items-center gap-3">
                               <div
@@ -633,7 +637,9 @@ export default function Results() {
                               </span>
                             </div>
                           )
-                        )}
+                        )
+                        : <p className="text-gray-400 text-sm">No language data available</p>
+                      }
                       </div>
                     </div>
                   </div>

@@ -104,18 +104,6 @@ function processGitHubData(viewer) {
   }, 0);
 
   // Extract languages
-  const languageCounts = {};
-  repos.forEach(repo => {
-    if (repo.primaryLanguage) {
-      const lang = repo.primaryLanguage.name;
-      languageCounts[lang] = (languageCounts[lang] || 0) + 1;
-    }
-  });
-
-  const topLanguages = Object.entries(languageCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([lang]) => lang);
 
   // Define frontend and backend language sets
   const frontendSet = new Set([
@@ -125,8 +113,37 @@ function processGitHubData(viewer) {
     'Python', 'Java', 'C#', 'C++', 'C', 'Go', 'Rust', 'Ruby', 'PHP', 'Node.js', 'Express', 'Kotlin', 'Scala', 'Swift', 'Django', 'Flask', 'Spring', 'Laravel', 'ASP.NET', 'Perl', 'Elixir', 'Haskell', 'Objective-C', 'SQL', 'GraphQL'
   ]);
 
-  const frontendLanguages = topLanguages.filter(lang => frontendSet.has(lang));
-  const backendLanguages = topLanguages.filter(lang => backendSet.has(lang));
+  const languageCounts = {};
+  const frontendLanguages = {};
+  const backendLanguages = {};
+  repos.forEach(repo => {
+    if (repo.primaryLanguage) {
+      const lang = repo.primaryLanguage.name;
+      if (frontendSet.has(lang)) {
+        frontendLanguages[lang] = (frontendLanguages[lang] || 0) + 1;
+      }
+      else if(backendSet.has(lang)) {
+        backendLanguages[lang] = (backendLanguages[lang] || 0) + 1;
+      }
+
+      languageCounts[lang] = (languageCounts[lang] || 0) + 1;
+    }
+  });
+
+  const topLanguages = Object.entries(languageCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([lang]) => lang);
+
+  const topfrontend = Object.entries(frontendLanguages)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([lang]) => lang);
+
+  const topbackend = Object.entries(backendLanguages)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([lang]) => lang);
 
   // Calculate current streak
   const contributionDays = viewer.contributionsCollection.contributionCalendar.weeks
@@ -162,8 +179,8 @@ function processGitHubData(viewer) {
     totalStars,
     totalForks,
     languages: topLanguages,
-    frontendLanguages,
-    backendLanguages,
+    frontend: topfrontend,
+    backend: topbackend,
     streak: currentStreak,
     totalContributions: viewer.contributionsCollection.contributionCalendar.totalContributions,
     contributionCalendar: viewer.contributionsCollection.contributionCalendar
