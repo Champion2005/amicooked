@@ -133,7 +133,7 @@ export default function Results() {
           </div>
         </header>
 
-        <div className="max-w-8xlf mx-auto px-10 py-8">
+        <div className="max-w-7xlf mx-auto px-10 py-8">
           <div className="grid grid-cols-12 gap-6">
             {/* Left Sidebar - Profile */}
             <div className="col-span-3">
@@ -217,7 +217,7 @@ export default function Results() {
             </div>
 
             {/* Main Content */}
-            <div className="col-span-9 pr-8 space-y-6">
+            <div className="col-span-9 space-y-6">
               <h2 className="text-lg font-semibold text-white mb-2">
                 AI Summary
               </h2>
@@ -238,15 +238,6 @@ export default function Results() {
                           {analysis.levelName}
                         </span>
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-400">
-                          Percentile:
-                        </span>
-                        <span className="text-sm text-white">
-                          {Math.max(10, 100 - analysis.cookedLevel * 10)}st
-                        </span>
-                      </div>
                     </div>
                   </div>
 
@@ -256,43 +247,43 @@ export default function Results() {
                 </CardContent>
               </Card>
 
-              {/* Recommended Projects */}
-              <Card className="bg-[#161b22] border-[#30363d]">
-                <CardHeader>
-                  <CardTitle className="text-white">
-                    Recommended Projects
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
+              <h2 className="text-lg font-semibold text-white mb-2">
+                Recommended Projects
+              </h2>
+
+              <Card className="bg-[#0d1117] border-none">
+                <CardContent className="p-0 ">
+                  <div className="grid grid-cols-4 gap-4">
                     {recommendedProjects.slice(0, 4).map((rec, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-[#0d1117] p-4 rounded-lg border border-[#30363d]"
-                      >
-                        <h3 className="font-semibold text-white mb-2">
-                          {rec.name}
-                        </h3>
-                        <div className="flex gap-2 flex-wrap">
-                          <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-green-500">
-                            ● {rec.skill1}
-                          </span>
-                          <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-blue-500">
-                            ● {rec.skill2}
-                          </span>
-                          <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-yellow-500">
+                        <div
+                            key={idx}
+                            className="bg-[#0d1117] p-4 rounded-lg border border-[#30363d]"
+                        >
+                          <h3 className="font-semibold text-white mb-2">
+                            {rec.name}
+                          </h3>
+
+                          <div className="flex flex-wrap">
+                            <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-green-500">
+                              ● {rec.skill1}
+                            </span>
+                            <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-blue-500">
+                              ● {rec.skill2}
+                            </span>
+                            <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-yellow-500">
                             ● {rec.skill3}
-                          </span>
+                            </span>
+                          </div>
                         </div>
-                      </div>
                     ))}
                   </div>
+
                   <p className="text-xs text-gray-500 mt-4">
-                    AI Notes: {analysis.recommendations[0]?.substring(0, 100)}
-                    ...
+                    AI Notes: {analysis.recommendations[0]}
                   </p>
                 </CardContent>
               </Card>
+
 
               {/* Activity Heatmap */}
               <Card className="bg-[#161b22] border-[#30363d]">
@@ -498,7 +489,7 @@ export default function Results() {
               </span>
             </div>
             <div className="text-gray-400 text-sm">
-              Katarina Mantey, Aditya Patel, Norika Upadhyay
+              Katarina Mantay, Aditya Patel, Norika Upadhyay
             </div>
           </div>
         </footer>
