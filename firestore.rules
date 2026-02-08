@@ -5,6 +5,11 @@ service cloud.firestore {
     // User profiles - users can read/write their own profile
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Chat history - users can read/write their own chats
+      match /chats/{chatId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
     
     // Analysis results - users can read/write their own results
