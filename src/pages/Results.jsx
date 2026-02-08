@@ -14,14 +14,13 @@ export default function Results() {
   const [chatQuery, setChatQuery] = useState('');
   const [headerInput, setHeaderInput] = useState('');
 
+  const { githubData, analysis, userProfile, recommendedProjects } = location.state || {};
   useEffect(() => {
     if (!githubData || !analysis) {
       navigate('/dashboard');
     }
   }, [githubData, analysis, navigate]);
-  const { githubData, analysis, userProfile, recommendedProjects } = location.state || {};
 
-  if (!githubData || !analysis) {
   if (!githubData || !analysis || !recommendedProjects) {
     navigate('/dashboard');
     return null;
@@ -407,5 +406,4 @@ export default function Results() {
       </footer>
     </div>
   );
-}
 }
