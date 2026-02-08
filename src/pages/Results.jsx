@@ -382,7 +382,27 @@ export default function Results() {
                   </div>
 
                   <div className="flex items-start">
-                    <div className="w-24 h-24 rounded-full bg-[#1f2831] shrink-0" />
+                    <div className="relative w-24 h-24 shrink-0">
+                      {/* Progress Ring */}
+                      <div
+                          className="absolute inset-0 rounded-full"
+                          style={{
+                            background: `conic-gradient(
+                              #ef4444 ${analysis.cookedLevel * 36}deg,
+                              #1f2831 0deg
+                            )`,
+
+                          }}
+                      />
+
+                      {/* Inner Circle */}
+                      <div className="absolute inset-2 bg-[#0d1117] rounded-full flex flex-col items-center justify-center">
+                          <span className="text-[28px] font-semibold text-white">
+                            {analysis.cookedLevel}
+                          </span>
+                      </div>
+                    </div>
+
                   </div>
                 </CardContent>
               </Card>
@@ -500,8 +520,9 @@ export default function Results() {
                                                   title={`${day.contributionCount} contributions on ${day.date}`}
                                                   className={`w-3 h-3 rounded-[2px] ${getIntensity(
                                                       day.contributionCount
-                                                  )}`}
+                                                  )} transition-transform duration-150 hover:scale-125`}
                                               />
+
                                           );
                                         })}
                                       </div>
@@ -538,107 +559,133 @@ export default function Results() {
 
                   </div>
 
-
-
                 </CardContent>
               </Card>
 
-              {/* Languages */}
-              <Card className="bg-[#161b22] border-[#30363d]">
-                <CardHeader>
-                  <CardTitle className="text-white">Languages</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-8">
-                    <div>
-                      <h3 className="text-lg font-semibold text-white mb-4">
-                        Frontend:
-                      </h3>
-                      <div className="space-y-3">
-                        {githubData.languages.slice(0, 4).map((lang, idx) => (
-                          <div key={idx} className="flex items-center gap-3">
-                            <div
-                              className={`w-2 h-2 rounded-full ${getStatusColor(
-                                getLanguageStatus(idx)
-                              )}`}
-                            />
-                            <span className="text-gray-300">{lang}</span>
-                            <span className="text-gray-500 ml-auto">
-                              – {getLanguageStatus(idx)}
-                            </span>
+              <div className="flex flex-col md:flex-row gap-6">
+
+                {/* Languages */}
+                <div className="flex-1">
+                  <h2 className="text-lg font-semibold pb-2 text-white mb-1">
+                    Languages
+                  </h2>
+
+                  <Card className="bg-[#161b22] border-[#30363d]">
+                    <CardContent className="py-3">
+
+                      <div className="grid grid-cols-2 gap-8">
+                        <div>
+                          <h3 className="text-sm font-semibold text-white mb-3">
+                            Frontend:
+                          </h3>
+
+                          <div className="space-y-2">
+                            {githubData.languages.slice(0, 4).map((lang, idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-sm">
+                                  <div
+                                      className={`w-2 h-2 rounded-full ${getStatusColor(
+                                          getLanguageStatus(idx)
+                                      )}`}
+                                  />
+
+                                  <span className="text-gray-300">
+                    {lang} –{" "}
+                                    <span className="text-gray-500">
+                      {getLanguageStatus(idx)}
+                    </span>
+                  </span>
+                                </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-white mb-4">
-                        Backend:
-                      </h3>
-                      <div className="space-y-3">
-                        {["Node.js", "Java", "Python", "C++"].map(
-                          (lang, idx) => (
-                            <div key={idx} className="flex items-center gap-3">
-                              <div
-                                className={`w-2 h-2 rounded-full ${getStatusColor(
-                                  getLanguageStatus(idx + 1)
-                                )}`}
-                              />
-                              <span className="text-gray-300">{lang}</span>
-                              <span className="text-gray-500 ml-auto">
-                                – {getLanguageStatus(idx + 1)}
-                              </span>
-                            </div>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                        </div>
 
-                  {analysis.languageInsight && (
-                    <p className="text-xs text-gray-500 mt-4">
-                      AI Notes: {analysis.languageInsight}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
+                        <div>
+                          <h3 className="text-sm font-semibold text-white mb-3">
+                            Backend:
+                          </h3>
 
-              {/* Employability */}
-              <Card className="bg-[#161b22] border-[#30363d]">
-                <CardHeader>
-                  <CardTitle className="text-white">Employability</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-3">
-                    <p className="text-sm text-gray-400 mb-2">
-                      Paste in Job Description:
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Based on your GitHub statistics, we will tell you if
-                      you're COOKED or COOKING
-                    </p>
-                  </div>
-                  <textarea
-                    placeholder="Enter Text Here..."
-                    className="w-full h-32 px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
-                    value={jobDescription}
-                    onChange={(e) => setJobDescription(e.target.value)}
-                  />
-                  <button
-                    onClick={() => {
-                      if (jobDescription.trim()) {
-                        const query = `I want you to evaluate how well my GitHub profile fits this job description. Analyze my strengths and weaknesses relative to the requirements, and provide specific actionable goals I can work on to improve my GitHub and increase my chances of landing this job.\n\nJob Description:\n${jobDescription.trim()}`;
-                        setChatQuery(query);
-                        setChatOpen(true);
-                      }
-                    }}
-                    disabled={!jobDescription.trim()}
-                    className="w-full mt-4 px-4 py-2.5 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm transition-colors"
-                  >
-                    <Target className="w-4 h-4" />
-                    Check Employability
-                  </button>
-                </CardContent>
-              </Card>
+                          <div className="space-y-2">
+                            {["Node.js", "Java", "Python", "C++"].map((lang, idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-sm">
+                                  <div
+                                      className={`w-2 h-2 rounded-full ${getStatusColor(
+                                          getLanguageStatus(idx + 1)
+                                      )}`}
+                                  />
+
+                                  <span className="text-gray-300">
+                    {lang} –{" "}
+                                    <span className="text-gray-500">
+                      {getLanguageStatus(idx + 1)}
+                    </span>
+                  </span>
+                                </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {analysis.languageInsight && (
+                          <>
+                            <div className="border-t border-[#30363d] my-3" />
+
+                            <p className="text-xs text-gray-500">
+                              AI Notes: {analysis.languageInsight}
+                            </p>
+                          </>
+                      )}
+
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Employability */}
+                <div className="flex-1">
+                  <h2 className="text-lg font-semibold pb-2 text-white mb-1">
+                    Employability
+                  </h2>
+
+                  <Card className="bg-[#161b22] pb-3 border-[#30363d]">
+                    <CardContent className="py-3">
+
+                      <div className="mb-3">
+                        <p className="text-sm text-gray-400 mb-2">
+                          Paste in Job Description:
+                        </p>
+
+                        <p className="text-xs text-gray-500">
+                          Based on your GitHub statistics, we will tell you if you're COOKED or COOKING
+                        </p>
+                      </div>
+
+                      <textarea
+                          placeholder="Enter Text Here..."
+                          className="w-full h-24 px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
+                          value={jobDescription}
+                          onChange={(e) => setJobDescription(e.target.value)}
+                      />
+
+                      <button
+                          onClick={() => {
+                            if (jobDescription.trim()) {
+                              const query = `I want you to evaluate how well my GitHub profile fits this job description. Analyze my strengths and weaknesses relative to the requirements, and provide specific actionable goals I can work on to improve my GitHub and increase my chances of landing this job.\n\nJob Description:\n${jobDescription.trim()}`;
+                              setChatQuery(query);
+                              setChatOpen(true);
+                            }
+                          }}
+                          disabled={!jobDescription.trim()}
+                          className="w-full mt-4 px-4 py-2.5 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm transition-colors"
+                      >
+                        <Target className="w-4 h-4" />
+                        Check Employability
+                      </button>
+
+                    </CardContent>
+                  </Card>
+                </div>
+
+              </div>
+
             </div>
           </div>
         </div>
