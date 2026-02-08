@@ -77,13 +77,13 @@ export async function callOpenRouter(prompt, systemPrompt = '') {
 export async function analyzeCookedLevel(githubData, userProfile) {
   const systemPrompt = `You are an expert technical recruiter analyzing GitHub profiles to determine employability. 
 Your job is to be brutally honest and provide actionable feedback. The "Cooked Level" scale is:
-- Low Score (0-2): "Cooking" / Ahead of the curve
-- 3-4: "Toasted" / Slightly behind
+- 9-10: "Cooking" / Ahead of the curve
+- 7-8: "Toasted" / Slightly behind
 - 5-6: "Cooked" / Concerning gaps
-- 7-8: "Well-Done" / Significant issues
-- 9-10: "Burnt" / Unemployable without major changes
+- 3-4: "Well-Done" / Significant issues
+- 1-2: "Burnt" / Unemployable without major changes
 
-Consider the user's context when making recommendations - tailor suggestions to their interests, experience level, and career goals.`;
+Higher scores are better. Consider the user's context when making recommendations - tailor suggestions to their interests, experience level, and career goals.`;
 
   // Build context string from profile
   const contextStr = `${userProfile.education?.replace(/_/g, ' ')} (${userProfile.age} years old)`;
