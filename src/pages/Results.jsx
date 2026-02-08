@@ -267,7 +267,7 @@ export default function Results() {
                     <img
                       src={githubData.avatarUrl}
                       alt={githubData.username}
-                      className="w-78 h-78 rounded-full mb-4 border-4 border-[#30363d]"
+                      className="w-78 h-78 rounded-full mb-4 border-2 border-[#30363d]"
                     />
                     <h2 className="text-2xl text-left font-bold text-white mb-1">
                       {githubData.name || githubData.username}
@@ -409,7 +409,7 @@ export default function Results() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-[#0d1117] pt-0 border-[#30363d] w-fit">
+              <Card className="bg-[#0d1117] pt-0 border-[#30363d] w-full">
                 <CardContent className="p-3 grid grid-cols-[auto_auto] gap-6 items-start">
 
                   {/* LEFT — HEATMAP */}
@@ -516,11 +516,8 @@ export default function Results() {
 
                   </div>
 
-
                 </CardContent>
               </Card>
-
-
 
               {/* Languages */}
               <Card className="bg-[#161b22] border-[#30363d]">
