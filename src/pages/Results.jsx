@@ -99,16 +99,22 @@ export default function Results() {
   };
 
   const getLanguageStatus = (lang) => {
-    const statuses = ["Seasoned", "Warming Up", "Cooked"];
     if (githubData.frontend[lang] >= 5) return "Seasoned";
     if (githubData.frontend[lang] >= 3) return "Warming Up";
-    return "Cooked";
+    if (githubData.frontend[lang] > 0) return "Cooked";
+
+    if (githubData.backend[lang] >= 5) return "Seasoned";
+    if (githubData.backend[lang] >= 3) return "Warming Up";
+    if (githubData.backend[lang] > 0) return "Cooked";
+
+    return "Cooked"
   };
 
   const getStatusColor = (status) => {
     if (status === "Seasoned") return "bg-yellow-500";
     if (status === "Warming Up") return "bg-orange-500";
     if (status === "Cooked") return "bg-red-500";
+    return "bg-gray-500";
   };
 
   // Generate contribution heatmap data from GitHub
