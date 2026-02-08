@@ -53,10 +53,10 @@ export async function analyzeCookedLevel(githubData, userProfile) {
   const systemPrompt = `You are an expert technical recruiter analyzing GitHub profiles to determine employability. 
 Your job is to be brutally honest and provide actionable feedback. The "Cooked Level" scale is:
 - Low Score (0-2): "Cooking" / Ahead of the curve
-- 3-4: "Cooked Rare" / Slightly behind
-- 5-6: "Cooked Medium Rare" / Concerning gaps
-- 7-8: "Cooked Medium Well" / Significant issues
-- 9-10: "Cooked Well Done" / Unemployable without major changes
+- 3-4: "Toasted" / Slightly behind
+- 5-6: "Cooked" / Concerning gaps
+- 7-8: "Well-Done" / Significant issues
+- 9-10: "Burnt" / Unemployable without major changes
 
 Consider the user's context when making recommendations - tailor suggestions to their interests, experience level, and career goals.`;
 
@@ -89,7 +89,7 @@ ${userProfile.hobbies ? `- Hobbies: ${userProfile.hobbies}` : ''}
 Provide your response in this exact JSON format:
 {
   "cookedLevel": <number 0-10>,
-  "levelName": "<e.g., Cooked Medium Rare>",
+  "levelName": "<e.g., Toasted>",
   "summary": "<1-2 sentence honest assessment>",
   "recommendations": [
     "<specific actionable task 1>",
@@ -116,22 +116,39 @@ Provide your response in this exact JSON format:
  * Get recommended projects from AI based on user profile and GitHub data
  * @param {Object} githubData - User's GitHub metrics
  * @param {Object} userProfile - User's profile data
- * @returns {Promise<Array>} - Array of project objects [{ name, skill1, skill2, skill3 }]
+ * @returns {Promise<Array>} - Array of project objects with detailed info
  */
 export async function RecommendedProjects(githubData, userProfile) {
   const systemPrompt = `You are an expert technical mentor. 
   Suggest four simple project ideas for the user based on their education level, technical interests, years of experience, career goal, current status, and, if relevant, hobbies and interests. 
-  Each project should use skills or technologies the user has little or no experience with, to help them grow. 
-  The skills should be only the name of the tool/framework they would learn by doing the project (e.g., "React", "Node.js", "Docker").
+  Each project should use skills or technologies the user has little or no experience with, to help them grow.
+  For each project, provide:
+  - A short name
+  - Three key skills/tags (just the tool/framework name, e.g. "React", "Docker")
+  - A 2-3 sentence overview of what the project is and what the user will learn
+  - A 1-2 sentence explanation of how it aligns with the user's interests and goals
+  - A list of 4-6 suggested technologies/tools with a short description of what each one is used for in the project
+  
   Return your answer as a JSON array like this:
 [
-  { "name": "<project name>", "skill1": "<skill1>", "skill2": "<skill2>", "skill3": "<skill3>" },
+  {
+    "name": "<project name>",
+    "skill1": "<skill1>",
+    "skill2": "<skill2>",
+    "skill3": "<skill3>",
+    "overview": "<2-3 sentence overview of the project and what the user will learn>",
+    "alignment": "<1-2 sentence explanation of how this aligns with user's interests/goals>",
+    "suggestedStack": [
+      { "name": "<technology name>", "description": "<what it's used for in this project>" },
+      ...
+    ]
+  },
   ...
 ]`;
 
   const contextStr = `${userProfile.education?.replace(/_/g, ' ')} (${userProfile.age} years old)`;
   const experienceStr = userProfile.experienceYears?.replace(/_/g, ' ') || 'Unknown';
-  const prompt = `User Profile:\n- Age: ${userProfile.age}\n- Education: ${userProfile.education?.replace(/_/g, ' ')}\n- Experience: ${experienceStr}\n- Current Status: ${userProfile.currentRole || 'Unknown'}\n- Career Goal: ${userProfile.careerGoal || 'Not specified'}\n- Technical Interests: ${userProfile.technicalInterests || 'Not specified'}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ''}\n\nGitHub Skills:\n- Top Languages: ${githubData.languages?.join(', ') || 'Unknown'}\n\nSuggest four simple projects using skills the user has little or no experience with.`;
+  const prompt = `User Profile:\n- Age: ${userProfile.age}\n- Education: ${userProfile.education?.replace(/_/g, ' ')}\n- Experience: ${experienceStr}\n- Current Status: ${userProfile.currentRole || 'Unknown'}\n- Career Goal: ${userProfile.careerGoal || 'Not specified'}\n- Technical Interests: ${userProfile.technicalInterests || 'Not specified'}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ''}\n\nGitHub Skills:\n- Top Languages: ${githubData.languages?.join(', ') || 'Unknown'}\n\nSuggest four simple projects using skills the user has little or no experience with. Include detailed info for each project.`;
 
   try {
     const response = await callOpenRouter(prompt, systemPrompt);
