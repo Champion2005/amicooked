@@ -93,12 +93,8 @@ export default function Profile() {
 
     try {
       setLoading(true);
-      // Format education level before saving
-      const dataToSave = {
-        ...formData,
-        education: formatEducationLevel(formData.education)
-      };
-      await saveUserProfile(user.uid, dataToSave);
+      // Save raw form data (keep education as the select value e.g. "high_school")
+      await saveUserProfile(user.uid, formData);
       alert(isEditing ? 'Profile updated successfully!' : 'Profile saved successfully!');
       
       // If we have results data, pass it back when navigating to results
@@ -106,7 +102,7 @@ export default function Profile() {
         navigate(returnTo, { 
           state: { 
             ...resultsData, 
-            userProfile: { ...formData, education: formatEducationLevel(formData.education) } // Update with formatted education
+            userProfile: formData
           } 
         });
       } else {
@@ -143,11 +139,11 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-[#0d1117] flex items-center justify-center p-4">
       <Card className="max-w-3xl w-full bg-[#161b22] border-[#30363d]">
-        <CardHeader>
+        <CardHeader className="px-4 sm:px-6">
           <div className="flex justify-center mb-4">
-            <img src={logo} alt="AmICooked" className="w-16 h-16 rounded-full object-cover" />
+            <img src={logo} alt="AmICooked" className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover" />
           </div>
-          <CardTitle className="text-3xl text-center text-white">
+          <CardTitle className="text-2xl sm:text-3xl text-center text-white">
             {isEditing ? "Edit Your Profile" : "Complete Your Profile"}
           </CardTitle>
           <CardDescription className="text-center text-gray-400">
@@ -157,7 +153,7 @@ export default function Profile() {
             }
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 px-4 sm:px-6">
           {/* Profile Form */}
           <div className="space-y-4">
             {/* Age */}
@@ -326,13 +322,13 @@ export default function Profile() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             {isEditing && (
               <Button 
                 onClick={handleCancel}
                 variant="outline"
                 disabled={loading}
-                className="flex-1 h-12 text-lg border-[#30363d] text-gray-400 hover:text-white hover:bg-[#1c2128]"
+                className="flex-1 h-11 sm:h-12 text-base sm:text-lg border-[#30363d] text-gray-400 hover:text-white hover:bg-[#1c2128]"
                 size="lg"
               >
                 <ArrowLeft className="mr-2 h-5 w-5" />
@@ -342,7 +338,7 @@ export default function Profile() {
             <Button 
               onClick={handleSaveProfile}
               disabled={loading || !formData.age || !formData.education || !formData.technicalSkills || !formData.experienceYears || !formData.careerGoal || !formData.currentRole}
-              className={`h-12 text-lg bg-[#58a6ff] hover:bg-[#4a9aee] text-white ${!isEditing ? 'w-full' : 'flex-1'}`}
+              className={`h-11 sm:h-12 text-base sm:text-lg bg-[#58a6ff] hover:bg-[#4a9aee] text-white ${!isEditing ? 'w-full' : 'flex-1'}`}
               size="lg"
             >
               {loading ? (

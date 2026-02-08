@@ -35,3 +35,33 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom scrollbar — thin, dark, blends with the UI */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #30363d transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #30363d;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #484f58;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
