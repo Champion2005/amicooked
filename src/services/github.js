@@ -96,7 +96,7 @@ export async function fetchGitHubData(accessToken) {
  */
 function processGitHubData(viewer) {
   const repos = viewer.repositories.nodes;
-  
+
   // Calculate total commits across all repos
   const totalCommitsInRepos = repos.reduce((sum, repo) => {
     const commits = repo.defaultBranchRef?.target?.history?.totalCount || 0;
@@ -114,8 +114,19 @@ function processGitHubData(viewer) {
 
   const topLanguages = Object.entries(languageCounts)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
+    .slice(0, 10)
     .map(([lang]) => lang);
+
+  // Define frontend and backend language sets
+  const frontendSet = new Set([
+    'JavaScript', 'TypeScript', 'HTML', 'CSS', 'Vue', 'React', 'Angular', 'Svelte', 'Next.js', 'Nuxt.js', 'Elm', 'Sass', 'Less', 'Redux', 'Tailwind', 'Bootstrap', 'jQuery'
+  ]);
+  const backendSet = new Set([
+    'Python', 'Java', 'C#', 'C++', 'C', 'Go', 'Rust', 'Ruby', 'PHP', 'Node.js', 'Express', 'Kotlin', 'Scala', 'Swift', 'Django', 'Flask', 'Spring', 'Laravel', 'ASP.NET', 'Perl', 'Elixir', 'Haskell', 'Objective-C', 'SQL', 'GraphQL'
+  ]);
+
+  const frontendLanguages = topLanguages.filter(lang => frontendSet.has(lang));
+  const backendLanguages = topLanguages.filter(lang => backendSet.has(lang));
 
   // Calculate current streak
   const contributionDays = viewer.contributionsCollection.contributionCalendar.weeks
@@ -151,6 +162,8 @@ function processGitHubData(viewer) {
     totalStars,
     totalForks,
     languages: topLanguages,
+    frontendLanguages,
+    backendLanguages,
     streak: currentStreak,
     totalContributions: viewer.contributionsCollection.contributionCalendar.totalContributions,
     contributionCalendar: viewer.contributionsCollection.contributionCalendar

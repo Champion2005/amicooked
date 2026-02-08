@@ -619,7 +619,7 @@ export default function Results() {
                         Backend:
                       </h3>
                       <div className="space-y-3">
-                        {["Node.js", "Java", "Python", "C++"].map(
+                        {githubData.languages.slice(0, 4).map(
                           (lang, idx) => (
                             <div key={idx} className="flex items-center gap-3">
                               <div
