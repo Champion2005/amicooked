@@ -7,6 +7,31 @@ if (!OPENROUTER_API_KEY) {
 }
 
 /**
+ * Attempt to parse JSON from an AI response, with progressive sanitization
+ */
+function safeParseJSON(raw) {
+  // Attempt 1: parse as-is
+  try { return JSON.parse(raw); } catch {}
+
+  // Attempt 2: fix trailing commas
+  let cleaned = raw.replace(/,\s*([\]}])/g, '$1');
+  try { return JSON.parse(cleaned); } catch {}
+
+  // Attempt 3: remove control characters that break JSON strings
+  cleaned = cleaned.replace(/[\x00-\x1F\x7F]/g, (ch) =>
+    ch === '\n' || ch === '\r' || ch === '\t' ? ch : ''
+  );
+  try { return JSON.parse(cleaned); } catch {}
+
+  // Attempt 4: use a regex to extract well-formed key-value pairs
+  // Replace any unescaped backslashes that aren't valid JSON escapes
+  cleaned = cleaned.replace(/\\(?!["\\bfnrtu/])/g, '\\\\');
+  try { return JSON.parse(cleaned); } catch {}
+
+  return null;
+}
+
+/**
  * Call OpenRouter API with auto model selection
  * @param {string} prompt - The prompt to send to the AI
  * @param {string} systemPrompt - Optional system prompt for context
@@ -72,7 +97,8 @@ Consider the user's context when making recommendations - tailor suggestions to 
 - Experience: ${experienceStr}
 - Current Status: ${userProfile.currentRole || 'Unknown'}
 - Career Goal: ${userProfile.careerGoal || 'Not specified'}
-- Technical Interests: ${userProfile.technicalInterests || 'Not specified'}
+- Technical Skills: ${userProfile.technicalSkills || 'Not specified'}
+${userProfile.technicalInterests ? `- Technical Interests: ${userProfile.technicalInterests}` : ''}
 ${userProfile.hobbies ? `- Hobbies: ${userProfile.hobbies}` : ''}
 
 **GitHub Metrics:**
@@ -106,7 +132,8 @@ Provide your response in this exact JSON format:
     // Parse JSON from response (handle potential markdown code blocks)
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      const result = safeParseJSON(jsonMatch[0]);
+      if (result) return result;
     }
     throw new Error('Could not parse AI response');
   } catch (error) {
@@ -151,14 +178,15 @@ export async function RecommendedProjects(githubData, userProfile) {
 
   const contextStr = `${userProfile.education?.replace(/_/g, ' ')} (${userProfile.age} years old)`;
   const experienceStr = userProfile.experienceYears?.replace(/_/g, ' ') || 'Unknown';
-  const prompt = `User Profile:\n- Age: ${userProfile.age}\n- Education: ${userProfile.education?.replace(/_/g, ' ')}\n- Experience: ${experienceStr}\n- Current Status: ${userProfile.currentRole || 'Unknown'}\n- Career Goal: ${userProfile.careerGoal || 'Not specified'}\n- Technical Interests: ${userProfile.technicalInterests || 'Not specified'}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ''}\n\nGitHub Skills:\n- Top Languages: ${githubData.languages?.join(', ') || 'Unknown'}\n\nSuggest four simple projects using skills the user has little or no experience with. Include detailed info for each project.`;
+  const prompt = `User Profile:\n- Age: ${userProfile.age}\n- Education: ${userProfile.education?.replace(/_/g, ' ')}\n- Experience: ${experienceStr}\n- Current Status: ${userProfile.currentRole || 'Unknown'}\n- Career Goal: ${userProfile.careerGoal || 'Not specified'}\n- Technical Skills: ${userProfile.technicalSkills || 'Not specified'}${userProfile.technicalInterests ? `\n- Technical Interests: ${userProfile.technicalInterests}` : ''}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ''}\n\nGitHub Skills:\n- Top Languages: ${githubData.languages?.join(', ') || 'Unknown'}\n\nSuggest four simple projects using skills the user has little or no experience with. Include detailed info for each project.`;
 
   try {
     const response = await callOpenRouter(prompt, systemPrompt);
     // Try to parse JSON array from response
-    const jsonMatch = response.match(/\[.*\]/s);
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      const result = safeParseJSON(jsonMatch[0]);
+      if (result) return result;
     }
     throw new Error('Could not parse AI project recommendations');
   } catch (error) {
