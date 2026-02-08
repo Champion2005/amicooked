@@ -14,8 +14,29 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [userProfile, setUserProfile] = useState(null);
+  const [status, setStatus] = useState('');
+  const [tipIndex, setTipIndex] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const tips = [
+    "💡 Tip: Use the AI chat on your results page to ask anything about your profile.",
+    "💡 Tip: Paste a job description into the Employability section to see how you stack up.",
+    "💡 Tip: Click any recommended project card to see a full breakdown and chat with AI about it.",
+    "💡 Tip: You can reanalyze anytime from the profile menu to track your progress.",
+    "💡 Tip: Consistency matters more than volume — even small daily commits add up.",
+    "💡 Tip: A strong README on your repos can significantly boost your profile impression.",
+  ];
+
+  // Rotate tips while loading
+  useEffect(() => {
+    if (!loading) return;
+    setTipIndex(Math.floor(Math.random() * tips.length));
+    const interval = setInterval(() => {
+      setTipIndex(prev => (prev + 1) % tips.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   // If coming from reanalyze, skip the cached results check
   const forceReanalyze = location.state?.reanalyze === true;
@@ -71,15 +92,43 @@ export default function Dashboard() {
         throw new Error('No GitHub token found');
       }
 
-      const data = await fetchGitHubData(token);
-      const analysis = await analyzeCookedLevel(data, userProfile);
-      const recommendedProjects = await RecommendedProjects(data, userProfile);
+      setStatus('Connecting to GitHub...');
+      await new Promise(r => setTimeout(r, 600));
 
-      // Save results to Firestore
+      setStatus('Pulling your repositories and commit history...');
+      const data = await fetchGitHubData(token);
+
+      setStatus('Crunching your contribution data...');
+      await new Promise(r => setTimeout(r, 400));
+
+      setStatus('AI is evaluating your profile — this may take a moment...');
+      const analysis = await analyzeCookedLevel(data, userProfile);
+
+      setStatus('Generating personalized project recommendations...');
+      let recommendedProjects = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          recommendedProjects = await RecommendedProjects(data, userProfile);
+          break;
+        } catch (err) {
+          console.warn(`Project recommendations attempt ${attempt}/3 failed:`, err.message);
+          if (attempt < 3) {
+            setStatus(`Retrying project recommendations (attempt ${attempt + 1}/3)...`);
+            await new Promise(r => setTimeout(r, 1000));
+          } else {
+            throw new Error('Failed to generate project recommendations after 3 attempts. Please try again.');
+          }
+        }
+      }
+
+      setStatus('Saving your results...');
       const userId = auth.currentUser?.uid;
       if (userId) {
         await saveAnalysisResults(userId, { githubData: data, analysis, recommendedProjects });
       }
+
+      setStatus('Done! Redirecting to your results...');
+      await new Promise(r => setTimeout(r, 500));
 
       navigate('/results', { 
         state: { 
@@ -91,6 +140,7 @@ export default function Dashboard() {
       });
     } catch (error) {
       console.error('Analysis error:', error);
+      setStatus('');
       alert('Failed to analyze your profile. Please try again.');
     } finally {
       setLoading(false);
@@ -174,6 +224,12 @@ export default function Dashboard() {
             </p>
           </div>
 
+          {loading && (
+            <p className="text-xs text-gray-500 text-center italic transition-opacity duration-500">
+              {tips[tipIndex]}
+            </p>
+          )}
+
           <Button 
             onClick={handleAnalyze}
             disabled={loading}
@@ -183,7 +239,7 @@ export default function Dashboard() {
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Analyzing your GitHub...
+                {status || 'Analyzing...'}
               </>
             ) : (
               <>
