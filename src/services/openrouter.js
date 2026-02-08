@@ -106,7 +106,12 @@ Provide your response in this exact JSON format:
     // Parse JSON from response (handle potential markdown code blocks)
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      let raw = jsonMatch[0];
+      // Fix common AI JSON issues: trailing commas before ] or }
+      raw = raw.replace(/,\s*([\]}])/g, '$1');
+      // Fix single-quoted strings → double-quoted
+      raw = raw.replace(/'/g, '"');
+      return JSON.parse(raw);
     }
     throw new Error('Could not parse AI response');
   } catch (error) {
@@ -156,9 +161,14 @@ export async function RecommendedProjects(githubData, userProfile) {
   try {
     const response = await callOpenRouter(prompt, systemPrompt);
     // Try to parse JSON array from response
-    const jsonMatch = response.match(/\[.*\]/s);
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      let raw = jsonMatch[0];
+      // Fix common AI JSON issues: trailing commas before ] or }
+      raw = raw.replace(/,\s*([\]}])/g, '$1');
+      // Fix single-quoted strings → double-quoted
+      raw = raw.replace(/'/g, '"');
+      return JSON.parse(raw);
     }
     throw new Error('Could not parse AI project recommendations');
   } catch (error) {
