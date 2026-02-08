@@ -90,12 +90,15 @@ Provide your response in this exact JSON format:
 {
   "cookedLevel": <number 0-10>,
   "levelName": "<e.g., Toasted>",
-  "summary": "<1-2 sentence honest assessment>",
+  "summary": "<2-3 medium length sentence honest assessment>",
   "recommendations": [
     "<specific actionable task 1>",
     "<specific actionable task 2>",
     "<specific actionable task 3>"
-  ]
+  ],
+  "projectsInsight": "<1 sentence insight about the recommended projects and how they'll help>",
+  "languageInsight": "<1 sentence insight about their language stack and specialization>",
+  "activityInsight": "<1 sentence insight about their contribution patterns and consistency>"
 }`;
 
   try {

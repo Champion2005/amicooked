@@ -278,7 +278,7 @@ export default function Results() {
                     </p>
                     <div className="mt-4">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm text-gray-400">Cooked Level:</p>
+                        <p className="text-sm text-gray-400">Developer Tier:</p>
                         <p
                           className={`text-sm font-bold ${getCookedColor(
                             analysis.cookedLevel
@@ -353,16 +353,21 @@ export default function Results() {
                       {analysis.summary}
                     </p>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-400">
-                          Developer Tier:
-                        </span>
-                        <span className="text-sm text-white">
-                          {analysis.levelName}
-                        </span>
+                    {analysis.recommendations && analysis.recommendations.length > 0 && (
+                      <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-gray-400 mb-2">
+                          Recommended Actions:
+                        </h3>
+                        <ul className="space-y-2">
+                          {analysis.recommendations.map((rec, idx) => (
+                            <li key={idx} className="flex items-start gap-2 text-sm text-gray-300">
+                              <span className="text-[#58a6ff] mt-0.5">•</span>
+                              <span>{rec}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   <div className="flex items-center h-full">
@@ -390,10 +395,10 @@ export default function Results() {
 
                           <div className="flex flex-wrap gap-2">
                             <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-green-500">
-                              ● {rec.skill1}
+                            ● {rec.skill1}
                             </span>
                             <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-blue-500">
-                              ● {rec.skill2}
+                            ● {rec.skill2}
                             </span>
                             <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-yellow-500">
                             ● {rec.skill3}
@@ -403,9 +408,11 @@ export default function Results() {
                     ))}
                   </div>
 
-                  <p className="text-xs text-gray-500 mt-4">
-                    AI Notes: {analysis.recommendations[0]}
-                  </p>
+                  {analysis.projectsInsight && (
+                    <p className="text-xs text-gray-500 mt-4">
+                      AI Notes: {analysis.projectsInsight}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -518,6 +525,13 @@ export default function Results() {
 
 
                 </CardContent>
+                {analysis.activityInsight && (
+                  <div className="px-5 pb-4">
+                    <p className="text-xs text-gray-500">
+                      AI Notes: {analysis.activityInsight}
+                    </p>
+                  </div>
+                )}
               </Card>
 
 
@@ -572,10 +586,12 @@ export default function Results() {
                       </div>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-4">
-                    AI Notes: Your GitHub activity is primarily centered around
-                    JavaScript and frontend frameworks.
-                  </p>
+
+                  {analysis.languageInsight && (
+                    <p className="text-xs text-gray-500 mt-4">
+                      AI Notes: {analysis.languageInsight}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
