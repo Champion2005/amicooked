@@ -6,6 +6,22 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { getUserProfile, saveUserProfile } from '@/services/userProfile';
 import { Loader2, User, ArrowLeft } from 'lucide-react';
 
+// Convert education level from lowercase underscore format to proper casing
+const formatEducationLevel = (value) => {
+  const educationMap = {
+    'high_school': 'High School',
+    'undergrad_freshman': 'Undergrad - Freshman',
+    'undergrad_sophomore': 'Undergrad - Sophomore',
+    'undergrad_junior': 'Undergrad - Junior',
+    'undergrad_senior': 'Undergrad - Senior',
+    'graduate': 'Graduate Student',
+    'bootcamp': 'Bootcamp Graduate',
+    'self_taught': 'Self-Taught',
+    'full_time': 'Full-Time Professional'
+  };
+  return educationMap[value] || value;
+};
+
 export default function Profile() {
   const [loading, setLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -75,7 +91,12 @@ export default function Profile() {
 
     try {
       setLoading(true);
-      await saveUserProfile(user.uid, formData);
+      // Format education level before saving
+      const dataToSave = {
+        ...formData,
+        education: formatEducationLevel(formData.education)
+      };
+      await saveUserProfile(user.uid, dataToSave);
       alert(isEditing ? 'Profile updated successfully!' : 'Profile saved successfully!');
       
       // If we have results data, pass it back when navigating to results
@@ -83,7 +104,7 @@ export default function Profile() {
         navigate(returnTo, { 
           state: { 
             ...resultsData, 
-            userProfile: formData // Update with new profile data
+            userProfile: { ...formData, education: formatEducationLevel(formData.education) } // Update with formatted education
           } 
         });
       } else {
