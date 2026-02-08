@@ -117,16 +117,17 @@ export default function Results() {
       return "text-red-600";
     };
 
-    const getLanguageStatus = (index) => {
-      const statuses = ["Seasoned", "Cooked", "Warming Up", "Raw"];
-      return statuses[index % statuses.length];
+    const getLanguageStatus = (lang) => {
+      const statuses = ["Seasoned", "Warming Up", "Cooked"];
+      if (githubData.frontend[lang] >= 5) return "Seasoned";
+      if (githubData.frontend[lang] >= 3) return "Warming Up";
+      return "Cooked";
     };
 
     const getStatusColor = (status) => {
-      if (status === "Seasoned") return "bg-blue-500";
-      if (status === "Cooked") return "bg-yellow-500";
+      if (status === "Seasoned") return "bg-yellow-500";
       if (status === "Warming Up") return "bg-orange-500";
-      return "bg-red-500";
+      if (status === "Cooked") return "bg-red-500";
     };
 
     // Generate contribution heatmap data from GitHub
@@ -599,17 +600,17 @@ export default function Results() {
                         Frontend:
                       </h3>
                       <div className="space-y-3">
-                        {Array.isArray(githubData.frontend)
-                        ? githubData.frontend.slice(0, 4).map((lang, idx) => (
+                        {Object.keys(githubData.frontend).length > 0
+                        ? Object.keys(githubData.frontend).slice(0, 4).map((lang, idx) => (
                           <div key={idx} className="flex items-center gap-3">
                             <div
                               className={`w-2 h-2 rounded-full ${getStatusColor(
-                                getLanguageStatus(idx)
+                                getLanguageStatus(lang)
                               )}`}
                             />
                             <span className="text-gray-300">{lang}</span>
                             <span className="text-gray-500 ml-auto">
-                              – {getLanguageStatus(idx)}
+                                {getLanguageStatus(lang)}
                             </span>
                           </div>
                         ))
@@ -622,18 +623,18 @@ export default function Results() {
                         Backend:
                       </h3>
                       <div className="space-y-3">
-                        {Array.isArray(githubData.backend)
-                        ? githubData.backend.slice(0, 4).map(
+                        {Object.keys(githubData.frontend).length > 0
+                        ? Object.keys(githubData.backend).slice(0, 4).map(
                           (lang, idx) => (
                             <div key={idx} className="flex items-center gap-3">
                               <div
                                 className={`w-2 h-2 rounded-full ${getStatusColor(
-                                  getLanguageStatus(idx + 1)
+                                  getLanguageStatus(lang)
                                 )}`}
                               />
                               <span className="text-gray-300">{lang}</span>
                               <span className="text-gray-500 ml-auto">
-                                – {getLanguageStatus(idx + 1)}
+                                {getLanguageStatus(lang)}
                               </span>
                             </div>
                           )

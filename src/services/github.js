@@ -135,15 +135,17 @@ function processGitHubData(viewer) {
     .slice(0, 5)
     .map(([lang]) => lang);
 
-  const topfrontend = Object.entries(frontendLanguages)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4)
-    .map(([lang]) => lang);
+  const topfrontend = Object.fromEntries(
+    Object.entries(frontendLanguages)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+  );
 
-  const topbackend = Object.entries(backendLanguages)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4)
-    .map(([lang]) => lang);
+  const topbackend = Object.fromEntries(
+    Object.entries(backendLanguages)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+  );
 
   // Calculate current streak
   const contributionDays = viewer.contributionsCollection.contributionCalendar.weeks
