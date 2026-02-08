@@ -168,7 +168,7 @@ export default function Results() {
                       navigate("/profile", {
                         state: {
                           returnTo: "/results",
-                          resultsData: { githubData, analysis, userProfile },
+                          resultsData: { githubData, analysis, userProfile, recommendedProjects },
                         },
                       })
                     }
@@ -260,7 +260,7 @@ export default function Results() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
-                    {recommendedProjects.slice(0, 4).map((rec, idx) => (
+                    {(recommendedProjects || []).slice(0, 5).map((rec, idx) => (
                       <div
                         key={idx}
                         className="bg-[#0d1117] p-4 rounded-lg border border-[#30363d]"
