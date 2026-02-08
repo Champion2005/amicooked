@@ -381,7 +381,7 @@ export default function Results() {
                     {recommendedProjects.slice(0, 4).map((rec, idx) => (
                         <div
                             key={idx}
-                            className="bg-[#0d1117] p-4 rounded-lg border border-[#30363d] cursor-pointer hover:border-[#58a6ff] hover:bg-[#1c2128] transition-colors"
+                            className="bg-[#0d1117] p-4 rounded-lg border border-[#30363d] cursor-pointer  hover:bg-[#161b22] transition-colors"
                             onClick={() => setSelectedProject(rec)}
                         >
                           <h3 className="font-semibold text-white mb-2">
