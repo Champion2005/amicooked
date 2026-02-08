@@ -9,7 +9,6 @@ export default function Results() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  const { githubData, analysis, userProfile } = location.state || {};
 
   const [chatOpen, setChatOpen] = useState(false);
   const [chatQuery, setChatQuery] = useState('');
@@ -20,8 +19,11 @@ export default function Results() {
       navigate('/dashboard');
     }
   }, [githubData, analysis, navigate]);
+  const { githubData, analysis, userProfile, recommendedProjects } = location.state || {};
 
   if (!githubData || !analysis) {
+  if (!githubData || !analysis || !recommendedProjects) {
+    navigate('/dashboard');
     return null;
   }
 
@@ -238,13 +240,13 @@ export default function Results() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
-                  {analysis.recommendations.slice(0, 4).map((rec, idx) => (
+                  {recommendedProjects.slice(0, 4).map((rec, idx) => (
                     <div key={idx} className="bg-[#0d1117] p-4 rounded-lg border border-[#30363d]">
-                      <h3 className="font-semibold text-white mb-2">Full Stack Task Manager</h3>
+                      <h3 className="font-semibold text-white mb-2">{rec.name}</h3>
                       <div className="flex gap-2 flex-wrap">
-                        <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-green-500">● React</span>
-                        <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-blue-500">● Node.js</span>
-                        <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-yellow-500">● PostgreSQL</span>
+                        <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-green-500">● {rec.skill1}</span>
+                        <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-blue-500">● {rec.skill2}</span>
+                        <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-yellow-500">● {rec.skill3}</span>
                       </div>
                     </div>
                   ))}
