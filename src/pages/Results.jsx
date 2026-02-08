@@ -20,15 +20,11 @@ import {
   MessageSquare,
   LogOut,
   RefreshCw,
-  Loader2,
   ChevronDown,
   Info,
 } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/config/firebase";
-import { fetchGitHubData } from "@/services/github";
-import { analyzeCookedLevel, RecommendedProjects } from "@/services/openrouter";
-import { getUserProfile } from "@/services/userProfile";
 import ChatPopup from "@/components/ChatPopup";
 import ProjectPopup from "@/components/ProjectPopup";
 
@@ -46,7 +42,6 @@ export default function Results() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
-  const [reanalyzing, setReanalyzing] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [showRecommendations, setShowRecommendations] = useState(false);
   const profileMenuRef = useRef(null);
@@ -68,34 +63,9 @@ export default function Results() {
     }
   }, [githubData, analysis, navigate]);
 
-  const handleReanalyze = async () => {
+  const handleReanalyze = () => {
     setShowReanalyzeConfirm(false);
-    setReanalyzing(true);
-    try {
-      const token = localStorage.getItem("github_token");
-      if (!token) throw new Error("No GitHub token found");
-
-      const data = await fetchGitHubData(token);
-      const userId = auth.currentUser?.uid;
-      const profile = userId ? await getUserProfile(userId) : userProfile;
-      const newAnalysis = await analyzeCookedLevel(data, profile || userProfile);
-      const newProjects = await RecommendedProjects(data, profile || userProfile);
-
-      navigate("/results", {
-        state: {
-          githubData: data,
-          analysis: newAnalysis,
-          userProfile: profile || userProfile,
-          recommendedProjects: newProjects,
-        },
-        replace: true,
-      });
-    } catch (error) {
-      console.error("Reanalysis error:", error);
-      alert("Failed to reanalyze. Please try again.");
-    } finally {
-      setReanalyzing(false);
-    }
+    navigate("/dashboard", { state: { reanalyze: true } });
   };
 
   const handleSignOut = async () => {
@@ -281,15 +251,10 @@ export default function Results() {
                       setProfileMenuOpen(false);
                       setShowReanalyzeConfirm(true);
                     }}
-                    disabled={reanalyzing}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#1c2128] hover:text-white transition-colors disabled:opacity-50"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#1c2128] hover:text-white transition-colors"
                   >
-                    {reanalyzing ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4" />
-                    )}
-                    {reanalyzing ? 'Reanalyzing...' : 'Reanalyze'}
+                    <RefreshCw className="w-4 h-4" />
+                    Reanalyze
                   </button>
                   <div className="border-t border-[#30363d] my-1" />
                   <button

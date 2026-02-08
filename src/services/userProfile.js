@@ -43,3 +43,43 @@ export async function saveUserProfile(userId, profileData) {
     throw error;
   }
 }
+
+/**
+ * Save analysis results to Firestore
+ * @param {string} userId - The user's Firebase Auth UID
+ * @param {Object} data - { githubData, analysis, recommendedProjects }
+ * @returns {Promise<void>}
+ */
+export async function saveAnalysisResults(userId, { githubData, analysis, recommendedProjects }) {
+  try {
+    const ref = doc(db, 'users', userId, 'results', 'latest');
+    await setDoc(ref, {
+      githubData,
+      analysis,
+      recommendedProjects,
+      analyzedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error saving analysis results:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get saved analysis results from Firestore
+ * @param {string} userId - The user's Firebase Auth UID
+ * @returns {Promise<Object|null>} Saved results or null
+ */
+export async function getAnalysisResults(userId) {
+  try {
+    const ref = doc(db, 'users', userId, 'results', 'latest');
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      return snap.data();
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching analysis results:', error);
+    throw error;
+  }
+}

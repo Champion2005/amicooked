@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { auth } from '@/config/firebase';
 import logo from '@/assets/amicooked_logo.png';
 import { Button } from '@/components/ui/Button';
@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { fetchGitHubData } from '@/services/github';
 import { analyzeCookedLevel } from '@/services/openrouter';
 import { RecommendedProjects } from '@/services/openrouter';
-import { getUserProfile } from '@/services/userProfile';
+import { getUserProfile, getAnalysisResults, saveAnalysisResults } from '@/services/userProfile';
 import { Loader2, Flame, User, Edit2 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -15,6 +15,10 @@ export default function Dashboard() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [userProfile, setUserProfile] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // If coming from reanalyze, skip the cached results check
+  const forceReanalyze = location.state?.reanalyze === true;
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -23,7 +27,6 @@ export default function Dashboard() {
       return;
     }
 
-    // Check if user already has a profile
     loadUserProfile(user.uid);
   }, [navigate]);
 
@@ -33,8 +36,24 @@ export default function Dashboard() {
       const profile = await getUserProfile(userId);
       if (profile) {
         setUserProfile(profile);
+
+        // If not reanalyzing, check for cached results
+        if (!forceReanalyze) {
+          const saved = await getAnalysisResults(userId);
+          if (saved) {
+            navigate('/results', {
+              state: {
+                githubData: saved.githubData,
+                analysis: saved.analysis,
+                userProfile: profile,
+                recommendedProjects: saved.recommendedProjects
+              },
+              replace: true
+            });
+            return;
+          }
+        }
       } else {
-        // No profile exists, redirect to profile page
         navigate('/profile', { state: { returnTo: '/dashboard' } });
       }
     } catch (error) {
@@ -52,14 +71,16 @@ export default function Dashboard() {
         throw new Error('No GitHub token found');
       }
 
-      // Fetch GitHub data
       const data = await fetchGitHubData(token);
-
-      // Analyze with AI using profile data
       const analysis = await analyzeCookedLevel(data, userProfile);
       const recommendedProjects = await RecommendedProjects(data, userProfile);
 
-      // Navigate to results with data
+      // Save results to Firestore
+      const userId = auth.currentUser?.uid;
+      if (userId) {
+        await saveAnalysisResults(userId, { githubData: data, analysis, recommendedProjects });
+      }
+
       navigate('/results', { 
         state: { 
           githubData: data, 
