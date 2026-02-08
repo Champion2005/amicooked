@@ -38,10 +38,6 @@ export default function Results() {
     }
   }, [githubData, analysis, navigate]);
 
-  if (!githubData || !analysis) {
-    return null;
-  }
-
   const getCookedColor = (level) => {
       if (level <= 2) return "text-green-500";
       if (level <= 4) return "text-yellow-500";
@@ -173,7 +169,7 @@ export default function Results() {
                       navigate("/profile", {
                         state: {
                           returnTo: "/results",
-                          resultsData: { githubData, analysis, userProfile },
+                          resultsData: { githubData, analysis, userProfile, recommendedProjects },
                         },
                       })
                     }
