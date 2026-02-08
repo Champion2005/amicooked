@@ -623,7 +623,7 @@ export default function Results() {
                         Backend:
                       </h3>
                       <div className="space-y-3">
-                        {Object.keys(githubData.frontend).length > 0
+                        {Object.keys(githubData.backend).length > 0
                         ? Object.keys(githubData.backend).slice(0, 4).map(
                           (lang, idx) => (
                             <div key={idx} className="flex items-center gap-3">
