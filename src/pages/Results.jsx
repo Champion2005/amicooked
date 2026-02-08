@@ -932,6 +932,9 @@ export default function Results() {
                 <li>
                   <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">Powered by OpenRouter</a>
                 </li>
+                <li>
+                  <a href="https://github.com/Champion2005/amicooked/issues" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">Report a Bug</a>
+                </li>
               </ul>
             </div>
           </div>
