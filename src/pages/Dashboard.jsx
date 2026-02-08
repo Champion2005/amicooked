@@ -113,7 +113,6 @@ export default function Dashboard() {
         } catch (err) {
           console.warn(`Project recommendations attempt ${attempt}/3 failed:`, err.message);
           if (attempt < 3) {
-            setStatus(`Retrying project recommendations (attempt ${attempt + 1}/3)...`);
             await new Promise(r => setTimeout(r, 1000));
           } else {
             throw new Error('Failed to generate project recommendations after 3 attempts. Please try again.');
@@ -163,27 +162,27 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#0d1117] flex items-center justify-center p-4">
       <Card className="max-w-3xl w-full bg-[#161b22] border-[#30363d]">
-        <CardHeader>
+        <CardHeader className="px-4 sm:px-6">
           <div className="flex justify-center mb-4">
             <button
               onClick={() => navigate("/")}
               className="cursor-pointer hover:opacity-80 transition-opacity"
             >
-              <img src={logo} alt="AmICooked" className="w-16 h-16 rounded-full object-cover" />
+              <img src={logo} alt="AmICooked" className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover" />
             </button>
           </div>
-          <CardTitle className="text-3xl text-center text-white">
+          <CardTitle className="text-2xl sm:text-3xl text-center text-white">
             Ready to Analyze!
           </CardTitle>
           <CardDescription className="text-center text-gray-400">
             Your profile is complete. Let's see how you measure up!
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 px-4 sm:px-6">
           {/* Profile Summary */}
-          <div className="bg-[#1c2128] p-4 rounded-lg border border-[#30363d] space-y-2">
+          <div className="bg-[#1c2128] p-3 sm:p-4 rounded-lg border border-[#30363d] space-y-2">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-white flex items-center">
+              <h3 className="font-semibold text-white flex items-center text-sm sm:text-base">
                 <User className="w-4 h-4 mr-2 text-[#58a6ff]" />
                 Your Profile
               </h3>
@@ -196,7 +195,7 @@ export default function Dashboard() {
                 Edit
               </Link>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-sm">
               <div>
                 <span className="text-gray-400">Age:</span>
                 <span className="text-white ml-2">{userProfile.age} years</span>
@@ -205,18 +204,16 @@ export default function Dashboard() {
                 <span className="text-gray-400">Education:</span>
                 <span className="text-white ml-2">{userProfile.education.replace(/_/g, ' ')}</span>
               </div>
-              <div className="col-span-2">
-                <span className="text-gray-400">Experience:</span>
+              <div className="sm:col-span-2">
                 <span className="text-white ml-2">{userProfile.experienceYears.replace(/_/g, ' ')}</span>
               </div>
-              <div className="col-span-2">
-                <span className="text-gray-400">Career Goal:</span>
+              <div className="sm:col-span-2">
                 <span className="text-white ml-2">{userProfile.careerGoal}</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-[#1c2128] p-4 rounded-lg border border-[#30363d]">
+          <div className="bg-[#1c2128] p-3 sm:p-4 rounded-lg border border-[#30363d]">
             <h3 className="font-semibold mb-2 text-yellow-500">⚠️ Fair Warning</h3>
             <p className="text-sm text-gray-300">
               Our AI will be brutally honest. If your profile has gaps, we'll call them out. 
@@ -233,7 +230,7 @@ export default function Dashboard() {
           <Button 
             onClick={handleAnalyze}
             disabled={loading}
-            className="w-full h-12 text-lg bg-[#238636] hover:bg-[#2ea043] text-white"
+            className="w-full h-11 sm:h-12 text-base sm:text-lg bg-[#238636] hover:bg-[#2ea043] text-white"
             size="lg"
           >
             {loading ? (

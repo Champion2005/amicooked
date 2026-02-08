@@ -213,23 +213,23 @@ export default function Results() {
     <div className="min-h-screen bg-[#0d1117]">
       {/* Header */}
       <header className="border-b border-[#30363d] bg-[#020408]">
-        <div className="max-w-full mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-full mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
           <button
             onClick={() => navigate("/")}
-            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 sm:gap-3 cursor-pointer hover:opacity-80 transition-opacity shrink-0"
           >
             <img
               src={logo}
               alt="AmICooked"
-              className="w-10 h-10 rounded-full object-cover"
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover"
             />
-            <h1 className="text-2xl font-bold text-white">AmICooked?</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-white hidden sm:block">AmICooked?</h1>
           </button>
-          <div className="flex-1 max-w-2xl mx-8 flex gap-2">
+          <div className="flex-1 max-w-2xl flex gap-2 min-w-0">
             <input
               type="text"
-              placeholder="Ask AI Anything about your profile..."
-              className="flex-1 px-4 py-2 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+              placeholder="Ask AI Anything..."
+              className="flex-1 min-w-0 px-3 sm:px-4 py-2 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
               value={headerInput}
               onChange={(e) => setHeaderInput(e.target.value)}
               onKeyDown={(e) => {
@@ -249,27 +249,27 @@ export default function Results() {
                 }
               }}
               disabled={!headerInput.trim()}
-              className="px-4 py-2 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+              className="px-3 sm:px-4 py-2 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm shrink-0"
             >
               <Send className="w-4 h-4" />
-              Ask
+              <span className="hidden sm:inline">Ask</span>
             </button>
             <button
               onClick={() => {
                 setChatQuery("");
                 setChatOpen(true);
               }}
-              className="px-3 py-2 rounded-md border border-[#30363d] text-gray-400 hover:text-white hover:bg-[#1c2128] flex items-center gap-1 text-sm"
+              className="px-3 py-2 rounded-md border border-[#30363d] text-gray-400 hover:text-white hover:bg-[#1c2128] flex items-center gap-1 text-sm shrink-0"
               title="Chat History"
             >
               <MessageSquare className="w-4 h-4" />
             </button>
           </div>
           {/* Profile Menu */}
-          <div className="relative" ref={profileMenuRef}>
+          <div className="relative shrink-0" ref={profileMenuRef}>
             <button
               onClick={() => setProfileMenuOpen((v) => !v)}
-              className="flex items-center gap-2 px-2 py-1 rounded-full border border-[#30363d] hover:bg-[#1c2128] transition-colors"
+              className="flex items-center gap-1 sm:gap-2 px-1.5 sm:px-2 py-1 rounded-full border border-[#30363d] hover:bg-[#1c2128] transition-colors"
             >
               <img
                 src={githubData.avatarUrl}
@@ -330,27 +330,27 @@ export default function Results() {
         </div>
       </header>
 
-      <div className="max-w-7xlf mx-auto px-10 py-8">
-        <div className="grid grid-cols-12 gap-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-4 sm:py-6 lg:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Sidebar - Profile */}
-          <div className="col-span-3">
-            <Card className="bg-[#0d1116] border-none sticky top-8">
+          <div className="lg:col-span-3">
+            <Card className="bg-[#0d1116] border-none lg:sticky lg:top-8">
               <CardContent className="pt-6">
-                <div className="flex flex-col text-center mb-6">
+                <div className="flex flex-col items-center lg:items-start text-center lg:text-left mb-6">
                   <img
                     src={githubData.avatarUrl}
                     alt={githubData.username}
-                    className="w-78 h-78 rounded-full mb-4 border-2 border-[#30363d]"
+                    className="w-32 sm:w-48 lg:w-64 max-w-full aspect-square rounded-full mb-4 border-2 border-[#30363d] object-cover"
                   />
-                  <h2 className="text-2xl text-left font-bold text-white mb-1">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">
                     {githubData.name || githubData.username}
                   </h2>
-                  <p className="text-gray-400 text-left text-md mb-1">
+                  <p className="text-gray-400 text-sm sm:text-md mb-1">
                     {githubData.username} -{" "}
                     {userProfile?.education?.replace(/_/g, " ") || "Student"}
                   </p>
                   <div className="mt-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center lg:justify-start gap-2">
                       <p className="text-sm text-gray-400">Developer Tier:</p>
                       <p
                         className={`text-sm font-bold ${getCookedColor(
@@ -419,15 +419,15 @@ export default function Results() {
           </div>
 
           {/* Main Content */}
-          <div className="col-span-9 space-y-6">
+          <div className="lg:col-span-9 space-y-6">
             <h2 className="text-lg font-semibold text-white mb-2">
               AI Summary
             </h2>
 
             <Card className="bg-[#0d1117] pt-5 border-[#30363d] overflow-hidden">
-              <CardContent className="grid grid-cols-[1fr_auto] gap-6 items-start">
+              <CardContent className="grid grid-cols-[1fr_auto] gap-4 sm:gap-6 items-start">
                 <div className="min-w-0">
-                  <p className="text-gray-300 mb-4 break-words">
+                  <p className="text-gray-300 text-sm sm:text-base mb-4 break-words">
                     {analysis.summary}
                   </p>
 
@@ -468,7 +468,7 @@ export default function Results() {
                 </div>
 
                 <div className="flex items-start">
-                  <div className="relative w-24 h-24 shrink-0">
+                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 shrink-0">
                     {/* Progress Ring */}
                     <div
                       className="absolute inset-0 rounded-full"
@@ -482,7 +482,7 @@ export default function Results() {
 
                     {/* Inner Circle */}
                     <div className="absolute inset-2 bg-[#0d1117] rounded-full flex flex-col items-center justify-center">
-                      <span className="text-[28px] font-semibold text-white">
+                      <span className="text-[22px] sm:text-[28px] font-semibold text-white">
                         {analysis.cookedLevel}
                       </span>
                     </div>
@@ -497,7 +497,7 @@ export default function Results() {
 
             <Card className="bg-[#0d1117] border-none">
               <CardContent className="p-0 ">
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                   {recommendedProjects.slice(0, 4).map((rec, idx) => (
                     <div
                       key={idx}
@@ -532,9 +532,9 @@ export default function Results() {
             </Card>
 
             <Card className="bg-[#0d1117] pt-0 border-[#30363d] w-full">
-              <CardContent className="p-3 grid grid-cols-[auto_auto] gap-6 items-start">
+              <CardContent className="p-3 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 items-start">
                 {/* LEFT — HEATMAP */}
-                <div>
+                <div className="min-w-0 overflow-x-auto">
                   <div className="space-y-1">
                     {heatmap.weeks.length === 0 ? (
                       <div className="text-center py-6">
@@ -584,7 +584,7 @@ export default function Results() {
                         </div>
 
                         <div className="flex gap-2">
-                          <div className="flex flex-col justify-between mt-3 text-[10px] text-gray-500 h-[84px]">
+                          <div className="flex flex-col justify-between mt-3 text-[10px] text-gray-500 h-[84px] shrink-0">
                             {["Mon", "", "Wed", "", "Fri", "", ""].map(
                               (d, i) => (
                                 <div key={i}>{d}</div>
@@ -593,9 +593,8 @@ export default function Results() {
                           </div>
 
                           {/* Heatmap */}
-                          <div className="flex-1 overflow-x-auto">
-                            <div className="flex gap-[2px]">
-                              {heatmap.weeks.map((week, weekIndex) => (
+                          <div className="flex gap-[2px]">
+                            {heatmap.weeks.map((week, weekIndex) => (
                                 <div
                                   key={weekIndex}
                                   className="flex flex-col gap-[2px]"
@@ -623,7 +622,6 @@ export default function Results() {
                                   )}
                                 </div>
                               ))}
-                            </div>
                           </div>
                         </div>
                       </>
@@ -632,7 +630,7 @@ export default function Results() {
                 </div>
 
                 {/* RIGHT — STATS */}
-                <div className="mt-4 w-[220px]">
+                <div className="mt-0 md:mt-4 w-full md:w-[220px]">
                   <div className="space-y-[6px] pr-3 text-xs text-gray-400">
                     {statItems.map((item, i) => (
                       <div
@@ -660,14 +658,14 @@ export default function Results() {
 
             <div className="flex flex-col md:flex-row gap-6">
               {/* Languages */}
-              <div className="flex-1">
+              <div className="flex-1 flex flex-col">
                 <h2 className="text-lg font-semibold text-white mb-2">
                   Languages
                 </h2>
 
-                <Card className="bg-[#0d1117] border-[#30363d]">
+                <Card className="bg-[#0d1117] border-[#30363d] flex-1">
                   <CardContent className="py-3">
-                    <div className="grid grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
                       <div>
                         <h3 className="text-sm font-semibold text-white mb-3">
                           Frontend:
@@ -749,12 +747,12 @@ export default function Results() {
               </div>
 
               {/* Employability */}
-              <div className="flex-1">
+              <div className="flex-1 flex flex-col">
                 <h2 className="text-lg font-semibold text-white mb-2">
                   Employability
                 </h2>
 
-                <Card className="bg-[#0d1117] border-[#30363d]">
+                <Card className="bg-[#0d1117] border-[#30363d] flex-1">
                   <CardContent className="py-3">
                     <div className="mb-3">
                       <p className="text-sm text-gray-400 mb-2">
@@ -885,19 +883,66 @@ export default function Results() {
 
       {/* Footer */}
       <footer className="border-t border-[#30363d] bg-[#161b22] mt-12">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img
-              src={logo}
-              alt="AmICooked"
-              className="w-8 h-8 rounded-full object-cover"
-            />
-            <span className="text-gray-400 text-sm">
-              @AmICooked Copyright 2026
-            </span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
+            {/* Brand */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <img
+                  src={logo}
+                  alt="AmICooked"
+                  className="w-8 h-8 rounded-full object-cover"
+                />
+                <span className="text-white font-semibold">AmICooked?</span>
+              </div>
+              <p className="text-gray-500 text-xs leading-relaxed">
+                AI-powered GitHub profile analysis to help you level up your developer career.
+              </p>
+            </div>
+
+            {/* Resources */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-300 mb-3">Resources</h4>
+              <ul className="space-y-2 text-xs">
+                <li>
+                  <a href="https://docs.github.com/en/get-started" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">GitHub Docs</a>
+                </li>
+                <li>
+                  <a href="https://roadmap.sh" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">Developer Roadmaps</a>
+                </li>
+                <li>
+                  <a href="https://github.com/topics/good-first-issue" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">Good First Issues</a>
+                </li>
+                <li>
+                  <a href="https://opensource.guide" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">Open Source Guide</a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Project */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-300 mb-3">Project</h4>
+              <ul className="space-y-2 text-xs">
+                <li>
+                  <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">GitHub</a>
+                </li>
+                <li>
+                  <a href="https://firebase.google.com" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">Built with Firebase</a>
+                </li>
+                <li>
+                  <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">Powered by OpenRouter</a>
+                </li>
+              </ul>
+            </div>
           </div>
-          <div className="text-gray-400 text-sm">
-            Katarina Mantay, Aditya Patel, Norika Upadhyay
+
+          <div className="border-t border-[#30363d] mt-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span className="text-gray-500 text-xs">
+              © 2026 AmICooked. All rights reserved.
+            </span>
+            <span className="text-gray-500 text-xs text-center">
+              Katarina Mantay, Aditya Patel, Norika Upadhyay
+            </span>
           </div>
         </div>
       </footer>

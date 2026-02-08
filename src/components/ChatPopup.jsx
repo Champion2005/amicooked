@@ -255,31 +255,31 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
   return (
     <div className="fixed inset-0 z-50 bg-[#0d1117] flex flex-col">
       {/* Chat Header */}
-      <header className="border-b border-[#30363d] bg-[#161b22] px-6 py-4 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="border-b border-[#30363d] bg-[#161b22] px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {!showSidebar && (
             <button 
               onClick={() => setShowSidebar(true)}
-              className="text-gray-400 hover:text-white mr-2"
+              className="text-gray-400 hover:text-white mr-1 sm:mr-2"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
           )}
-          <img src={logo} alt="AmICooked" className="w-10 h-10 rounded-full object-cover" />
-          <div>
-            <h1 className="text-xl font-bold text-white">AmICooked Bot</h1>
-            <p className="text-xs text-gray-400">Ask anything about your profile</p>
+          <img src={logo} alt="AmICooked" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-xl font-bold text-white truncate">AmICooked Bot</h1>
+            <p className="text-xs text-gray-400 hidden sm:block">Ask anything about your profile</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <Button
             onClick={handleNewChat}
             variant="outline"
             size="sm"
             className="border-[#30363d] text-gray-300 hover:text-white hover:bg-[#1c2128]"
           >
-            <Plus className="w-4 h-4 mr-1" />
-            New Chat
+            <Plus className="w-4 h-4 sm:mr-1" />
+            <span className="hidden sm:inline">New Chat</span>
           </Button>
           <button 
             onClick={handleClose}
@@ -294,7 +294,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar - Chat History */}
         {showSidebar && (
-          <div className="w-80 border-r border-[#30363d] bg-[#161b22] flex flex-col shrink-0">
+          <div className="absolute inset-0 sm:relative sm:inset-auto w-full sm:w-80 border-r border-[#30363d] bg-[#161b22] flex flex-col shrink-0 z-10">
             <div className="p-4 border-b border-[#30363d]">
               <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Chat History</h2>
             </div>
@@ -371,14 +371,14 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
           {activeChat ? (
             <>
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
                 {activeChat.messages.map((msg, idx) => (
                   <div
                     key={idx}
                     className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-2xl rounded-lg px-4 py-3 ${
+                      className={`max-w-[85%] sm:max-w-2xl rounded-lg px-3 sm:px-4 py-2 sm:py-3 ${
                         msg.role === 'user'
                           ? 'bg-[#238636] text-white'
                           : 'bg-[#161b22] border border-[#30363d] text-gray-300'
@@ -466,12 +466,12 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
               </div>
 
               {/* Input */}
-              <div className="border-t border-[#30363d] bg-[#161b22] p-4">
-                <div className="max-w-4xl mx-auto flex gap-3">
+              <div className="border-t border-[#30363d] bg-[#161b22] p-3 sm:p-4">
+                <div className="max-w-4xl mx-auto flex gap-2 sm:gap-3">
                   <textarea
                     ref={inputRef}
                     placeholder="Type your message..."
-                    className="flex-1 px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
+                    className="flex-1 px-3 sm:px-4 py-2 sm:py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
                     rows="2"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
@@ -499,7 +499,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                 <p className="text-gray-400 text-sm max-w-md">
                   Ask about your GitHub profile, get career advice, project ideas, or help understanding your Cooked Level.
                 </p>
-                <div className="mt-6 grid grid-cols-2 gap-3 max-w-lg mx-auto">
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto px-4 sm:px-0">
                   {[
                     'How can I improve my GitHub profile?',
                     'What projects should I build next?',

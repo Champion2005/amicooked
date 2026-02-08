@@ -30,40 +30,40 @@ export default function Landing() {
     <div className="min-h-screen bg-[#0d1117] text-white">
       {/* Nav */}
       <nav className="border-b border-[#30363d] bg-[#020408]">
-        <div className="max-w-full mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-full mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <img src={logo} alt="AmICooked" className="w-9 h-9 rounded-full object-cover" />
-            <span className="text-xl font-bold">AmICooked?</span>
+            <img src={logo} alt="AmICooked" className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover" />
+            <span className="text-lg sm:text-xl font-bold">AmICooked?</span>
           </div>
           <Button
             onClick={handleGitHubSignIn}
             disabled={loading}
-            className="bg-[#238636] hover:bg-[#2ea043] text-white text-sm"
+            className="bg-[#238636] hover:bg-[#2ea043] text-white text-xs sm:text-sm"
           >
-            <Github className="mr-2 h-4 w-4" />
+            <Github className="mr-1 sm:mr-2 h-4 w-4" />
             {loading ? 'Signing in...' : 'Sign in with GitHub'}
           </Button>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="max-w-6xl mx-auto px-6 pt-20 pb-16 text-center">
-        <div className="inline-block mb-6 px-4 py-1.5 rounded-full border border-[#30363d] bg-[#161b22] text-sm text-gray-400">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-10 sm:pb-16 text-center">
+        <div className="inline-block mb-4 sm:mb-6 px-3 sm:px-4 py-1.5 rounded-full border border-[#30363d] bg-[#161b22] text-xs sm:text-sm text-gray-400">
           🔥 Stop guessing. Start building what matters.
         </div>
-        <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6">
+        <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold leading-tight mb-4 sm:mb-6">
           Your GitHub is your resume.<br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">
             Is yours getting you hired?
           </span>
         </h1>
-        <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+        <p className="text-base sm:text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed px-2">
           AmICooked analyzes your GitHub, matches it against real job requirements, and gives you a personalized roadmap of projects and skills to build — so your profile actually lands you interviews.
         </p>
         <Button
           onClick={handleGitHubSignIn}
           disabled={loading}
-          className="h-14 px-8 text-lg bg-[#238636] hover:bg-[#2ea043] text-white rounded-lg"
+          className="h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg bg-[#238636] hover:bg-[#2ea043] text-white rounded-lg"
           size="lg"
         >
           <Github className="mr-2 h-5 w-5" />
@@ -75,9 +75,9 @@ export default function Landing() {
       </section>
 
       {/* Problem → Solution */}
-      <section className="max-w-6xl mx-auto px-6 py-16">
-        <div className="grid md:grid-cols-2 gap-8">
-          <Card className="bg-[#161b22] border-[#30363d] p-8">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
+        <div className="grid md:grid-cols-2 gap-6 sm:gap-8">
+          <Card className="bg-[#161b22] border-[#30363d] p-5 sm:p-8">
             <CardContent className="p-0">
               <h3 className="text-red-400 font-semibold text-sm uppercase tracking-wider mb-3">The Problem</h3>
               <h2 className="text-2xl font-bold mb-4">You're applying everywhere and hearing nothing back.</h2>
@@ -102,7 +102,7 @@ export default function Landing() {
             </CardContent>
           </Card>
 
-          <Card className="bg-[#161b22] border-[#238636]/30 p-8">
+          <Card className="bg-[#161b22] border-[#238636]/30 p-5 sm:p-8">
             <CardContent className="p-0">
               <h3 className="text-green-400 font-semibold text-sm uppercase tracking-wider mb-3">The Solution</h3>
               <h2 className="text-2xl font-bold mb-4">A personalized plan to make your GitHub hire-worthy.</h2>
@@ -130,8 +130,8 @@ export default function Landing() {
       </section>
 
       {/* Features */}
-      <section className="max-w-6xl mx-auto px-6 py-16">
-        <h2 className="text-3xl font-bold text-center mb-3">How it works</h2>
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
+        <h2 className="text-2xl sm:text-3xl font-bold text-center mb-3">How it works</h2>
         <p className="text-gray-400 text-center mb-12 max-w-xl mx-auto">
           Connect your GitHub, tell us your goals, and get a clear picture of where you stand and what to build next.
         </p>
@@ -214,9 +214,9 @@ export default function Landing() {
       </section>
 
       {/* CTA */}
-      <section className="max-w-6xl mx-auto px-6 py-20">
-        <div className="bg-gradient-to-br from-[#161b22] to-[#1c2128] border border-[#30363d] rounded-xl p-12 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+        <div className="bg-gradient-to-br from-[#161b22] to-[#1c2128] border border-[#30363d] rounded-xl p-6 sm:p-12 text-center">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
             Ready to find out if you're <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">cooked</span>?
           </h2>
           <p className="text-gray-400 max-w-lg mx-auto mb-8">
@@ -225,7 +225,7 @@ export default function Landing() {
           <Button
             onClick={handleGitHubSignIn}
             disabled={loading}
-            className="h-14 px-8 text-lg bg-[#238636] hover:bg-[#2ea043] text-white rounded-lg"
+            className="h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg bg-[#238636] hover:bg-[#2ea043] text-white rounded-lg"
             size="lg"
           >
             <Github className="mr-2 h-5 w-5" />
@@ -237,13 +237,62 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="border-t border-[#30363d] bg-[#020408]">
-        <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="AmICooked" className="w-7 h-7 rounded-full object-cover" />
-            <span className="text-gray-500 text-sm">@AmICooked Copyright 2026</span>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
+            {/* Brand */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <img src={logo} alt="AmICooked" className="w-8 h-8 rounded-full object-cover" />
+                <span className="text-white font-semibold">AmICooked?</span>
+              </div>
+              <p className="text-gray-500 text-xs leading-relaxed">
+                AI-powered GitHub profile analysis to help you level up your developer career.
+              </p>
+            </div>
+
+            {/* Resources */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-300 mb-3">Resources</h4>
+              <ul className="space-y-2 text-xs">
+                <li>
+                  <a href="https://docs.github.com/en/get-started" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">GitHub Docs</a>
+                </li>
+                <li>
+                  <a href="https://roadmap.sh" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">Developer Roadmaps</a>
+                </li>
+                <li>
+                  <a href="https://github.com/topics/good-first-issue" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">Good First Issues</a>
+                </li>
+                <li>
+                  <a href="https://opensource.guide" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">Open Source Guide</a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Project */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-300 mb-3">Project</h4>
+              <ul className="space-y-2 text-xs">
+                <li>
+                  <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">GitHub</a>
+                </li>
+                <li>
+                  <a href="https://firebase.google.com" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">Built with Firebase</a>
+                </li>
+                <li>
+                  <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#58a6ff] transition-colors">Powered by OpenRouter</a>
+                </li>
+              </ul>
+            </div>
           </div>
-          <div className="text-gray-500 text-sm">
-            Katarina Mantey, Aditya Patel, Norika Upadhyay
+
+          <div className="border-t border-[#30363d] mt-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span className="text-gray-500 text-xs">
+              © 2026 AmICooked. All rights reserved.
+            </span>
+            <span className="text-gray-500 text-xs text-center">
+              Katarina Mantay, Aditya Patel, Norika Upadhyay
+            </span>
           </div>
         </div>
       </footer>

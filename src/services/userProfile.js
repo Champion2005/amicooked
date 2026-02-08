@@ -60,8 +60,8 @@ export async function saveAnalysisResults(userId, { githubData, analysis, recomm
       analyzedAt: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error saving analysis results:', error);
-    throw error;
+    // Non-critical: results are already in memory, so just log and continue
+    console.warn('Could not save analysis results (ad blocker may be active):', error.message);
   }
 }
 
@@ -79,7 +79,8 @@ export async function getAnalysisResults(userId) {
     }
     return null;
   } catch (error) {
-    console.error('Error fetching analysis results:', error);
-    throw error;
+    // Non-critical: if cache fetch fails, fall through to fresh analysis
+    console.warn('Could not fetch cached results (ad blocker may be active):', error.message);
+    return null;
   }
 }
