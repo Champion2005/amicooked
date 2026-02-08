@@ -41,6 +41,21 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
     }
   }, [isOpen, userId]);
 
+  // Push history state when popup opens so browser back closes it
+  useEffect(() => {
+    if (!isOpen) return;
+
+    window.history.pushState({ chatOpen: true }, '');
+
+    const handlePopState = (e) => {
+      // Browser back was pressed — close the popup instead of navigating away
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isOpen, onClose]);
+
   // Handle initial query (when user types in header bar and clicks Ask)
   useEffect(() => {
     if (isOpen && initialQuery && !hasHandledInitialQuery.current && !chatsLoading) {
