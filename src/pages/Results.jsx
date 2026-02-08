@@ -128,27 +128,38 @@ export default function Results() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-8xlf mx-auto px-10 py-8">
         <div className="grid grid-cols-12 gap-6">
           {/* Left Sidebar - Profile */}
           <div className="col-span-3">
-            <Card className="bg-[#161b22] border-[#30363d] sticky top-8">
+            <Card className="bg-[#0d1116] border-none sticky top-8">
               <CardContent className="pt-6">
-                <div className="flex flex-col items-center text-center mb-6">
+                <div className="flex flex-col text-center mb-6">
                   <img 
                     src={githubData.avatarUrl} 
                     alt={githubData.username}
-                    className="w-32 h-32 rounded-full mb-4 border-4 border-[#30363d]"
+                    className="w-78 h-78 rounded-full mb-4 border-4 border-[#30363d]"
                   />
-                  <h2 className="text-2xl font-bold text-white mb-1">{githubData.name || githubData.username}</h2>
-                  <p className="text-gray-400 text-sm mb-1">{githubData.username} - {userProfile?.education?.replace(/_/g, ' ') || 'Student'}</p>
+                  <h2 className="text-2xl text-left font-bold text-white mb-1">{githubData.name || githubData.username}</h2>
+                  <p className="text-gray-400 text-left text-md mb-1">{githubData.username} - {userProfile?.education?.replace(/_/g, ' ') || 'Student'}</p>
                   <div className="mt-4">
-                    <p className="text-sm text-gray-400 mb-2">Cooked Level:</p>
-                    <p className={`text-3xl font-bold ${getCookedColor(analysis.cookedLevel)}`}>
-                      {analysis.levelName}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-gray-400">Cooked Level:</p>
+                      <p className={`text-sm font-bold ${getCookedColor(analysis.cookedLevel)}`}>
+                        {analysis.levelName}
+                      </p>
+                    </div>
+
                   </div>
                 </div>
+
+                <Button
+                    variant="outline"
+                    className="w-full mb-5 border-[#30363d] text-white hover:bg-[#1c2128]"
+                    onClick={() => navigate('/profile', { state: { returnTo: '/results', resultsData: { githubData, analysis, userProfile } } })}
+                >
+                  Edit Profile
+                </Button>
 
                 <div className="space-y-4 text-sm">
                   <div className="flex items-center gap-3 text-gray-300">
@@ -172,39 +183,53 @@ export default function Results() {
                     <span className="text-white ml-auto text-xs">{userProfile?.experienceYears?.replace(/_/g, ' ') || 'N/A'}</span>
                   </div>
                 </div>
-
-                <Button 
-                  variant="outline"
-                  className="w-full mt-6 border-[#30363d] text-white hover:bg-[#1c2128]"
-                  onClick={() => navigate('/profile', { state: { returnTo: '/results', resultsData: { githubData, analysis, userProfile } } })}
-                >
-                  Edit Profile
-                </Button>
               </CardContent>
             </Card>
           </div>
 
           {/* Main Content */}
-          <div className="col-span-6 space-y-6">
-            {/* AI Summary */}
-            <Card className="bg-[#161b22] border-[#30363d]">
-              <CardHeader>
-                <CardTitle className="text-white">AI Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-300 mb-4">{analysis.summary}</p>
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <div>
-                    <p className="text-sm text-gray-400">Developer Tier:</p>
-                    <p className="text-lg font-semibold text-white">{analysis.levelName}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-400">Percentile:</p>
-                    <p className="text-lg font-semibold text-white">{Math.max(10, 100 - analysis.cookedLevel * 10)}st</p>
+          <div className="col-span-9 pr-8 space-y-6">
+            <h2 className="text-lg font-semibold text-white mb-2">AI Summary</h2>
+
+            <Card className="bg-[#0d1117] pt-5 border-[#30363d]">
+              <CardContent className="grid grid-cols-[1fr_auto] gap-6 items-center">
+
+                <div className="min-w-0">
+
+                  <p className="text-gray-300 mb-4 break-words">
+                    {analysis.summary}
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-4">
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-400">Developer Tier:</span>
+                      <span className="text-sm text-white">
+                        {analysis.levelName}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-400">Percentile:</span>
+                      <span className="text-sm text-white">
+                        {Math.max(10, 100 - analysis.cookedLevel * 10)}st
+                      </span>
+                    </div>
+
                   </div>
                 </div>
+
+                <div className="flex items-center h-full">
+                  <div className="h-[90%] aspect-square rounded-full bg-[#1f2831]" />
+                </div>
+
               </CardContent>
             </Card>
+
+
+
+
+
 
             {/* Recommended Projects */}
             <Card className="bg-[#161b22] border-[#30363d]">
@@ -345,34 +370,6 @@ export default function Results() {
                   placeholder="Enter Text Here..."
                   className="w-full h-32 px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
                 />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Sidebar - Stats */}
-          <div className="col-span-3">
-            <Card className="bg-[#161b22] border-[#30363d] sticky top-8">
-              <CardContent className="pt-6 space-y-6">
-                <div>
-                  <h3 className="text-sm text-gray-400 mb-2">Activity Level:</h3>
-                  <p className="text-2xl font-bold text-white">0.9</p>
-                </div>
-                <div>
-                  <h3 className="text-sm text-gray-400 mb-2">Avg Commits / m:</h3>
-                  <p className="text-2xl font-bold text-white">{Math.floor(githubData.totalCommits / 12)}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm text-gray-400 mb-2">Momentum:</h3>
-                  <p className="text-2xl font-bold text-white">{(githubData.totalContributions / 365).toFixed(1)}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm text-gray-400 mb-2">Current Streak:</h3>
-                  <p className="text-2xl font-bold text-white">{githubData.streak}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm text-gray-400 mb-2">Consistency:</h3>
-                  <p className="text-2xl font-bold text-white">0.9</p>
-                </div>
               </CardContent>
             </Card>
           </div>
