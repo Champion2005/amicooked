@@ -541,13 +541,6 @@ export default function Results() {
 
 
                 </CardContent>
-                {analysis.activityInsight && (
-                  <div className="px-5 pb-4">
-                    <p className="text-xs text-gray-500">
-                      AI Notes: {analysis.activityInsight}
-                    </p>
-                  </div>
-                )}
               </Card>
 
               {/* Languages */}
