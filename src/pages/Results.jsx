@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import {
@@ -17,8 +17,18 @@ import {
   TrendingUp,
   Send,
   MessageSquare,
+  LogOut,
+  RefreshCw,
+  Loader2,
+  ChevronDown,
 } from "lucide-react";
+import { signOut } from "firebase/auth";
+import { auth } from "@/config/firebase";
+import { fetchGitHubData } from "@/services/github";
+import { analyzeCookedLevel, RecommendedProjects } from "@/services/openrouter";
+import { getUserProfile } from "@/services/userProfile";
 import ChatPopup from "@/components/ChatPopup";
+import ProjectPopup from "@/components/ProjectPopup";
 
 export default function Results() {
   const location = useLocation();
@@ -31,12 +41,70 @@ export default function Results() {
   const [chatQuery, setChatQuery] = useState("");
   const [headerInput, setHeaderInput] = useState("");
   const [jobDescription, setJobDescription] = useState("");
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
+
+  // Close profile menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!githubData || !analysis) {
       navigate("/dashboard");
     }
   }, [githubData, analysis, navigate]);
+
+  const handleReanalyze = async () => {
+    setShowReanalyzeConfirm(false);
+    setReanalyzing(true);
+    try {
+      const token = localStorage.getItem("github_token");
+      if (!token) throw new Error("No GitHub token found");
+
+      const data = await fetchGitHubData(token);
+      const userId = auth.currentUser?.uid;
+      const profile = userId ? await getUserProfile(userId) : userProfile;
+      const newAnalysis = await analyzeCookedLevel(data, profile || userProfile);
+      const newProjects = await RecommendedProjects(data, profile || userProfile);
+
+      navigate("/results", {
+        state: {
+          githubData: data,
+          analysis: newAnalysis,
+          userProfile: profile || userProfile,
+          recommendedProjects: newProjects,
+        },
+        replace: true,
+      });
+    } catch (error) {
+      console.error("Reanalysis error:", error);
+      alert("Failed to reanalyze. Please try again.");
+    } finally {
+      setReanalyzing(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setShowSignOutConfirm(false);
+    try {
+      await signOut(auth);
+      localStorage.removeItem("github_token");
+      navigate("/");
+    } catch (error) {
+      console.error("Sign out error:", error);
+    }
+  };
 
   const getCookedColor = (level) => {
       if (level <= 2) return "text-green-500";
@@ -79,7 +147,7 @@ export default function Results() {
       <div className="min-h-screen bg-[#0d1117]">
         {/* Header */}
         <header className="border-b border-[#30363d] bg-[#020408]">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="max-w-full mx-auto px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center">
                 <Flame className="w-6 h-6 text-orange-500" />
@@ -125,6 +193,66 @@ export default function Results() {
               >
                 <MessageSquare className="w-4 h-4" />
               </button>
+            </div>
+            {/* Profile Menu */}
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                onClick={() => setProfileMenuOpen((v) => !v)}
+                className="flex items-center gap-2 px-2 py-1 rounded-full border border-[#30363d] hover:bg-[#1c2128] transition-colors"
+              >
+                <img
+                  src={githubData.avatarUrl}
+                  alt={githubData.username}
+                  className="w-8 h-8 rounded-full"
+                />
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${profileMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {profileMenuOpen && (
+                <div className="absolute right-0 mt-2 w-52 bg-[#161b22] border border-[#30363d] rounded-lg shadow-xl py-1 z-50">
+                  <button
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      navigate("/profile", {
+                        state: {
+                          returnTo: "/results",
+                          resultsData: { githubData, analysis, userProfile, recommendedProjects },
+                        },
+                      });
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#1c2128] hover:text-white transition-colors"
+                  >
+                    <User className="w-4 h-4" />
+                    Edit Profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      setShowReanalyzeConfirm(true);
+                    }}
+                    disabled={reanalyzing}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#1c2128] hover:text-white transition-colors disabled:opacity-50"
+                  >
+                    {reanalyzing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    {reanalyzing ? 'Reanalyzing...' : 'Reanalyze'}
+                  </button>
+                  <div className="border-t border-[#30363d] my-1" />
+                  <button
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      setShowSignOutConfirm(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -253,7 +381,8 @@ export default function Results() {
                     {recommendedProjects.slice(0, 4).map((rec, idx) => (
                         <div
                             key={idx}
-                            className="bg-[#0d1117] p-4 rounded-lg border border-[#30363d]"
+                            className="bg-[#0d1117] p-4 rounded-lg border border-[#30363d] cursor-pointer hover:border-[#58a6ff] hover:bg-[#1c2128] transition-colors"
+                            onClick={() => setSelectedProject(rec)}
                         >
                           <h3 className="font-semibold text-white mb-2">
                             {rec.name}
@@ -443,7 +572,7 @@ export default function Results() {
                   <button
                     onClick={() => {
                       if (jobDescription.trim()) {
-                        const query = `I want you to evaluate how well my GitHub profile fits this job description. Analyze my strengths and weaknesses relative to the requirements, give me a clear verdict on whether I'm COOKED or COOKING for this role, and provide specific actionable goals I can work on to improve my GitHub and increase my chances of landing this job.\n\nJob Description:\n${jobDescription.trim()}`;
+                        const query = `I want you to evaluate how well my GitHub profile fits this job description. Analyze my strengths and weaknesses relative to the requirements, and provide specific actionable goals I can work on to improve my GitHub and increase my chances of landing this job.\n\nJob Description:\n${jobDescription.trim()}`;
                         setChatQuery(query);
                         setChatOpen(true);
                       }
@@ -472,6 +601,70 @@ export default function Results() {
           userProfile={userProfile}
           analysis={analysis}
         />
+
+        {/* Project Detail Popup */}
+        <ProjectPopup
+          isOpen={!!selectedProject}
+          onClose={() => setSelectedProject(null)}
+          project={selectedProject}
+          githubData={githubData}
+          userProfile={userProfile}
+          analysis={analysis}
+        />
+
+        {/* Reanalyze Confirmation */}
+        {showReanalyzeConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowReanalyzeConfirm(false)} />
+            <div className="relative bg-[#161b22] border border-[#30363d] rounded-xl p-6 max-w-sm mx-4 shadow-2xl">
+              <h3 className="text-lg font-bold text-white mb-2">Reanalyze Profile?</h3>
+              <p className="text-sm text-gray-400 mb-6">
+                This will re-fetch your GitHub data and run a fresh AI analysis. This may take a moment.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowReanalyzeConfirm(false)}
+                  className="flex-1 px-4 py-2 rounded-md border border-[#30363d] text-gray-300 hover:bg-[#1c2128] text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReanalyze}
+                  className="flex-1 px-4 py-2 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white text-sm transition-colors"
+                >
+                  Reanalyze
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sign Out Confirmation */}
+        {showSignOutConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowSignOutConfirm(false)} />
+            <div className="relative bg-[#161b22] border border-[#30363d] rounded-xl p-6 max-w-sm mx-4 shadow-2xl">
+              <h3 className="text-lg font-bold text-white mb-2">Sign Out?</h3>
+              <p className="text-sm text-gray-400 mb-6">
+                Are you sure you want to sign out? You'll need to log in again to view your results.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSignOutConfirm(false)}
+                  className="flex-1 px-4 py-2 rounded-md border border-[#30363d] text-gray-300 hover:bg-[#1c2128] text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="flex-1 px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm transition-colors"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <footer className="border-t border-[#30363d] bg-[#161b22] mt-12">
