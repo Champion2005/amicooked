@@ -38,6 +38,7 @@ export default function Profile() {
   const [formData, setFormData] = useState({
     age: '',
     education: '',
+    technicalSkills: '',
     technicalInterests: '',
     hobbies: '',
     careerGoal: '',
@@ -84,7 +85,7 @@ export default function Profile() {
     if (!user) return;
 
     // Validate required fields
-    if (!formData.age || !formData.education || !formData.technicalInterests || 
+    if (!formData.age || !formData.education || !formData.technicalSkills || 
         !formData.experienceYears || !formData.careerGoal || !formData.currentRole) {
       alert('Please fill in all required fields');
       return;
@@ -204,10 +205,30 @@ export default function Profile() {
               </select>
             </div>
 
+            {/* Technical Skills */}
+            <div className="space-y-2">
+              <label htmlFor="technicalSkills" className="text-sm font-medium text-gray-300">
+                Technical Skills <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="technicalSkills"
+                name="technicalSkills"
+                rows="3"
+                placeholder="e.g., JavaScript, React, Python, SQL, Docker, Git"
+                className="w-full px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
+                value={formData.technicalSkills}
+                onChange={handleInputChange}
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-500">
+                List languages, frameworks, and tools you have experience with
+              </p>
+            </div>
+
             {/* Technical Interests */}
             <div className="space-y-2">
               <label htmlFor="technicalInterests" className="text-sm font-medium text-gray-300">
-                Technical Interests <span className="text-red-500">*</span>
+                Technical Interests <span className="text-gray-500">(Optional)</span>
               </label>
               <textarea
                 id="technicalInterests"
@@ -220,7 +241,7 @@ export default function Profile() {
                 disabled={loading}
               />
               <p className="text-xs text-gray-500">
-                List areas of tech you're passionate about or want to work in
+                Areas of tech you're passionate about or want to explore
               </p>
             </div>
 
@@ -320,7 +341,7 @@ export default function Profile() {
             )}
             <Button 
               onClick={handleSaveProfile}
-              disabled={loading || !formData.age || !formData.education || !formData.technicalInterests || !formData.experienceYears || !formData.careerGoal || !formData.currentRole}
+              disabled={loading || !formData.age || !formData.education || !formData.technicalSkills || !formData.experienceYears || !formData.careerGoal || !formData.currentRole}
               className={`h-12 text-lg bg-[#58a6ff] hover:bg-[#4a9aee] text-white ${!isEditing ? 'w-full' : 'flex-1'}`}
               size="lg"
             >
