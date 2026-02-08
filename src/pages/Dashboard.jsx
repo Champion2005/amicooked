@@ -94,7 +94,12 @@ export default function Dashboard() {
       <Card className="max-w-3xl w-full bg-[#161b22] border-[#30363d]">
         <CardHeader>
           <div className="flex justify-center mb-4">
-            <img src={logo} alt="AmICooked" className="w-16 h-16 rounded-full object-cover" />
+            <button
+              onClick={() => navigate("/")}
+              className="cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              <img src={logo} alt="AmICooked" className="w-16 h-16 rounded-full object-cover" />
+            </button>
           </div>
           <CardTitle className="text-3xl text-center text-white">
             Ready to Analyze!
