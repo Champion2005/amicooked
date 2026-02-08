@@ -497,24 +497,30 @@ export default function Results() {
                   </div>
 
                   {/* RIGHT — STATS */}
-                  <div className="grid grid-cols-[auto_1fr] gap-x-8 gap-y-[5px] text-xs text-gray-400 min-w-[180px] mt-4">
+                  <div className="mt-4 w-[200px]">
 
-                    <span>Activity Level:</span>
-                    <span className="text-white text-right">0.92</span>
+                    <div className="grid grid-cols-[1fr_auto] items-center pr-3 gap-y-[5px] text-xs text-gray-400">
 
-                    <span>Avg Commits / m:</span>
-                    <span className="text-white text-right">34</span>
+                      <span>Activity Level:</span>
+                      <span className="text-white text-right">0.92</span>
 
-                    <span>Momentum:</span>
-                    <span className="text-white text-right">1.4</span>
+                      <span>Avg Commits / m:</span>
+                      <span className="text-white text-right">34</span>
 
-                    <span>Current Streak:</span>
-                    <span className="text-white text-right">12</span>
+                      <span>Momentum:</span>
+                      <span className="text-white text-right">1.4</span>
 
-                    <span>Consistency:</span>
-                    <span className="text-white text-right">0.88</span>
+                      <span>Current Streak:</span>
+                      <span className="text-white text-right">12</span>
+
+                      <span>Consistency:</span>
+                      <span className="text-white text-right">0.88</span>
+
+                    </div>
 
                   </div>
+
+
 
                 </CardContent>
               </Card>
