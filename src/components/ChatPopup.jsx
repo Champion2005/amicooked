@@ -252,7 +252,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
           )}
           <img src={logo} alt="AmICooked" className="w-10 h-10 rounded-full object-cover" />
           <div>
-            <h1 className="text-xl font-bold text-white">AI Chat</h1>
+            <h1 className="text-xl font-bold text-white">AmICooked Bot</h1>
             <p className="text-xs text-gray-400">Ask anything about your profile</p>
           </div>
         </div>
