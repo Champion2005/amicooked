@@ -178,19 +178,18 @@ export async function RecommendedProjects(githubData, userProfile) {
 
   const contextStr = `${userProfile.education?.replace(/_/g, ' ')} (${userProfile.age} years old)`;
   const experienceStr = userProfile.experienceYears?.replace(/_/g, ' ') || 'Unknown';
-  const prompt = `User Profile:\n- Age: ${userProfile.age}\n- Education: ${userProfile.education?.replace(/_/g, ' ')}\n- Experience: ${experienceStr}\n- Current Status: ${userProfile.currentRole || 'Unknown'}\n- Career Goal: ${userProfile.careerGoal || 'Not specified'}\n- Technical Skills: ${userProfile.technicalSkills || 'Not specified'}${userProfile.technicalInterests ? `\n- Technical Interests: ${userProfile.technicalInterests}` : ''}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ''}\n\nGitHub Skills:\n- Top Languages: ${githubData.languages?.join(', ') || 'Unknown'}\n\nSuggest four simple projects using skills the user has little or no experience with. Include detailed info for each project.`;
+  const prompt = `User Profile:\n- Age: ${userProfile.age}\n- Education: ${userProfile.education?.replace(/_/g, ' ')}\n- Experience: ${experienceStr}\n- Current Status: ${userProfile.currentRole || 'Unknown'}\n- Career Goal: ${userProfile.careerGoal || 'Not specified'}\n- Technical Skills: ${userProfile.technicalSkills || 'Not specified'}${userProfile.technicalInterests ? `\n- Technical Interests: ${userProfile.technicalInterests}` : ''}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ''}\n\nGitHub Skills:\n- Top Languages: ${githubData.languages?.join(', ') || 'Unknown'}\n\nSuggest four simple projects using skills the user has little or no experience with. Include detailed info for each project.\n\nIMPORTANT: Return ONLY valid JSON. No trailing commas. Use double quotes for all keys and string values. Avoid apostrophes (use \"is not\" instead of \"isn't\"). Spaces in names and descriptions are fine and expected.`;
 
   try {
     const response = await callOpenRouter(prompt, systemPrompt);
-    // Try to parse JSON array from response
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const result = safeParseJSON(jsonMatch[0]);
-      if (result) return result;
+      if (result && Array.isArray(result) && result.length > 0) return result;
     }
     throw new Error('Could not parse AI project recommendations');
   } catch (error) {
     console.error('AI project recommendation error:', error);
-    return [];
+    throw error;
   }
 }
