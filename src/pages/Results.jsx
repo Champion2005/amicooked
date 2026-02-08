@@ -80,10 +80,10 @@ export default function Results() {
   };
 
   const getCookedColor = (level) => {
-      if (level <= 2) return "text-green-500";
-      if (level <= 4) return "text-yellow-500";
-      if (level <= 6) return "text-orange-500";
-      if (level <= 8) return "text-red-500";
+      if (level >= 9) return "text-green-500";
+      if (level >= 7) return "text-yellow-500";
+      if (level >= 5) return "text-orange-500";
+      if (level >= 3) return "text-red-500";
       return "text-red-600";
     };
 

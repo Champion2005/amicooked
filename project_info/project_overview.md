@@ -19,11 +19,11 @@ The system aggregates key performance indicators from the user's GitHub profile,
 **2. The "Cooked Level" Algorithm**
 Using this data, the system calculates a score that represents the user's current standing in the job market.
 
-* **Low Score (0-2):** "Cooking" / Ahead of the curve.
-* **3-4:** "Toasted" / Slightly behind.
+* **9-10:** "Cooking" / Ahead of the curve.
+* **7-8:** "Toasted" / Slightly behind.
 * **5-6:** "Cooked" / Concerning gaps.
-* **7-8:** "Well-Done" / Significant issues.
-* **9-10:** "Burnt" / Unemployable without major changes.
+* **3-4:** "Well-Done" / Significant issues.
+* **1-2:** "Burnt" / Unemployable without major changes.
 
 **3. AI Summary & Employability Check**
 A generative AI model digests the data to provide a concise, qualitative summary. It highlights critical gaps—such as a lack of collaborative projects (0 PRs) or being "one-dimensional" (100% HTML/CSS)—and offers a clear verdict on whether the user is ready for recruiters.
