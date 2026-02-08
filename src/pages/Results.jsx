@@ -259,7 +259,7 @@ export default function Results() {
                             {rec.name}
                           </h3>
 
-                          <div className="flex flex-wrap">
+                          <div className="flex flex-wrap gap-2">
                             <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-green-500">
                               ● {rec.skill1}
                             </span>
@@ -280,87 +280,118 @@ export default function Results() {
                 </CardContent>
               </Card>
 
+              <Card className="bg-[#0d1117] pt-0 border-[#30363d] w-fit">
+                <CardContent className="p-3 grid grid-cols-[auto_auto] gap-6 items-start">
 
-              {/* Activity Heatmap */}
-              <Card className="bg-[#161b22] border-[#30363d]">
-                <CardHeader>
-                  <CardTitle className="text-white">
-                    Contribution Activity
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Last 12 months of GitHub activity
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {heatmap.weeks.length === 0 ? (
-                      <div className="text-center py-8">
-                        <p className="text-gray-400">
-                          No contribution data available
-                        </p>
-                        <p className="text-xs text-gray-500 mt-2">
-                          Check browser console for debug info
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex gap-1">
-                          <div className="flex flex-col justify-between text-xs text-gray-400 mr-2 h-[84px]">
-                            {heatmap.days.map((day, i) => (
-                              <div key={i} className="h-3 leading-3">
-                                {day}
-                              </div>
-                            ))}
+                  {/* LEFT — HEATMAP */}
+                  <div>
+                    <div className="space-y-1">
+                      {heatmap.weeks.length === 0 ? (
+                          <div className="text-center py-6">
+                            <p className="text-gray-400 text-xs">
+                              No contribution data available
+                            </p>
                           </div>
-                          <div className="flex-1 overflow-x-auto">
-                            <div className="flex gap-1">
-                              {heatmap.weeks.map((week, weekIndex) => (
-                                <div
-                                  key={weekIndex}
-                                  className="flex flex-col gap-1"
-                                >
-                                  {week.contributionDays.map(
-                                    (day, dayIndex) => {
-                                      const getIntensity = (count) => {
-                                        if (count === 0) return "bg-[#0d1117]";
-                                        if (count < 3) return "bg-green-900/60";
-                                        if (count < 6) return "bg-green-700/70";
-                                        if (count < 10)
-                                          return "bg-green-600/90";
-                                        return "bg-green-500";
-                                      };
-                                      return (
-                                        <div
-                                          key={dayIndex}
-                                          className={`w-3 h-3 rounded-sm ${getIntensity(
-                                            day.contributionCount
-                                          )} border border-[#30363d]`}
-                                          title={`${day.contributionCount} contributions on ${day.date}`}
-                                        />
-                                      );
+                      ) : (
+                          <>
+                            {/* Month labels */}
+                            <div className="ml-[30px] mb-1">
+                              <div className="flex">
+                                {(() => {
+                                  const months = [];
+
+                                  heatmap.weeks.forEach((week, i) => {
+                                    const date = new Date(week.contributionDays[0].date);
+                                    const month = date.toLocaleString("en-US", { month: "short" });
+
+                                    if (!months.length || months[months.length - 1].name !== month) {
+                                      months.push({ name: month, weeks: 1 });
+                                    } else {
+                                      months[months.length - 1].weeks++;
                                     }
-                                  )}
-                                </div>
-                              ))}
+                                  });
+
+                                  return months.map((m, i) => (
+                                      <div
+                                          key={i}
+                                          className="text-[10px] text-gray-500"
+                                          style={{
+                                            width: `${m.weeks * 14}px`,
+                                          }}
+                                      >
+                                        {m.name}
+                                      </div>
+                                  ));
+                                })()}
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-400 mt-4">
-                          <span>Less</span>
-                          <div className="flex gap-1">
-                            <div className="w-3 h-3 rounded-sm bg-[#0d1117] border border-[#30363d]"></div>
-                            <div className="w-3 h-3 rounded-sm bg-green-900/60 border border-[#30363d]"></div>
-                            <div className="w-3 h-3 rounded-sm bg-green-700/70 border border-[#30363d]"></div>
-                            <div className="w-3 h-3 rounded-sm bg-green-600/90 border border-[#30363d]"></div>
-                            <div className="w-3 h-3 rounded-sm bg-green-500 border border-[#30363d]"></div>
-                          </div>
-                          <span>More</span>
-                        </div>
-                      </>
-                    )}
+
+                            <div className="flex gap-2">
+                              <div className="flex flex-col justify-between mt-3 text-[10px] text-gray-500 h-[84px]">
+                                {["Mon", "", "Wed", "", "Fri", "", ""].map((d, i) => (
+                                    <div key={i}>{d}</div>
+                                ))}
+                              </div>
+
+                              {/* Heatmap */}
+                              <div className="flex-1 overflow-x-auto">
+                                <div className="flex gap-[2px]">
+                                  {heatmap.weeks.map((week, weekIndex) => (
+                                      <div key={weekIndex} className="flex flex-col gap-[2px]">
+                                        {week.contributionDays.map((day, dayIndex) => {
+                                          const getIntensity = (count) => {
+                                            if (count === 0) return "bg-[#151b23]";
+                                            if (count < 3) return "bg-[#023a16]";
+                                            if (count < 6) return "bg-[#17682d]";
+                                            if (count < 10) return "bg-[#186d2e]";
+                                            return "bg-[#57d463]";
+                                          };
+
+                                          return (
+                                              <div
+                                                  key={dayIndex}
+                                                  title={`${day.contributionCount} contributions on ${day.date}`}
+                                                  className={`w-3 h-3 rounded-[2px] ${getIntensity(
+                                                      day.contributionCount
+                                                  )}`}
+                                              />
+                                          );
+                                        })}
+                                      </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                      )}
+                    </div>
                   </div>
+
+                  {/* RIGHT — STATS */}
+                  <div className="grid grid-cols-[auto_1fr] gap-x-8 gap-y-[5px] text-xs text-gray-400 min-w-[180px] mt-4">
+
+                    <span>Activity Level:</span>
+                    <span className="text-white text-right">0.92</span>
+
+                    <span>Avg Commits / m:</span>
+                    <span className="text-white text-right">34</span>
+
+                    <span>Momentum:</span>
+                    <span className="text-white text-right">1.4</span>
+
+                    <span>Current Streak:</span>
+                    <span className="text-white text-right">12</span>
+
+                    <span>Consistency:</span>
+                    <span className="text-white text-right">0.88</span>
+
+                  </div>
+
+
                 </CardContent>
               </Card>
+
+
 
               {/* Languages */}
               <Card className="bg-[#161b22] border-[#30363d]">
