@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { Flame, Github, User, GraduationCap, Target, TrendingUp } from 'lucide-react';
+import { Flame, Github, User, GraduationCap, Target, TrendingUp, Send, MessageSquare } from 'lucide-react';
+import ChatPopup from '@/components/ChatPopup';
 
 export default function Results() {
   const location = useLocation();
@@ -9,8 +11,17 @@ export default function Results() {
   
   const { githubData, analysis, userProfile } = location.state || {};
 
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatQuery, setChatQuery] = useState('');
+  const [headerInput, setHeaderInput] = useState('');
+
+  useEffect(() => {
+    if (!githubData || !analysis) {
+      navigate('/dashboard');
+    }
+  }, [githubData, analysis, navigate]);
+
   if (!githubData || !analysis) {
-    navigate('/dashboard');
     return null;
   }
 
@@ -66,7 +77,7 @@ export default function Results() {
   return (
     <div className="min-h-screen bg-[#0d1117]">
       {/* Header */}
-      <header className="border-b border-[#30363d] bg-[#161b22]">
+      <header className="border-b border-[#30363d] bg-[#020408]">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center">
@@ -74,12 +85,45 @@ export default function Results() {
             </div>
             <h1 className="text-2xl font-bold text-white">AmICooked?</h1>
           </div>
-          <div className="flex-1 max-w-2xl mx-8">
+          <div className="flex-1 max-w-2xl mx-8 flex gap-2">
             <input
               type="text"
               placeholder="Ask AI Anything about your profile..."
-              className="w-full px-4 py-2 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+              className="flex-1 px-4 py-2 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+              value={headerInput}
+              onChange={(e) => setHeaderInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && headerInput.trim()) {
+                  setChatQuery(headerInput.trim());
+                  setChatOpen(true);
+                  setHeaderInput('');
+                }
+              }}
             />
+            <button
+              onClick={() => {
+                if (headerInput.trim()) {
+                  setChatQuery(headerInput.trim());
+                  setChatOpen(true);
+                  setHeaderInput('');
+                }
+              }}
+              disabled={!headerInput.trim()}
+              className="px-4 py-2 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+            >
+              <Send className="w-4 h-4" />
+              Ask
+            </button>
+            <button
+              onClick={() => {
+                setChatQuery('');
+                setChatOpen(true);
+              }}
+              className="px-3 py-2 rounded-md border border-[#30363d] text-gray-400 hover:text-white hover:bg-[#1c2128] flex items-center gap-1 text-sm"
+              title="Chat History"
+            >
+              <MessageSquare className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </header>
@@ -334,6 +378,19 @@ export default function Results() {
           </div>
         </div>
       </div>
+
+      {/* Chat Popup */}
+      <ChatPopup
+        isOpen={chatOpen}
+        onClose={() => {
+          setChatOpen(false);
+          setChatQuery('');
+        }}
+        initialQuery={chatQuery}
+        githubData={githubData}
+        userProfile={userProfile}
+        analysis={analysis}
+      />
 
       {/* Footer */}
       <footer className="border-t border-[#30363d] bg-[#161b22] mt-12">

@@ -90,7 +90,7 @@ Provide your response in this exact JSON format:
 {
   "cookedLevel": <number 0-10>,
   "levelName": "<e.g., Cooked Medium Rare>",
-  "summary": "<2-3 sentence honest assessment>",
+  "summary": "<1-2 sentence honest assessment>",
   "recommendations": [
     "<specific actionable task 1>",
     "<specific actionable task 2>",
