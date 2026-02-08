@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Loader2,
   ChevronDown,
+  Info,
 } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/config/firebase";
@@ -144,6 +145,53 @@ export default function Results() {
     };
 
     const heatmap = generateHeatmap();
+
+    // Compute real stats from GitHub data
+    const computeStats = () => {
+      const calendar = githubData.contributionCalendar;
+      const allDays = calendar.weeks.flatMap(w => w.contributionDays);
+      const totalDays = allDays.length;
+      const activeDays = allDays.filter(d => d.contributionCount > 0).length;
+
+      // Activity level: ratio of active days to total days (0-1)
+      const activityLevel = totalDays > 0 ? (activeDays / totalDays).toFixed(2) : '0.00';
+
+      // Avg commits per month: total contributions / months covered
+      const monthsCovered = Math.max(1, Math.round(totalDays / 30));
+      const avgCommitsPerMonth = Math.round(calendar.totalContributions / monthsCovered);
+
+      // Current streak (already computed in githubData)
+      const currentStreak = githubData.streak || 0;
+
+      // Longest streak
+      let longestStreak = 0;
+      let tempStreak = 0;
+      const chronoDays = calendar.weeks.flatMap(w => w.contributionDays);
+      for (const day of chronoDays) {
+        if (day.contributionCount > 0) { tempStreak++; longestStreak = Math.max(longestStreak, tempStreak); }
+        else { tempStreak = 0; }
+      }
+
+      // Consistency: std-dev based — low variance = high consistency
+      const counts = allDays.map(d => d.contributionCount);
+      const mean = counts.reduce((a, b) => a + b, 0) / counts.length;
+      const variance = counts.reduce((sum, c) => sum + (c - mean) ** 2, 0) / counts.length;
+      const stdDev = Math.sqrt(variance);
+      // Normalize: consistency = 1 / (1 + coefficient of variation)
+      const consistency = mean > 0 ? (1 / (1 + stdDev / mean)).toFixed(2) : '0.00';
+
+      return { activityLevel, avgCommitsPerMonth, currentStreak, longestStreak, consistency };
+    };
+
+    const stats = computeStats();
+
+    const statItems = [
+      { label: 'Activity Level', value: stats.activityLevel, tip: 'Ratio of days with at least one contribution over the past year (0–1)' },
+      { label: 'Avg Commits / mo', value: stats.avgCommitsPerMonth, tip: 'Average number of contributions per month over the past year' },
+      { label: 'Current Streak', value: `${stats.currentStreak}d`, tip: 'Number of consecutive days with contributions up to today' },
+      { label: 'Longest Streak', value: `${stats.longestStreak}d`, tip: 'Longest consecutive run of days with at least one contribution' },
+      { label: 'Consistency', value: stats.consistency, tip: 'How evenly spread your contributions are — 1.0 = perfectly even, lower = spiky bursts' },
+    ];
 
     return (
       <div className="min-h-screen bg-[#0d1117]">
@@ -515,27 +563,23 @@ export default function Results() {
                   </div>
 
                   {/* RIGHT — STATS */}
-                  <div className="mt-4 w-[200px]">
-
-                    <div className="grid grid-cols-[1fr_auto] items-center pr-3 gap-y-[5px] text-xs text-gray-400">
-
-                      <span>Activity Level:</span>
-                      <span className="text-white text-right">0.92</span>
-
-                      <span>Avg Commits / m:</span>
-                      <span className="text-white text-right">34</span>
-
-                      <span>Momentum:</span>
-                      <span className="text-white text-right">1.4</span>
-
-                      <span>Current Streak:</span>
-                      <span className="text-white text-right">12</span>
-
-                      <span>Consistency:</span>
-                      <span className="text-white text-right">0.88</span>
-
+                  <div className="mt-4 w-[220px]">
+                    <div className="space-y-[6px] pr-3 text-xs text-gray-400">
+                      {statItems.map((item, i) => (
+                        <div key={i} className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1">
+                            {item.label}
+                            <span className="relative group">
+                              <Info className="w-3 h-3 text-gray-600 hover:text-gray-400 cursor-help" />
+                              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-48 px-2 py-1.5 text-[10px] text-gray-200 bg-[#1c2128] border border-[#30363d] rounded-md shadow-lg z-10 text-center leading-tight">
+                                {item.tip}
+                              </span>
+                            </span>
+                          </span>
+                          <span className="text-white font-medium">{item.value}</span>
+                        </div>
+                      ))}
                     </div>
-
                   </div>
 
 
