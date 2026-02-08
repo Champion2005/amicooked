@@ -98,16 +98,17 @@ export default function Results() {
     return "text-red-600";
   };
 
-  const getLanguageStatus = (index) => {
-    const statuses = ["Seasoned", "Cooked", "Warming Up", "Raw"];
-    return statuses[index % statuses.length];
+  const getLanguageStatus = (lang) => {
+    const statuses = ["Seasoned", "Warming Up", "Cooked"];
+    if (githubData.frontend[lang] >= 5) return "Seasoned";
+    if (githubData.frontend[lang] >= 3) return "Warming Up";
+    return "Cooked";
   };
 
   const getStatusColor = (status) => {
-    if (status === "Seasoned") return "bg-blue-500";
-    if (status === "Cooked") return "bg-yellow-500";
+    if (status === "Seasoned") return "bg-yellow-500";
     if (status === "Warming Up") return "bg-orange-500";
-    return "bg-red-500";
+    if (status === "Cooked") return "bg-red-500";
   };
 
   // Generate contribution heatmap data from GitHub
@@ -682,12 +683,12 @@ export default function Results() {
                                 >
                                   <div
                                     className={`w-2 h-2 rounded-full ${getStatusColor(
-                                      getLanguageStatus(idx),
+                                      getLanguageStatus(lang),
                                     )}`}
                                   />
                                   <span className="text-gray-300">{lang}</span>
                                   <span className="text-gray-500 ml-auto">
-                                    {getLanguageStatus(idx)}
+                                    {getLanguageStatus(lang)}
                                   </span>
                                 </div>
                               ))
@@ -715,12 +716,12 @@ export default function Results() {
                                 >
                                   <div
                                     className={`w-2 h-2 rounded-full ${getStatusColor(
-                                      getLanguageStatus(idx),
+                                      getLanguageStatus(lang),
                                     )}`}
                                   />
                                   <span className="text-gray-300">{lang}</span>
                                   <span className="text-gray-500 ml-auto">
-                                    {getLanguageStatus(idx)}
+                                    {getLanguageStatus(lang)}
                                   </span>
                                 </div>
                               ))
