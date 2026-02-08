@@ -20,11 +20,15 @@ import {
   MessageSquare,
   LogOut,
   RefreshCw,
+  Loader2,
   ChevronDown,
   Info,
 } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/config/firebase";
+import { fetchGitHubData } from "@/services/github";
+import { analyzeCookedLevel, RecommendedProjects } from "@/services/openrouter";
+import { getUserProfile } from "@/services/userProfile";
 import ChatPopup from "@/components/ChatPopup";
 import ProjectPopup from "@/components/ProjectPopup";
 
@@ -42,6 +46,7 @@ export default function Results() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [reanalyzing, setReanalyzing] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [showRecommendations, setShowRecommendations] = useState(false);
   const profileMenuRef = useRef(null);
@@ -63,9 +68,34 @@ export default function Results() {
     }
   }, [githubData, analysis, navigate]);
 
-  const handleReanalyze = () => {
+  const handleReanalyze = async () => {
     setShowReanalyzeConfirm(false);
-    navigate("/dashboard", { state: { reanalyze: true } });
+    setReanalyzing(true);
+    try {
+      const token = localStorage.getItem("github_token");
+      if (!token) throw new Error("No GitHub token found");
+
+      const data = await fetchGitHubData(token);
+      const userId = auth.currentUser?.uid;
+      const profile = userId ? await getUserProfile(userId) : userProfile;
+      const newAnalysis = await analyzeCookedLevel(data, profile || userProfile);
+      const newProjects = await RecommendedProjects(data, profile || userProfile);
+
+      navigate("/results", {
+        state: {
+          githubData: data,
+          analysis: newAnalysis,
+          userProfile: profile || userProfile,
+          recommendedProjects: newProjects,
+        },
+        replace: true,
+      });
+    } catch (error) {
+      console.error("Reanalysis error:", error);
+      alert("Failed to reanalyze. Please try again.");
+    } finally {
+      setReanalyzing(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -87,16 +117,17 @@ export default function Results() {
       return "text-red-600";
     };
 
-    const getLanguageStatus = (index) => {
-      const statuses = ["Seasoned", "Cooked", "Warming Up", "Raw"];
-      return statuses[index % statuses.length];
+    const getLanguageStatus = (lang) => {
+      const statuses = ["Seasoned", "Warming Up", "Cooked"];
+      if (githubData.frontend[lang] >= 5) return "Seasoned";
+      if (githubData.frontend[lang] >= 3) return "Warming Up";
+      return "Cooked";
     };
 
     const getStatusColor = (status) => {
-      if (status === "Seasoned") return "bg-blue-500";
-      if (status === "Cooked") return "bg-yellow-500";
+      if (status === "Seasoned") return "bg-yellow-500";
       if (status === "Warming Up") return "bg-orange-500";
-      return "bg-red-500";
+      if (status === "Cooked") return "bg-red-500";
     };
 
     // Generate contribution heatmap data from GitHub
@@ -168,13 +199,10 @@ export default function Results() {
         {/* Header */}
         <header className="border-b border-[#30363d] bg-[#020408]">
           <div className="max-w-full mx-auto px-6 py-4 flex items-center justify-between">
-            <button
-              onClick={() => navigate("/")}
-              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-            >
+            <div className="flex items-center gap-3">
               <img src={logo} alt="AmICooked" className="w-10 h-10 rounded-full object-cover" />
               <h1 className="text-2xl font-bold text-white">AmICooked?</h1>
-            </button>
+            </div>
             <div className="flex-1 max-w-2xl mx-8 flex gap-2">
               <input
                 type="text"
@@ -251,10 +279,15 @@ export default function Results() {
                       setProfileMenuOpen(false);
                       setShowReanalyzeConfirm(true);
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#1c2128] hover:text-white transition-colors"
+                    disabled={reanalyzing}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#1c2128] hover:text-white transition-colors disabled:opacity-50"
                   >
-                    <RefreshCw className="w-4 h-4" />
-                    Reanalyze
+                    {reanalyzing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    {reanalyzing ? 'Reanalyzing...' : 'Reanalyze'}
                   </button>
                   <div className="border-t border-[#30363d] my-1" />
                   <button
@@ -398,27 +431,7 @@ export default function Results() {
                   </div>
 
                   <div className="flex items-start">
-                    <div className="relative w-24 h-24 shrink-0">
-                      {/* Progress Ring */}
-                      <div
-                          className="absolute inset-0 rounded-full"
-                          style={{
-                            background: `conic-gradient(
-                              #ef4444 ${analysis.cookedLevel * 36}deg,
-                              #1f2831 0deg
-                            )`,
-
-                          }}
-                      />
-
-                      {/* Inner Circle */}
-                      <div className="absolute inset-2 bg-[#0d1117] rounded-full flex flex-col items-center justify-center">
-                          <span className="text-[28px] font-semibold text-white">
-                            {analysis.cookedLevel}
-                          </span>
-                      </div>
-                    </div>
-
+                    <div className="w-24 h-24 rounded-full bg-[#1f2831] shrink-0" />
                   </div>
                 </CardContent>
               </Card>
@@ -536,9 +549,8 @@ export default function Results() {
                                                   title={`${day.contributionCount} contributions on ${day.date}`}
                                                   className={`w-3 h-3 rounded-[2px] ${getIntensity(
                                                       day.contributionCount
-                                                  )} transition-transform duration-150 hover:scale-125`}
+                                                  )}`}
                                               />
-
                                           );
                                         })}
                                       </div>
@@ -571,133 +583,113 @@ export default function Results() {
                     </div>
                   </div>
 
+
+
                 </CardContent>
               </Card>
 
-              <div className="flex flex-col md:flex-row gap-6">
-
-                {/* Languages */}
-                <div className="flex-1">
-                  <h2 className="text-lg font-semibold pb-2 text-white mb-1">
-                    Languages
-                  </h2>
-
-                  <Card className="bg-[#161b22] border-[#30363d]">
-                    <CardContent className="py-3">
-
-                      <div className="grid grid-cols-2 gap-8">
-                        <div>
-                          <h3 className="text-sm font-semibold text-white mb-3">
-                            Frontend:
-                          </h3>
-
-                          <div className="space-y-2">
-                            {githubData.languages.slice(0, 4).map((lang, idx) => (
-                                <div key={idx} className="flex items-center gap-2 text-sm">
-                                  <div
-                                      className={`w-2 h-2 rounded-full ${getStatusColor(
-                                          getLanguageStatus(idx)
-                                      )}`}
-                                  />
-
-                                  <span className="text-gray-300">
-                    {lang} –{" "}
-                                    <span className="text-gray-500">
-                      {getLanguageStatus(idx)}
-                    </span>
-                  </span>
-                                </div>
-                            ))}
+              {/* Languages */}
+              <Card className="bg-[#161b22] border-[#30363d]">
+                <CardHeader>
+                  <CardTitle className="text-white">Languages</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-8">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-4">
+                        Frontend:
+                      </h3>
+                      <div className="space-y-3">
+                        {Object.keys(githubData.frontend).length > 0
+                        ? Object.keys(githubData.frontend).slice(0, 4).map((lang, idx) => (
+                          <div key={idx} className="flex items-center gap-3">
+                            <div
+                              className={`w-2 h-2 rounded-full ${getStatusColor(
+                                getLanguageStatus(lang)
+                              )}`}
+                            />
+                            <span className="text-gray-300">{lang}</span>
+                            <span className="text-gray-500 ml-auto">
+                                {getLanguageStatus(lang)}
+                            </span>
                           </div>
-                        </div>
-
-                        <div>
-                          <h3 className="text-sm font-semibold text-white mb-3">
-                            Backend:
-                          </h3>
-
-                          <div className="space-y-2">
-                            {["Node.js", "Java", "Python", "C++"].map((lang, idx) => (
-                                <div key={idx} className="flex items-center gap-2 text-sm">
-                                  <div
-                                      className={`w-2 h-2 rounded-full ${getStatusColor(
-                                          getLanguageStatus(idx + 1)
-                                      )}`}
-                                  />
-
-                                  <span className="text-gray-300">
-                    {lang} –{" "}
-                                    <span className="text-gray-500">
-                      {getLanguageStatus(idx + 1)}
-                    </span>
-                  </span>
-                                </div>
-                            ))}
-                          </div>
-                        </div>
+                        ))
+                        : <p className="text-gray-400 text-sm">No language data available</p>
+                      }
                       </div>
-
-                      {analysis.languageInsight && (
-                          <>
-                            <div className="border-t border-[#30363d] my-3" />
-
-                            <p className="text-xs text-gray-500">
-                              AI Notes: {analysis.languageInsight}
-                            </p>
-                          </>
-                      )}
-
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Employability */}
-                <div className="flex-1">
-                  <h2 className="text-lg font-semibold pb-2 text-white mb-1">
-                    Employability
-                  </h2>
-
-                  <Card className="bg-[#161b22] pb-3 border-[#30363d]">
-                    <CardContent className="py-3">
-
-                      <div className="mb-3">
-                        <p className="text-sm text-gray-400 mb-2">
-                          Paste in Job Description:
-                        </p>
-
-                        <p className="text-xs text-gray-500">
-                          Based on your GitHub statistics, we will tell you if you're COOKED or COOKING
-                        </p>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-4">
+                        Backend:
+                      </h3>
+                      <div className="space-y-3">
+                        {Object.keys(githubData.backend).length > 0
+                        ? Object.keys(githubData.backend).slice(0, 4).map(
+                          (lang, idx) => (
+                            <div key={idx} className="flex items-center gap-3">
+                              <div
+                                className={`w-2 h-2 rounded-full ${getStatusColor(
+                                  getLanguageStatus(lang)
+                                )}`}
+                              />
+                              <span className="text-gray-300">{lang}</span>
+                              <span className="text-gray-500 ml-auto">
+                                {getLanguageStatus(lang)}
+                              </span>
+                            </div>
+                          )
+                        )
+                        : <p className="text-gray-400 text-sm">No language data available</p>
+                      }
                       </div>
+                    </div>
+                  </div>
 
-                      <textarea
-                          placeholder="Enter Text Here..."
-                          className="w-full h-24 px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
-                          value={jobDescription}
-                          onChange={(e) => setJobDescription(e.target.value)}
-                      />
+                  {analysis.languageInsight && (
+                    <p className="text-xs text-gray-500 mt-4">
+                      AI Notes: {analysis.languageInsight}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
 
-                      <button
-                          onClick={() => {
-                            if (jobDescription.trim()) {
-                              const query = `I want you to evaluate how well my GitHub profile fits this job description. Analyze my strengths and weaknesses relative to the requirements, and provide specific actionable goals I can work on to improve my GitHub and increase my chances of landing this job.\n\nJob Description:\n${jobDescription.trim()}`;
-                              setChatQuery(query);
-                              setChatOpen(true);
-                            }
-                          }}
-                          disabled={!jobDescription.trim()}
-                          className="w-full mt-4 px-4 py-2.5 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm transition-colors"
-                      >
-                        <Target className="w-4 h-4" />
-                        Check Employability
-                      </button>
-
-                    </CardContent>
-                  </Card>
-                </div>
-
-              </div>
-
+              {/* Employability */}
+              <Card className="bg-[#161b22] border-[#30363d]">
+                <CardHeader>
+                  <CardTitle className="text-white">Employability</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-3">
+                    <p className="text-sm text-gray-400 mb-2">
+                      Paste in Job Description:
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Based on your GitHub statistics, we will tell you if
+                      you're COOKED or COOKING
+                    </p>
+                  </div>
+                  <textarea
+                    placeholder="Enter Text Here..."
+                    className="w-full h-32 px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                  />
+                  <button
+                    onClick={() => {
+                      if (jobDescription.trim()) {
+                        const query = `I want you to evaluate how well my GitHub profile fits this job description. Analyze my strengths and weaknesses relative to the requirements, and provide specific actionable goals I can work on to improve my GitHub and increase my chances of landing this job.\n\nJob Description:\n${jobDescription.trim()}`;
+                        setChatQuery(query);
+                        setChatOpen(true);
+                      }
+                    }}
+                    disabled={!jobDescription.trim()}
+                    className="w-full mt-4 px-4 py-2.5 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm transition-colors"
+                  >
+                    <Target className="w-4 h-4" />
+                    Check Employability
+                  </button>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
