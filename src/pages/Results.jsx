@@ -109,6 +109,7 @@ export default function Results() {
     if (status === "Seasoned") return "bg-yellow-500";
     if (status === "Warming Up") return "bg-orange-500";
     if (status === "Cooked") return "bg-red-500";
+    return "bg-gray-300";
   };
 
   // Generate contribution heatmap data from GitHub
