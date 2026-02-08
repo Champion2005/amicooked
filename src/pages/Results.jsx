@@ -267,7 +267,7 @@ export default function Results() {
                     <img
                       src={githubData.avatarUrl}
                       alt={githubData.username}
-                      className="w-78 h-78 rounded-full mb-4 border-4 border-[#30363d]"
+                      className="w-78 h-78 rounded-full mb-4 border-2 border-[#30363d]"
                     />
                     <h2 className="text-2xl text-left font-bold text-white mb-1">
                       {githubData.name || githubData.username}
@@ -416,7 +416,7 @@ export default function Results() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-[#0d1117] pt-0 border-[#30363d] w-fit">
+              <Card className="bg-[#0d1117] pt-0 border-[#30363d] w-full">
                 <CardContent className="p-3 grid grid-cols-[auto_auto] gap-6 items-start">
 
                   {/* LEFT — HEATMAP */}
@@ -504,24 +504,29 @@ export default function Results() {
                   </div>
 
                   {/* RIGHT — STATS */}
-                  <div className="grid grid-cols-[auto_1fr] gap-x-8 gap-y-[5px] text-xs text-gray-400 min-w-[180px] mt-4">
+                  <div className="mt-4 w-[200px]">
 
-                    <span>Activity Level:</span>
-                    <span className="text-white text-right">0.92</span>
+                    <div className="grid grid-cols-[1fr_auto] items-center pr-3 gap-y-[5px] text-xs text-gray-400">
 
-                    <span>Avg Commits / m:</span>
-                    <span className="text-white text-right">34</span>
+                      <span>Activity Level:</span>
+                      <span className="text-white text-right">0.92</span>
 
-                    <span>Momentum:</span>
-                    <span className="text-white text-right">1.4</span>
+                      <span>Avg Commits / m:</span>
+                      <span className="text-white text-right">34</span>
 
-                    <span>Current Streak:</span>
-                    <span className="text-white text-right">12</span>
+                      <span>Momentum:</span>
+                      <span className="text-white text-right">1.4</span>
 
-                    <span>Consistency:</span>
-                    <span className="text-white text-right">0.88</span>
+                      <span>Current Streak:</span>
+                      <span className="text-white text-right">12</span>
+
+                      <span>Consistency:</span>
+                      <span className="text-white text-right">0.88</span>
+
+                    </div>
 
                   </div>
+
 
 
                 </CardContent>
@@ -533,8 +538,6 @@ export default function Results() {
                   </div>
                 )}
               </Card>
-
-
 
               {/* Languages */}
               <Card className="bg-[#161b22] border-[#30363d]">
