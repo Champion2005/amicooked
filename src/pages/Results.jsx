@@ -14,6 +14,7 @@ export default function Results() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatQuery, setChatQuery] = useState('');
   const [headerInput, setHeaderInput] = useState('');
+  const [jobDescription, setJobDescription] = useState('');
 
   useEffect(() => {
     if (!githubData || !analysis) {
@@ -47,27 +48,15 @@ export default function Results() {
 
   // Generate contribution heatmap data from GitHub
   const generateHeatmap = () => {
-    console.log('Full GitHub Data:', githubData);
-    console.log('Available keys:', Object.keys(githubData || {}));
-    console.log('Contribution Calendar:', githubData?.contributionCalendar);
-    
-    if (!githubData?.contributionCalendar?.weeks) {
-      console.warn('No contribution calendar data found - creating mock data for now');
-      // Generate mock data with some random contributions for visualization
-      const mockWeeks = Array.from({ length: 52 }, (_, weekIdx) => ({
-        contributionDays: Array.from({ length: 7 }, (_, dayIdx) => ({
-          contributionCount: Math.floor(Math.random() * 15),
-          date: new Date(Date.now() - (52 - weekIdx) * 7 * 24 * 60 * 60 * 1000 + dayIdx * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-        }))
-      }));
-      return { weeks: mockWeeks, days: ['Mon', '', 'Wed', '', 'Fri', '', 'Sun'] };
-    }
+    // console.log('Full GitHub Data:', githubData);
+    // console.log('Available keys:', Object.keys(githubData || {}));
+    // console.log('Contribution Calendar:', githubData?.contributionCalendar);
 
     const weeks = githubData.contributionCalendar.weeks;
     const days = ['Mon', '', 'Wed', '', 'Fri', '', 'Sun'];
     
-    console.log('Weeks data:', weeks);
-    console.log('First week:', weeks[0]);
+    // console.log('Weeks data:', weeks);
+    // console.log('First week:', weeks[0]);
     
     return { weeks, days };
   };
@@ -344,7 +333,23 @@ export default function Results() {
                 <textarea
                   placeholder="Enter Text Here..."
                   className="w-full h-32 px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
                 />
+                <button
+                  onClick={() => {
+                    if (jobDescription.trim()) {
+                      const query = `I want you to evaluate how well my GitHub profile fits this job description. Analyze my strengths and weaknesses relative to the requirements, give me a clear verdict on whether I'm COOKED or COOKING for this role, and provide specific actionable goals I can work on to improve my GitHub and increase my chances of landing this job.\n\nJob Description:\n${jobDescription.trim()}`;
+                      setChatQuery(query);
+                      setChatOpen(true);
+                    }
+                  }}
+                  disabled={!jobDescription.trim()}
+                  className="w-full mt-4 px-4 py-2.5 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm transition-colors"
+                >
+                  <Target className="w-4 h-4" />
+                  Check Employability
+                </button>
               </CardContent>
             </Card>
           </div>
