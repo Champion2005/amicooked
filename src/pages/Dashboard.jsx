@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { fetchGitHubData } from '@/services/github';
 import { analyzeCookedLevel } from '@/services/openrouter';
+import { RecommendedProjects } from '@/services/openrouter';
 import { getUserProfile } from '@/services/userProfile';
 import { Loader2, Flame, User, Edit2 } from 'lucide-react';
 
@@ -55,13 +56,15 @@ export default function Dashboard() {
 
       // Analyze with AI using profile data
       const analysis = await analyzeCookedLevel(data, userProfile);
+      const recommendedProjects = await RecommendedProjects(data, userProfile);
 
       // Navigate to results with data
       navigate('/results', { 
         state: { 
           githubData: data, 
           analysis, 
-          userProfile 
+          userProfile, 
+          recommendedProjects
         } 
       });
     } catch (error) {

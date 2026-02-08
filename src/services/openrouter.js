@@ -111,3 +111,38 @@ Provide your response in this exact JSON format:
     throw error;
   }
 }
+
+/**
+ * Get recommended projects from AI based on user profile and GitHub data
+ * @param {Object} githubData - User's GitHub metrics
+ * @param {Object} userProfile - User's profile data
+ * @returns {Promise<Array>} - Array of project objects [{ name, skill1, skill2, skill3 }]
+ */
+export async function RecommendedProjects(githubData, userProfile) {
+  const systemPrompt = `You are an expert technical mentor. 
+  Suggest three simple project ideas for the user based on their education level, technical interests, years of experience, career goal, current status, and, if relevant, hobbies and interests. 
+  Each project should use skills or technologies the user has little or no experience with, to help them grow. 
+  The skills should be only the name of the tool/framework they would learn by doing the project (e.g., "React", "Node.js", "Docker").
+  Return your answer as a JSON array like this:
+[
+  { "name": "<project name>", "skill1": "<skill1>", "skill2": "<skill2>", "skill3": "<skill3>" },
+  ...
+]`;
+
+  const contextStr = `${userProfile.education?.replace(/_/g, ' ')} (${userProfile.age} years old)`;
+  const experienceStr = userProfile.experienceYears?.replace(/_/g, ' ') || 'Unknown';
+  const prompt = `User Profile:\n- Age: ${userProfile.age}\n- Education: ${userProfile.education?.replace(/_/g, ' ')}\n- Experience: ${experienceStr}\n- Current Status: ${userProfile.currentRole || 'Unknown'}\n- Career Goal: ${userProfile.careerGoal || 'Not specified'}\n- Technical Interests: ${userProfile.technicalInterests || 'Not specified'}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ''}\n\nGitHub Skills:\n- Top Languages: ${githubData.languages?.join(', ') || 'Unknown'}\n\nSuggest three simple projects using skills the user has little or no experience with.`;
+
+  try {
+    const response = await callOpenRouter(prompt, systemPrompt);
+    // Try to parse JSON array from response
+    const jsonMatch = response.match(/\[.*\]/s);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    throw new Error('Could not parse AI project recommendations');
+  } catch (error) {
+    console.error('AI project recommendation error:', error);
+    return [];
+  }
+}
