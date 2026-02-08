@@ -291,7 +291,7 @@ export default function Landing() {
 
           <div className="border-t border-[#30363d] mt-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2">
             <span className="text-gray-500 text-xs">
-              © 2026 AmICooked. All rights reserved.
+              © 2026 AmICooked. Built with ❤️ for WinHacks 2026.
             </span>
             <span className="text-gray-500 text-xs text-center">
               Katarina Mantay, Aditya Patel, Norika Upadhyay
