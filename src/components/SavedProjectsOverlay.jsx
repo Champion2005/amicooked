@@ -24,8 +24,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import ChatMessage from "@/components/ChatMessage";
 
 /**
  * Full-screen overlay for saved projects — sidebar list + main chat area
@@ -94,9 +93,7 @@ export default function SavedProjectsOverlay({
     // Fetch fresh data to get latest messages
     const fresh = await getSavedProject(userId, proj.id);
     setActiveProject(fresh || proj);
-    // On mobile, hide sidebar to show chat full-screen; on desktop keep both visible
-    if (window.innerWidth < 640) setShowSidebar(false);
-    setInfoExpanded(false);
+    setInfoExpanded(true);
   };
 
   const handleConfirmDelete = async () => {
@@ -409,7 +406,7 @@ export default function SavedProjectsOverlay({
                       <div key={proj.id} className="group relative">
                         <button
                           onClick={() => handleSelectProject(proj)}
-                          className={`w-full text-left px-3 py-3 rounded-md transition-colors ${
+                          className={`w-full text-left px-3 py-3 pr-8 rounded-md transition-colors ${
                             activeProject?.id === proj.id
                               ? "bg-[#1c2128] border border-[#58a6ff]/30"
                               : "hover:bg-[#1c2128] border border-transparent"
@@ -530,7 +527,7 @@ export default function SavedProjectsOverlay({
                 )}
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
                   {messages.length === 0 ? (
                     <div className="flex-1 flex items-center justify-center h-full">
                       <div className="text-center">
@@ -561,37 +558,13 @@ export default function SavedProjectsOverlay({
                   ) : (
                     <>
                       {messages.map((msg, idx) => (
-                        <div
+                        <ChatMessage
                           key={idx}
-                          className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                        >
-                          <div
-                            className={`max-w-[85%] sm:max-w-2xl rounded-lg px-3 sm:px-4 py-2 sm:py-3 ${
-                              msg.role === "user"
-                                ? "bg-[#238636] text-white"
-                                : "bg-[#161b22] border border-[#30363d] text-gray-300"
-                            }`}
-                          >
-                            {msg.role === "user" ? (
-                              <p className="text-sm whitespace-pre-wrap">
-                                {msg.content}
-                              </p>
-                            ) : (
-                              <div className="text-sm prose prose-invert prose-sm max-w-none">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                  {msg.content}
-                                </ReactMarkdown>
-                              </div>
-                            )}
-                            {msg.timestamp && (
-                              <p
-                                className={`text-xs mt-2 ${msg.role === "user" ? "text-green-200/60" : "text-gray-500"}`}
-                              >
-                                {formatTime(msg.timestamp)}
-                              </p>
-                            )}
-                          </div>
-                        </div>
+                          role={msg.role}
+                          content={msg.content}
+                          timestamp={msg.timestamp}
+                          formatTime={formatTime}
+                        />
                       ))}
                       {chatLoading && (
                         <div className="flex justify-start">
@@ -610,12 +583,12 @@ export default function SavedProjectsOverlay({
 
                 {/* Input */}
                 <div className="border-t border-[#30363d] bg-[#161b22] p-3 sm:p-4 shrink-0">
-                  <div className="max-w-4xl mx-auto flex gap-2 sm:gap-3">
-                    <textarea
+                  <div className="max-w-4xl mx-auto relative">
+                    <input
                       ref={inputRef}
+                      type="text"
                       placeholder={`Ask about ${activeProject.name}...`}
-                      className="flex-1 px-3 sm:px-4 py-2 sm:py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
-                      rows="2"
+                      className="w-full pl-4 pr-12 py-3 rounded-full bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -629,7 +602,7 @@ export default function SavedProjectsOverlay({
                     <button
                       onClick={handleSendMessage}
                       disabled={!input.trim() || chatLoading}
-                      className="px-4 py-3 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white disabled:opacity-50 disabled:cursor-not-allowed self-end"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/60 hover:text-white disabled:text-white/20 transition-colors"
                     >
                       {chatLoading ? (
                         <Loader2 className="w-5 h-5 animate-spin" />

@@ -8,8 +8,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { formatEducation } from '@/utils/formatEducation';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import ChatMessage from '@/components/ChatMessage';
 
 /**
  * Full-screen AI chat popup
@@ -157,7 +156,6 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       ];
 
       setActiveChat({ id: chatId, title: query.trim().substring(0, 50), messages: newMessages });
-      setShowSidebar(false);
 
       // Get AI response
       const response = await getAIResponse(newMessages);
@@ -229,7 +227,6 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       title: chat.title,
       messages: chat.messages || []
     });
-    setShowSidebar(false);
   };
 
   const handleNewChat = () => {
@@ -334,49 +331,18 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
 
             {/* Saved Projects shortcut */}
             {onOpenSavedProjects && (
-              <div className="px-3 pt-3">
+              <div className="px-3 py-3">
                 <button
                   onClick={onOpenSavedProjects}
                   className="w-full flex items-center gap-2 px-3 py-2.5 rounded-md text-sm text-yellow-400/80 hover:text-yellow-400 hover:bg-yellow-400/5 border border-transparent hover:border-yellow-400/20 transition-colors"
                 >
                   <Bookmark className="w-4 h-4" />
-                  <span>Saved Projects</span>
+                  <span>Saved Projects Chat</span>
                 </button>
               </div>
             )}
 
-            {/* New chat input at bottom of sidebar */}
-            {!activeChat && (
-              <div className="p-4 border-t border-[#30363d]">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Ask something..."
-                    className="flex-1 px-3 py-2 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleNewChatWithQuery(input);
-                        setInput('');
-                      }
-                    }}
-                    disabled={loading}
-                  />
-                  <button
-                    onClick={() => {
-                      handleNewChatWithQuery(input);
-                      setInput('');
-                    }}
-                    disabled={!input.trim() || loading}
-                    className="px-3 py-2 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-            )}
+
           </div>
         )}
 
@@ -385,86 +351,15 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
           {activeChat ? (
             <>
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
                 {activeChat.messages.map((msg, idx) => (
-                  <div
+                  <ChatMessage
                     key={idx}
-                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[85%] sm:max-w-2xl rounded-lg px-3 sm:px-4 py-2 sm:py-3 ${
-                        msg.role === 'user'
-                          ? 'bg-[#238636] text-white'
-                          : 'bg-[#161b22] border border-[#30363d] text-gray-300'
-                      }`}
-                    >
-                      {msg.role === 'user' ? (
-                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                      ) : (
-                        <div className="text-sm prose prose-invert prose-sm max-w-none">
-                          <ReactMarkdown 
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                              // Customize code blocks
-                              code: ({node, inline, className, children, ...props}) => {
-                                return true ? (
-                                  <code className="bg-[#0d1117] px-1.5 py-0.5 rounded text-xs text-green-400 font-mono" {...props}>
-                                    {children}
-                                  </code>
-                                ) : (
-                                  <code className="block bg-[#0d1117] p-3 rounded-md text-xs text-green-400 font-mono overflow-x-auto" {...props}>
-                                    {children}
-                                  </code>
-                                );
-                              },
-                              // Customize links
-                              a: ({node, children, ...props}) => (
-                                <a className="text-[#58a6ff] hover:underline" target="_blank" rel="noopener noreferrer" {...props}>
-                                  {children}
-                                </a>
-                              ),
-                              // Customize lists
-                              ul: ({node, children, ...props}) => (
-                                <ul className="list-disc list-inside space-y-1 my-2" {...props}>
-                                  {children}
-                                </ul>
-                              ),
-                              ol: ({node, children, ...props}) => (
-                                <ol className="list-decimal list-inside space-y-1 my-2" {...props}>
-                                  {children}
-                                </ol>
-                              ),
-                              // Customize headings
-                              h1: ({node, children, ...props}) => (
-                                <h1 className="text-lg font-bold mt-4 mb-2" {...props}>{children}</h1>
-                              ),
-                              h2: ({node, children, ...props}) => (
-                                <h2 className="text-base font-bold mt-3 mb-2" {...props}>{children}</h2>
-                              ),
-                              h3: ({node, children, ...props}) => (
-                                <h3 className="text-sm font-bold mt-2 mb-1" {...props}>{children}</h3>
-                              ),
-                              // Customize paragraphs
-                              p: ({node, children, ...props}) => (
-                                <p className="mb-2 leading-relaxed" {...props}>{children}</p>
-                              ),
-                              // Customize blockquotes
-                              blockquote: ({node, children, ...props}) => (
-                                <blockquote className="border-l-4 border-[#30363d] pl-4 italic text-gray-400 my-2" {...props}>
-                                  {children}
-                                </blockquote>
-                              ),
-                            }}
-                          >
-                            {msg.content}
-                          </ReactMarkdown>
-                        </div>
-                      )}
-                      <p className={`text-xs mt-2 ${msg.role === 'user' ? 'text-green-200/60' : 'text-gray-500'}`}>
-                        {formatTime(msg.timestamp)}
-                      </p>
-                    </div>
-                  </div>
+                    role={msg.role}
+                    content={msg.content}
+                    timestamp={msg.timestamp}
+                    formatTime={formatTime}
+                  />
                 ))}
                 {loading && (
                   <div className="flex justify-start">
@@ -481,12 +376,12 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
 
               {/* Input */}
               <div className="border-t border-[#30363d] bg-[#161b22] p-3 sm:p-4">
-                <div className="max-w-4xl mx-auto flex gap-2 sm:gap-3">
-                  <textarea
+                <div className="max-w-4xl mx-auto relative">
+                  <input
                     ref={inputRef}
+                    type="text"
                     placeholder="Type your message..."
-                    className="flex-1 px-3 sm:px-4 py-2 sm:py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
-                    rows="2"
+                    className="w-full pl-4 pr-12 py-3 rounded-full bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -495,7 +390,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                   <button
                     onClick={handleSendMessage}
                     disabled={!input.trim() || loading}
-                    className="px-4 py-3 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white disabled:opacity-50 disabled:cursor-not-allowed self-end"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/60 hover:text-white disabled:text-white/20 transition-colors"
                   >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                   </button>
@@ -504,31 +399,66 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
             </>
           ) : (
             /* Empty state when no chat is selected */
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-20 h-20 rounded-full bg-[#161b22] border border-[#30363d] flex items-center justify-center mx-auto mb-4">
-                  <MessageSquare className="w-10 h-10 text-gray-600" />
+            <div className="flex-1 flex flex-col">
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-20 h-20 rounded-full bg-[#161b22] border border-[#30363d] flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare className="w-10 h-10 text-gray-600" />
+                  </div>
+                  <h2 className="text-xl font-semibold text-white mb-2">Ask AI Anything</h2>
+                  <p className="text-gray-400 text-sm max-w-md">
+                    Ask about your GitHub profile, get career advice, project ideas, or help understanding your Cooked Level.
+                  </p>
+                  <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto px-4 sm:px-0">
+                    {[
+                      'How can I improve my GitHub profile?',
+                      'What projects should I build next?',
+                      'How do I stand against my peers?',
+                      'What skills am I missing?'
+                    ].map((suggestion, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleNewChatWithQuery(suggestion)}
+                        disabled={loading}
+                        className="text-left px-4 py-3 rounded-lg border border-[#30363d] bg-[#161b22] hover:bg-[#1c2128] text-sm text-gray-300 hover:text-white transition-colors disabled:opacity-50"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <h2 className="text-xl font-semibold text-white mb-2">Ask AI Anything</h2>
-                <p className="text-gray-400 text-sm max-w-md">
-                  Ask about your GitHub profile, get career advice, project ideas, or help understanding your Cooked Level.
-                </p>
-                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto px-4 sm:px-0">
-                  {[
-                    'How can I improve my GitHub profile?',
-                    'What projects should I build next?',
-                    'How do I stand against my peers?',
-                    'What skills am I missing?'
-                  ].map((suggestion, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleNewChatWithQuery(suggestion)}
-                      disabled={loading}
-                      className="text-left px-4 py-3 rounded-lg border border-[#30363d] bg-[#161b22] hover:bg-[#1c2128] text-sm text-gray-300 hover:text-white transition-colors disabled:opacity-50"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
+              </div>
+              {/* New chat input */}
+              <div className="border-t border-[#30363d] bg-[#161b22] p-3 sm:p-4">
+                <div className="max-w-4xl mx-auto relative">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    placeholder="Ask something..."
+                    className="w-full pl-4 pr-12 py-3 rounded-full bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey && input.trim()) {
+                        e.preventDefault();
+                        handleNewChatWithQuery(input);
+                        setInput('');
+                      }
+                    }}
+                    disabled={loading}
+                  />
+                  <button
+                    onClick={() => {
+                      if (input.trim()) {
+                        handleNewChatWithQuery(input);
+                        setInput('');
+                      }
+                    }}
+                    disabled={!input.trim() || loading}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/60 hover:text-white disabled:text-white/20 transition-colors"
+                  >
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                  </button>
                 </div>
               </div>
             </div>

@@ -65,3 +65,23 @@
 *::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* ── Chat markdown overrides ── */
+.chat-markdown {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.chat-markdown pre {
+  max-width: 100%;
+}
+
+.chat-markdown img {
+  max-width: 100%;
+  border-radius: 0.5rem;
+}
+
+/* Ensure tables don't blow out on mobile */
+.chat-markdown table {
+  font-size: 0.8125rem;
+}

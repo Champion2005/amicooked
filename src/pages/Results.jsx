@@ -264,40 +264,41 @@ export default function Results() {
             <h1 className="text-lg sm:text-2xl font-bold text-white hidden sm:block">AmICooked?</h1>
           </button>
           <div className="flex-1 max-w-2xl flex gap-2 min-w-0">
-            <input
-              type="text"
-              placeholder="Ask AI Anything..."
-              className="flex-1 min-w-0 px-3 sm:px-4 py-2 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
-              value={headerInput}
-              onChange={(e) => setHeaderInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && headerInput.trim()) {
-                  setChatQuery(headerInput.trim());
-                  setChatOpen(true);
-                  setHeaderInput("");
-                }
-              }}
-            />
-            <button
-              onClick={() => {
-                if (headerInput.trim()) {
-                  setChatQuery(headerInput.trim());
-                  setChatOpen(true);
-                  setHeaderInput("");
-                }
-              }}
-              disabled={!headerInput.trim()}
-              className="px-3 sm:px-4 py-2 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm shrink-0"
-            >
-              <Send className="w-4 h-4" />
-              <span className="hidden sm:inline">Ask</span>
-            </button>
+            <div className="relative flex-1 min-w-0">
+              <input
+                type="text"
+                placeholder="Ask AI Anything..."
+                className="w-full px-4 py-2 pr-12 rounded-full bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                value={headerInput}
+                onChange={(e) => setHeaderInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && headerInput.trim()) {
+                    setChatQuery(headerInput.trim());
+                    setChatOpen(true);
+                    setHeaderInput("");
+                  }
+                }}
+              />
+              <button
+                onClick={() => {
+                  if (headerInput.trim()) {
+                    setChatQuery(headerInput.trim());
+                    setChatOpen(true);
+                    setHeaderInput("");
+                  }
+                }}
+                disabled={!headerInput.trim()}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
             <button
               onClick={() => {
                 setChatQuery("");
                 setChatOpen(true);
               }}
-              className="px-3 py-2 rounded-md border border-[#30363d] text-gray-400 hover:text-white hover:bg-[#1c2128] flex items-center gap-1 text-sm shrink-0"
+              className="px-2.5 py-2 rounded-full border border-[#30363d] text-gray-400 hover:text-white hover:bg-[#1c2128] flex items-center gap-1 text-sm shrink-0"
               title="Chat History"
             >
               <MessageSquare className="w-4 h-4" />
