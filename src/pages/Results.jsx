@@ -541,25 +541,51 @@ export default function Results() {
                 </div>
 
                 <div className="flex items-start">
-                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 shrink-0">
-                    {/* Progress Ring */}
-                    <div
-                      className="absolute inset-0 rounded-full"
-                      style={{
-                        background: `conic-gradient(
-                              #ef4444 ${analysis.cookedLevel * 36}deg,
-                              #1f2831 0deg
-                            )`,
-                      }}
-                    />
+                  {(() => {
+                    const size = 96; // matches w-24/h-24
+                    const strokeW = 6;
+                    const r = (size - strokeW) / 2;
+                    const circ = 2 * Math.PI * r;
+                    const pct = analysis.cookedLevel / 10;
+                    const offset = circ * (1 - pct);
+                    // Color matching getCookedColor tiers
+                    const ringColor =
+                      analysis.cookedLevel >= 9 ? '#22c55e' :
+                      analysis.cookedLevel >= 7 ? '#eab308' :
+                      analysis.cookedLevel >= 5 ? '#f97316' :
+                      analysis.cookedLevel >= 3 ? '#ef4444' : '#dc2626';
 
-                    {/* Inner Circle */}
-                    <div className="absolute inset-2 bg-[#0d1117] rounded-full flex flex-col items-center justify-center">
-                      <span className="text-[22px] sm:text-[28px] font-semibold text-white">
-                        {analysis.cookedLevel}
-                      </span>
-                    </div>
-                  </div>
+                    return (
+                      <div className="flex flex-col items-center gap-1 shrink-0">
+                        <div className="relative w-20 h-20 sm:w-24 sm:h-24">
+                          <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full -rotate-90">
+                            {/* Background track */}
+                            <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#1f2831" strokeWidth={strokeW} />
+                            {/* Filled arc */}
+                            <circle
+                              cx={size/2} cy={size/2} r={r}
+                              fill="none"
+                              stroke={ringColor}
+                              strokeWidth={strokeW}
+                              strokeLinecap="round"
+                              strokeDasharray={circ}
+                              strokeDashoffset={offset}
+                              className="transition-all duration-500"
+                            />
+                          </svg>
+                          {/* Center number */}
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-[22px] sm:text-[28px] font-semibold text-white">
+                              {analysis.cookedLevel}
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`text-xs font-semibold ${getCookedColor(analysis.cookedLevel)}`}>
+                          {analysis.levelName}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </CardContent>
             </Card>
