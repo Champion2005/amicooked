@@ -22,14 +22,19 @@ import {
   RefreshCw,
   ChevronDown,
   Info,
+  Bookmark,
+  FolderOpen,
 } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/config/firebase";
 import ChatPopup from "@/components/ChatPopup";
 import ProjectPopup from "@/components/ProjectPopup";
+import SavedProjectsOverlay from "@/components/SavedProjectsOverlay";
 import { fetchGitHubData } from "@/services/github";
 import { analyzeCookedLevel, RecommendedProjects } from "@/services/openrouter";
 import { getUserProfile } from "@/services/userProfile";
+import { formatEducation } from "@/utils/formatEducation";
+import { isProjectSaved, saveProject } from "@/services/savedProjects";
 
 export default function Results() {
   const location = useLocation();
@@ -47,7 +52,49 @@ export default function Results() {
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [showRecommendations, setShowRecommendations] = useState(false);
+  const [savedProjectsOpen, setSavedProjectsOpen] = useState(false);
+  const [savedProjectNames, setSavedProjectNames] = useState(new Set());
   const profileMenuRef = useRef(null);
+
+  // Load saved project status for bookmark icons
+  useEffect(() => {
+    const userId = auth.currentUser?.uid;
+    if (!userId || !recommendedProjects) return;
+    const checkSaved = async () => {
+      const checks = await Promise.all(
+        recommendedProjects.slice(0, 4).map(async (rec) => {
+          const saved = await isProjectSaved(userId, rec.name);
+          return saved ? rec.name : null;
+        })
+      );
+      setSavedProjectNames(new Set(checks.filter(Boolean)));
+    };
+    checkSaved();
+  }, [recommendedProjects]);
+
+  const refreshSavedStatus = async () => {
+    const userId = auth.currentUser?.uid;
+    if (!userId || !recommendedProjects) return;
+    const checks = await Promise.all(
+      recommendedProjects.slice(0, 4).map(async (rec) => {
+        const saved = await isProjectSaved(userId, rec.name);
+        return saved ? rec.name : null;
+      })
+    );
+    setSavedProjectNames(new Set(checks.filter(Boolean)));
+  };
+
+  const handleCardBookmark = async (e, rec) => {
+    e.stopPropagation();
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
+    try {
+      await saveProject(userId, rec);
+      setSavedProjectNames(prev => new Set([...prev, rec.name]));
+    } catch (err) {
+      console.error('Save error:', err);
+    }
+  };
 
   // Close profile menu on outside click
   useEffect(() => {
@@ -313,6 +360,16 @@ export default function Results() {
                 <button
                   onClick={() => {
                     setProfileMenuOpen(false);
+                    setSavedProjectsOpen(true);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#1c2128] hover:text-white transition-colors"
+                >
+                  <Bookmark className="w-4 h-4" />
+                  Saved Projects
+                </button>
+                <button
+                  onClick={() => {
+                    setProfileMenuOpen(false);
                     setShowReanalyzeConfirm(true);
                   }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#1c2128] hover:text-white transition-colors"
@@ -354,7 +411,7 @@ export default function Results() {
                   </h2>
                   <p className="text-gray-400 text-sm sm:text-md mb-1">
                     {githubData.username} -{" "}
-                    {userProfile?.education?.replace(/_/g, " ") || "Student"}
+                    {formatEducation(userProfile?.education) || "Student"}
                   </p>
                   <div className="mt-4">
                     <div className="flex items-center justify-center lg:justify-start gap-2">
@@ -372,7 +429,7 @@ export default function Results() {
 
                 <Button
                   variant="outline"
-                  className="w-full mb-5 border-[#30363d] text-white hover:bg-[#1c2128]"
+                  className="w-full mb-2 border-[#30363d] text-white hover:bg-[#1c2128]"
                   onClick={() =>
                     navigate("/profile", {
                       state: {
@@ -390,6 +447,15 @@ export default function Results() {
                   Edit Profile
                 </Button>
 
+                <Button
+                  variant="outline"
+                  className="w-full mb-5 border-[#30363d] text-white hover:bg-[#1c2128]"
+                  onClick={() => setSavedProjectsOpen(true)}
+                >
+                  <Bookmark className="w-4 h-4 mr-2" />
+                  Saved Projects
+                </Button>
+
                 <div className="space-y-4 text-sm">
                   <div className="flex items-center gap-3 text-gray-300">
                     <User className="w-4 h-4" />
@@ -402,7 +468,7 @@ export default function Results() {
                     <GraduationCap className="w-4 h-4" />
                     <span className="text-gray-500">Education:</span>
                     <span className="text-white ml-auto text-xs">
-                      {userProfile?.education?.replace(/_/g, " ") || "N/A"}
+                      {formatEducation(userProfile?.education) || "N/A"}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 text-gray-300">
@@ -498,9 +564,18 @@ export default function Results() {
               </CardContent>
             </Card>
 
-            <h2 className="text-lg font-semibold text-white mb-2">
-              Recommended Projects
-            </h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-semibold text-white">
+                Recommended Projects
+              </h2>
+              {/* <button
+                onClick={() => setSavedProjectsOpen(true)}
+                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-yellow-400 transition-colors"
+              >
+                <Bookmark className="w-3.5 h-3.5" />
+                Saved
+              </button> */}
+            </div>
 
             <Card className="bg-[#0d1117] border-none">
               <CardContent className="p-0 ">
@@ -508,22 +583,35 @@ export default function Results() {
                   {recommendedProjects.slice(0, 4).map((rec, idx) => (
                     <div
                       key={idx}
-                      className="bg-[#0d1117] p-4 rounded-lg border border-[#30363d] cursor-pointer  hover:bg-[#161b22] transition-colors"
+                      className="bg-[#0d1117] p-4 rounded-lg border border-[#30363d] cursor-pointer hover:bg-[#161b22] transition-colors group"
                       onClick={() => setSelectedProject(rec)}
                     >
-                      <h3 className="font-semibold text-white mb-2">
-                        {rec.name}
-                      </h3>
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-white text-sm">
+                          {rec.name}
+                        </h3>
+                        <button
+                          onClick={(e) => handleCardBookmark(e, rec)}
+                          className={`p-0.5 rounded transition-colors shrink-0 mt-0.5 ${
+                            savedProjectNames.has(rec.name)
+                              ? 'text-yellow-400'
+                              : 'text-gray-600 group-hover:text-gray-400 hover:text-yellow-400'
+                          }`}
+                          title={savedProjectNames.has(rec.name) ? 'Saved' : 'Save project'}
+                        >
+                          <Bookmark className={`w-3.5 h-3.5 ${savedProjectNames.has(rec.name) ? 'fill-current' : ''}`} />
+                        </button>
+                      </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-green-500">
-                          ● {rec.skill1}
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1c2128] border border-[#30363d] text-green-400">
+                          {rec.skill1}
                         </span>
-                        <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-blue-500">
-                          ● {rec.skill2}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1c2128] border border-[#30363d] text-blue-400">
+                          {rec.skill2}
                         </span>
-                        <span className="text-xs px-2 py-1 rounded-full bg-[#1c2128] text-yellow-500">
-                          ● {rec.skill3}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1c2128] border border-[#30363d] text-yellow-400">
+                          {rec.skill3}
                         </span>
                       </div>
                     </div>
@@ -812,6 +900,11 @@ export default function Results() {
         githubData={githubData}
         userProfile={userProfile}
         analysis={analysis}
+        onOpenSavedProjects={() => {
+          setChatOpen(false);
+          setChatQuery("");
+          setSavedProjectsOpen(true);
+        }}
       />
 
       {/* Project Detail Popup */}
@@ -819,6 +912,16 @@ export default function Results() {
         isOpen={!!selectedProject}
         onClose={() => setSelectedProject(null)}
         project={selectedProject}
+        githubData={githubData}
+        userProfile={userProfile}
+        analysis={analysis}
+        onSaveChange={refreshSavedStatus}
+      />
+
+      {/* Saved Projects Overlay */}
+      <SavedProjectsOverlay
+        isOpen={savedProjectsOpen}
+        onClose={() => setSavedProjectsOpen(false)}
         githubData={githubData}
         userProfile={userProfile}
         analysis={analysis}

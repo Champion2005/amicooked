@@ -9,6 +9,7 @@ import { analyzeCookedLevel } from '@/services/openrouter';
 import { RecommendedProjects } from '@/services/openrouter';
 import { getUserProfile, getAnalysisResults, saveAnalysisResults } from '@/services/userProfile';
 import { Loader2, Flame, User, Edit2 } from 'lucide-react';
+import { formatEducation } from '@/utils/formatEducation';
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(false);
@@ -26,6 +27,13 @@ export default function Dashboard() {
     "💡 Tip: You can reanalyze anytime from the profile menu to track your progress.",
     "💡 Tip: Consistency matters more than volume — even small daily commits add up.",
     "💡 Tip: A strong README on your repos can significantly boost your profile impression.",
+    "💡 Tip: Don't have many contributions? Focus on quality and learning in your profile description.",
+    "💡 Tip: The AI looks for growth over time, so keep contributing and updating your profile regularly.",
+    "💡 Tip: If the analysis feels off, try reanalyzing after a few days of new contributions to see the impact!",
+    "💡 Tip: Remember, this is just a tool to help you grow. Use the feedback to guide your learning journey, not as a final judgment of your worth as a developer.",
+    "💡 Tip: If you encounter any issues or have feedback, please reach out to us. We're here to help you succeed!",
+    "💡 Tip: The AI is most effective when it has a complete profile to analyze. Make sure to fill out all sections of your profile for the best insights!",
+    "💡 Tip: Don't be discouraged by critical feedback. The AI is designed to help you identify areas for improvement, and every developer has room to grow!",
   ];
 
   // Rotate tips while loading
@@ -202,13 +210,17 @@ export default function Dashboard() {
               </div>
               <div>
                 <span className="text-gray-400">Education:</span>
-                <span className="text-white ml-2">{userProfile.education.replace(/_/g, ' ')}</span>
+                <span className="text-white ml-2">{formatEducation(userProfile.education)}</span>
               </div>
-              <div className="sm:col-span-2">
+              <div>
+                <span className="text-gray-400">Experience:</span>
                 <span className="text-white ml-2">{userProfile.experienceYears.replace(/_/g, ' ')}</span>
               </div>
-              <div className="sm:col-span-2">
-                <span className="text-white ml-2">{userProfile.careerGoal}</span>
+              <div className="min-w-0">
+                <span className="text-gray-400">Career Goal:</span>
+                <span className="text-white ml-2 truncate inline-block max-w-[calc(100%-90px)] align-bottom">
+                  {userProfile.careerGoal}
+                </span>
               </div>
             </div>
           </div>
