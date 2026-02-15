@@ -70,10 +70,41 @@
 .chat-markdown {
   word-break: break-word;
   overflow-wrap: anywhere;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.chat-markdown * {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .chat-markdown pre {
   max-width: 100%;
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.chat-markdown code {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.chat-markdown pre code {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.chat-markdown p,
+.chat-markdown li,
+.chat-markdown blockquote,
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3,
+.chat-markdown td,
+.chat-markdown th {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .chat-markdown img {

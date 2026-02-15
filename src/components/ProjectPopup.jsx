@@ -279,8 +279,8 @@ export default function ProjectPopup({
         )}
 
         {/* Chat area — fills remaining space */}
-        <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-3">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-5 py-4 space-y-3">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 gap-2">
                 <MessageSquare className="w-8 h-8 text-gray-600" />

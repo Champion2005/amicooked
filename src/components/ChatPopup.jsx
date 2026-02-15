@@ -349,11 +349,11 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
         )}
 
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {activeChat ? (
             <>
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-5">
                 {activeChat.messages.map((msg, idx) => (
                   <ChatMessage
                     key={idx}
@@ -401,7 +401,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
             </>
           ) : (
             /* Empty state when no chat is selected */
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
                   <div className="w-20 h-20 rounded-full bg-[#161b22] border border-[#30363d] flex items-center justify-center mx-auto mb-4">

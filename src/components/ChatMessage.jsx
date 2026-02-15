@@ -44,7 +44,7 @@ const markdownComponents = {
     // Block-level code (fenced) — only if multi-line
     if (!inline && codeString.includes('\n')) {
       return (
-        <div className="group/code relative my-3">
+        <div className="group/code relative my-3 max-w-full overflow-hidden">
           {match && (
             <div className="flex items-center justify-between px-4 py-1.5 bg-[#1c2128] border border-[#30363d] border-b-0 rounded-t-lg">
               <span className="text-[11px] font-mono text-gray-400 uppercase tracking-wider">{match[1]}</span>
@@ -73,8 +73,8 @@ const markdownComponents = {
     );
   },
 
-  // ---------- Pre (wrapper — just pass through, code handles styling) ----------
-  pre: ({ children }) => <>{children}</>,
+  // ---------- Pre (wrapper — constrain width) ----------
+  pre: ({ children }) => <div className="max-w-full overflow-x-auto min-w-0">{children}</div>,
 
   // ---------- Links ----------
   a: ({ node, children, ...props }) => (
@@ -180,8 +180,8 @@ export default function ChatMessage({ role, content, timestamp, formatTime }) {
     return (
       <div className="max-w-4xl w-full mx-auto">
         <div className="flex justify-end">
-          <div className="max-w-[85%] sm:max-w-xl rounded-2xl rounded-br-sm px-4 py-2.5 bg-[#238636] text-white">
-            <p className="text-[15px] whitespace-pre-wrap break-words leading-relaxed">{content}</p>
+          <div className="max-w-[85%] sm:max-w-xl rounded-2xl rounded-br-sm px-3 sm:px-4 py-2.5 bg-[#238636] text-white min-w-0">
+            <p className="text-[15px] whitespace-pre-wrap break-words leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{content}</p>
             {timeLabel && (
               <p className="text-[10px] mt-1.5 text-white/40 text-right">{timeLabel}</p>
             )}
@@ -193,9 +193,9 @@ export default function ChatMessage({ role, content, timestamp, formatTime }) {
 
   // Assistant message — no bubble, just clean markdown
   return (
-    <div className="max-w-4xl w-full mx-auto">
-      <div className="px-0 sm:px-2 min-w-0 overflow-hidden">
-        <div className="chat-markdown text-[15px]">
+    <div className="max-w-full sm:max-w-4xl w-full mx-auto min-w-0 overflow-hidden">
+      <div className="px-1 sm:px-2 min-w-0" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+        <div className="chat-markdown text-[15px] min-w-0 w-full">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={markdownComponents}

@@ -449,7 +449,7 @@ export default function SavedProjectsOverlay({
           )}
 
           {/* Chat Area */}
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
             {activeProject ? (
               <>
                 {/* Collapsible project info */}
@@ -528,7 +528,7 @@ export default function SavedProjectsOverlay({
                 )}
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-5">
                   {messages.length === 0 ? (
                     <div className="flex-1 flex items-center justify-center h-full">
                       <div className="text-center">
