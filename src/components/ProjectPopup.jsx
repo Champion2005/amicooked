@@ -10,8 +10,7 @@ import {
   addProjectMessage, getSavedProject
 } from '@/services/savedProjects';
 import { formatEducation } from '@/utils/formatEducation';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import ChatMessage from '@/components/ChatMessage';
 
 /**
  * ProjectPopup — modal for a project with collapsible info header,
@@ -290,19 +289,11 @@ export default function ProjectPopup({
               </div>
             )}
             {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                  msg.role === 'user'
-                    ? 'bg-[#238636] text-white'
-                    : 'bg-[#161b22] border border-[#30363d] text-gray-300'
-                }`}>
-                  {msg.role === 'assistant' ? (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose prose-invert prose-sm max-w-none">
-                      {msg.content}
-                    </ReactMarkdown>
-                  ) : msg.content}
-                </div>
-              </div>
+              <ChatMessage
+                key={i}
+                role={msg.role}
+                content={msg.content}
+              />
             ))}
             {loading && (
               <div className="flex justify-start">
@@ -316,7 +307,7 @@ export default function ProjectPopup({
 
           {/* Input */}
           <div className="px-4 sm:px-5 py-3 border-t border-[#30363d] bg-[#161b22] shrink-0">
-            <div className="flex gap-2">
+            <div className="relative">
               <input
                 ref={inputRef}
                 type="text"
@@ -329,12 +320,12 @@ export default function ProjectPopup({
                   }
                 }}
                 placeholder="Ask about this project..."
-                className="flex-1 px-3 py-2 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] text-sm"
+                className="w-full pl-4 pr-12 py-3 rounded-full bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
               />
               <button
                 onClick={handleAsk}
                 disabled={!question.trim() || loading}
-                className="px-3 py-2 rounded-md bg-[#238636] hover:bg-[#2ea043] text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/60 hover:text-white disabled:text-white/20 transition-colors"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </button>
