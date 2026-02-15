@@ -1,4 +1,6 @@
 // OpenRouter API configuration
+import { formatEducation } from '@/utils/formatEducation';
+
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -86,14 +88,14 @@ Your job is to be brutally honest and provide actionable feedback. The "Cooked L
 Higher scores are better. Consider the user's context when making recommendations - tailor suggestions to their interests, experience level, and career goals.`;
 
   // Build context string from profile
-  const contextStr = `${userProfile.education?.replace(/_/g, ' ')} (${userProfile.age} years old)`;
+  const contextStr = `${formatEducation(userProfile.education)} (${userProfile.age} years old)`;
   const experienceStr = userProfile.experienceYears?.replace(/_/g, ' ') || 'Unknown';
   
   const prompt = `Analyze this GitHub profile for a ${contextStr}:
 
 **User Profile:**
 - Age: ${userProfile.age}
-- Education: ${userProfile.education?.replace(/_/g, ' ')}
+- Education: ${formatEducation(userProfile.education)}
 - Experience: ${experienceStr}
 - Current Status: ${userProfile.currentRole || 'Unknown'}
 - Career Goal: ${userProfile.careerGoal || 'Not specified'}
@@ -176,9 +178,9 @@ export async function RecommendedProjects(githubData, userProfile) {
   ...
 ]`;
 
-  const contextStr = `${userProfile.education?.replace(/_/g, ' ')} (${userProfile.age} years old)`;
+  const contextStr = `${formatEducation(userProfile.education)} (${userProfile.age} years old)`;
   const experienceStr = userProfile.experienceYears?.replace(/_/g, ' ') || 'Unknown';
-  const prompt = `User Profile:\n- Age: ${userProfile.age}\n- Education: ${userProfile.education?.replace(/_/g, ' ')}\n- Experience: ${experienceStr}\n- Current Status: ${userProfile.currentRole || 'Unknown'}\n- Career Goal: ${userProfile.careerGoal || 'Not specified'}\n- Technical Skills: ${userProfile.technicalSkills || 'Not specified'}${userProfile.technicalInterests ? `\n- Technical Interests: ${userProfile.technicalInterests}` : ''}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ''}\n\nGitHub Skills:\n- Top Languages: ${githubData.languages?.join(', ') || 'Unknown'}\n\nSuggest four simple projects using skills the user has little or no experience with. Include detailed info for each project.\n\nIMPORTANT: Return ONLY valid JSON. No trailing commas. Use double quotes for all keys and string values. Avoid apostrophes (use \"is not\" instead of \"isn't\"). Spaces in names and descriptions are fine and expected.`;
+  const prompt = `User Profile:\n- Age: ${userProfile.age}\n- Education: ${formatEducation(userProfile.education)}\n- Experience: ${experienceStr}\n- Current Status: ${userProfile.currentRole || 'Unknown'}\n- Career Goal: ${userProfile.careerGoal || 'Not specified'}\n- Technical Skills: ${userProfile.technicalSkills || 'Not specified'}${userProfile.technicalInterests ? `\n- Technical Interests: ${userProfile.technicalInterests}` : ''}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ''}\n\nGitHub Skills:\n- Top Languages: ${githubData.languages?.join(', ') || 'Unknown'}\n\nSuggest four simple projects using skills the user has little or no experience with. Include detailed info for each project.\n\nIMPORTANT: Return ONLY valid JSON. No trailing commas. Use double quotes for all keys and string values. Avoid apostrophes (use \"is not\" instead of \"isn't\"). Spaces in names and descriptions are fine and expected.`;
 
   try {
     const response = await callOpenRouter(prompt, systemPrompt);

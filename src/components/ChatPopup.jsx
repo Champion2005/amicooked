@@ -4,9 +4,10 @@ import logo from '@/assets/amicooked_logo.png';
 import { callOpenRouter } from '@/services/openrouter';
 import { createChat, addMessage, getUserChats } from '@/services/chat';
 import { 
-  X, Send, MessageSquare, Plus, Loader2, ChevronLeft, Flame 
+  X, Send, MessageSquare, Plus, Loader2, ChevronLeft, Flame, Bookmark 
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { formatEducation } from '@/utils/formatEducation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -20,7 +21,7 @@ import remarkGfm from 'remark-gfm';
  * @param {Object} props.userProfile - User profile for AI context
  * @param {Object} props.analysis - Analysis results for AI context
  */
-export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, userProfile, analysis }) {
+export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, userProfile, analysis, onOpenSavedProjects }) {
   const [chats, setChats] = useState([]);
   const [activeChat, setActiveChat] = useState(null); // { id, title, messages }
   const [input, setInput] = useState('');
@@ -102,7 +103,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
     if (userProfile) {
       parts.push(`\nUser Profile:`);
       if (userProfile.age) parts.push(`- Age: ${userProfile.age}`);
-      if (userProfile.education) parts.push(`- Education: ${userProfile.education.replace(/_/g, ' ')}`);
+      if (userProfile.education) parts.push(`- Education: ${formatEducation(userProfile.education)}`);
       if (userProfile.experienceYears) parts.push(`- Experience: ${userProfile.experienceYears.replace(/_/g, ' ')}`);
       if (userProfile.careerGoal) parts.push(`- Career Goal: ${userProfile.careerGoal}`);
       if (userProfile.technicalInterests) parts.push(`- Technical Interests: ${userProfile.technicalInterests}`);
@@ -330,6 +331,19 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                 </div>
               )}
             </div>
+
+            {/* Saved Projects shortcut */}
+            {onOpenSavedProjects && (
+              <div className="px-3 pt-3">
+                <button
+                  onClick={onOpenSavedProjects}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-md text-sm text-yellow-400/80 hover:text-yellow-400 hover:bg-yellow-400/5 border border-transparent hover:border-yellow-400/20 transition-colors"
+                >
+                  <Bookmark className="w-4 h-4" />
+                  <span>Saved Projects</span>
+                </button>
+              </div>
+            )}
 
             {/* New chat input at bottom of sidebar */}
             {!activeChat && (

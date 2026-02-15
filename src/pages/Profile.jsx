@@ -7,22 +7,6 @@ import { getUserProfile, saveUserProfile } from '@/services/userProfile';
 import logo from '@/assets/amicooked_logo.png';
 import { Loader2, User, ArrowLeft } from 'lucide-react';
 
-// Convert education level from lowercase underscore format to proper casing
-const formatEducationLevel = (value) => {
-  const educationMap = {
-    'high_school': 'High School',
-    'undergrad_freshman': 'Undergrad - Freshman',
-    'undergrad_sophomore': 'Undergrad - Sophomore',
-    'undergrad_junior': 'Undergrad - Junior',
-    'undergrad_senior': 'Undergrad - Senior',
-    'graduate': 'Graduate Student',
-    'bootcamp': 'Bootcamp Graduate',
-    'self_taught': 'Self-Taught',
-    'full_time': 'Full-Time Professional'
-  };
-  return educationMap[value] || value;
-};
-
 export default function Profile() {
   const [loading, setLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
