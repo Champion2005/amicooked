@@ -93,6 +93,7 @@ export default function SavedProjectsOverlay({
     // Fetch fresh data to get latest messages
     const fresh = await getSavedProject(userId, proj.id);
     setActiveProject(fresh || proj);
+    if (window.innerWidth < 640) setShowSidebar(false);
     setInfoExpanded(true);
   };
 

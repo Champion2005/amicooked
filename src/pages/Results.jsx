@@ -478,6 +478,7 @@ export default function Results() {
 
           {/* Main Content */}
           <div className="lg:col-span-9 space-y-6">
+            <div>
             <h2 className="text-lg font-semibold text-white mb-2">
               AI Summary
             </h2>
@@ -574,7 +575,9 @@ export default function Results() {
                 </div>
               </CardContent>
             </Card>
+            </div>
 
+            <div>
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg font-semibold text-white">
                 Recommended Projects
@@ -636,6 +639,7 @@ export default function Results() {
                 )}
               </CardContent>
             </Card>
+            </div>
 
             <Card className="bg-[#0d1117] pt-0 border-[#30363d] w-full">
               <CardContent className="p-3 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 items-start">

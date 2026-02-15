@@ -156,6 +156,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       ];
 
       setActiveChat({ id: chatId, title: query.trim().substring(0, 50), messages: newMessages });
+      if (window.innerWidth < 640) setShowSidebar(false);
 
       // Get AI response
       const response = await getAIResponse(newMessages);
@@ -227,6 +228,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       title: chat.title,
       messages: chat.messages || []
     });
+    if (window.innerWidth < 640) setShowSidebar(false);
   };
 
   const handleNewChat = () => {
