@@ -24,8 +24,18 @@ export async function fetchGitHubData(accessToken) {
             description
             stargazerCount
             forkCount
+            updatedAt
             primaryLanguage {
               name
+            }
+            languages(first: 10) {
+              edges {
+                size
+                node {
+                  name
+                  color
+                }
+              }
             }
             defaultBranchRef {
               target {
@@ -103,14 +113,56 @@ function processGitHubData(viewer) {
     return sum + commits;
   }, 0);
 
-  // Extract languages
+  // Category mapping for languages
+  const categoryMap = {
+    'JavaScript': 'web', 'TypeScript': 'web', 'HTML': 'web', 'CSS': 'web',
+    'SCSS': 'web', 'Sass': 'web', 'Less': 'web', 'Vue': 'web', 'Svelte': 'web', 'Elm': 'web',
+    'Python': 'general', 'Java': 'enterprise', 'C#': 'enterprise',
+    'C': 'systems', 'C++': 'systems', 'Rust': 'systems', 'Go': 'systems', 'Assembly': 'systems', 'Zig': 'systems',
+    'Ruby': 'web', 'PHP': 'web',
+    'Swift': 'mobile', 'Kotlin': 'mobile', 'Dart': 'mobile', 'Objective-C': 'mobile',
+    'R': 'data', 'Jupyter Notebook': 'data', 'MATLAB': 'data', 'Julia': 'data',
+    'Shell': 'scripting', 'PowerShell': 'scripting', 'Lua': 'scripting', 'Perl': 'scripting', 'Makefile': 'scripting',
+    'Haskell': 'functional', 'Elixir': 'functional', 'Erlang': 'functional',
+    'Scala': 'functional', 'Clojure': 'functional', 'OCaml': 'functional', 'F#': 'functional',
+  };
 
-  // Define frontend and backend language sets
+  // Build comprehensive language data from per-repo language edges
+  const langAgg = {}; // key: language name
+  repos.forEach(repo => {
+    const edges = repo.languages?.edges || [];
+    edges.forEach(edge => {
+      const name = edge.node.name;
+      const color = edge.node.color;
+      const size = edge.size;
+      if (!langAgg[name]) {
+        langAgg[name] = { name, color, bytes: 0, repoCount: 0, lastUsed: null };
+      }
+      langAgg[name].bytes += size;
+      langAgg[name].repoCount += 1;
+      if (!langAgg[name].lastUsed || repo.updatedAt > langAgg[name].lastUsed) {
+        langAgg[name].lastUsed = repo.updatedAt;
+      }
+    });
+  });
+
+  const totalLanguageBytes = Object.values(langAgg).reduce((s, l) => s + l.bytes, 0);
+
+  const languageBreakdown = Object.values(langAgg)
+    .map(l => ({
+      ...l,
+      percentage: totalLanguageBytes > 0 ? parseFloat(((l.bytes / totalLanguageBytes) * 100).toFixed(2)) : 0,
+      category: categoryMap[l.name] ?? null,
+    }))
+    .sort((a, b) => b.bytes - a.bytes);
+
+  // --- Backward-compatible language counts (from primaryLanguage) ---
   const frontendSet = new Set([
-    'JavaScript', 'TypeScript', 'HTML', 'CSS', 'Vue', 'React', 'Angular', 'Svelte', 'Next.js', 'Nuxt.js', 'Elm', 'Sass', 'Less', 'Redux', 'Tailwind', 'Bootstrap', 'jQuery'
+    'JavaScript', 'TypeScript', 'HTML', 'CSS', 'Vue', 'Svelte', 'Elm', 'Sass', 'Less', 'SCSS', 'Ruby', 'PHP'
   ]);
   const backendSet = new Set([
-    'Python', 'Java', 'C#', 'C++', 'C', 'Go', 'Rust', 'Ruby', 'PHP', 'Node.js', 'Express', 'Kotlin', 'Scala', 'Swift', 'Django', 'Flask', 'Spring', 'Laravel', 'ASP.NET', 'Perl', 'Elixir', 'Haskell', 'Objective-C', 'SQL', 'GraphQL'
+    'Python', 'Java', 'C#', 'C++', 'C', 'Go', 'Rust', 'Kotlin', 'Scala', 'Swift',
+    'Perl', 'Elixir', 'Haskell', 'Objective-C'
   ]);
 
   const languageCounts = {};
@@ -121,11 +173,9 @@ function processGitHubData(viewer) {
       const lang = repo.primaryLanguage.name;
       if (frontendSet.has(lang)) {
         frontendLanguages[lang] = (frontendLanguages[lang] || 0) + 1;
-      }
-      else if(backendSet.has(lang)) {
+      } else if (backendSet.has(lang)) {
         backendLanguages[lang] = (backendLanguages[lang] || 0) + 1;
       }
-
       languageCounts[lang] = (languageCounts[lang] || 0) + 1;
     }
   });
@@ -183,6 +233,8 @@ function processGitHubData(viewer) {
     languages: topLanguages,
     frontend: topfrontend,
     backend: topbackend,
+    languageBreakdown,
+    totalLanguageBytes,
     streak: currentStreak,
     totalContributions: viewer.contributionsCollection.contributionCalendar.totalContributions,
     contributionCalendar: viewer.contributionsCollection.contributionCalendar

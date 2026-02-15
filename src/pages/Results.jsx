@@ -30,6 +30,7 @@ import { auth } from "@/config/firebase";
 import ChatPopup from "@/components/ChatPopup";
 import ProjectPopup from "@/components/ProjectPopup";
 import SavedProjectsOverlay from "@/components/SavedProjectsOverlay";
+import LanguageBreakdown from "@/components/LanguageBreakdown";
 import { fetchGitHubData } from "@/services/github";
 import { analyzeCookedLevel, RecommendedProjects } from "@/services/openrouter";
 import { getUserProfile } from "@/services/userProfile";
@@ -145,24 +146,7 @@ export default function Results() {
     return "text-red-600";
   };
 
-  const getLanguageStatus = (lang) => {
-    if (githubData.frontend[lang] >= 5) return "Seasoned";
-    if (githubData.frontend[lang] >= 3) return "Warming Up";
-    if (githubData.frontend[lang] > 0) return "Cooked";
 
-    if (githubData.backend[lang] >= 5) return "Seasoned";
-    if (githubData.backend[lang] >= 3) return "Warming Up";
-    if (githubData.backend[lang] > 0) return "Cooked";
-
-    return "Cooked"
-  };
-
-  const getStatusColor = (status) => {
-    if (status === "Seasoned") return "bg-yellow-500";
-    if (status === "Warming Up") return "bg-orange-500";
-    if (status === "Cooked") return "bg-red-500";
-    return "bg-gray-500";
-  };
 
   // Generate contribution heatmap data from GitHub
   const generateHeatmap = () => {
@@ -784,87 +768,11 @@ export default function Results() {
                   Languages
                 </h2>
 
-                <Card className="bg-[#0d1117] border-[#30363d] flex-1">
-                  <CardContent className="py-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
-                      <div>
-                        <h3 className="text-sm font-semibold text-white mb-3">
-                          Frontend:
-                        </h3>
-
-                        <div className="space-y-3">
-                          {Object.keys(githubData.frontend || {}).length > 0 ? (
-                            Object.keys(githubData.frontend || {})
-                              .slice(0, 4)
-                              .map((lang, idx) => (
-                                <div
-                                  key={idx}
-                                  className="flex items-center gap-3"
-                                >
-                                  <div
-                                    className={`w-2 h-2 rounded-full ${getStatusColor(
-                                      getLanguageStatus(lang),
-                                    )}`}
-                                  />
-                                  <span className="text-gray-300">{lang}</span>
-                                  <span className="text-gray-500 ml-auto">
-                                    {getLanguageStatus(lang)}
-                                  </span>
-                                </div>
-                              ))
-                          ) : (
-                            <p className="text-gray-400 text-sm">
-                              No language data available
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h3 className="text-sm font-semibold text-white mb-3">
-                          Backend:
-                        </h3>
-
-                        <div className="space-y-3">
-                          {Object.keys(githubData.backend || {}).length > 0 ? (
-                            Object.keys(githubData.backend || {})
-                              .slice(0, 4)
-                              .map((lang, idx) => (
-                                <div
-                                  key={idx}
-                                  className="flex items-center gap-3"
-                                >
-                                  <div
-                                    className={`w-2 h-2 rounded-full ${getStatusColor(
-                                      getLanguageStatus(lang),
-                                    )}`}
-                                  />
-                                  <span className="text-gray-300">{lang}</span>
-                                  <span className="text-gray-500 ml-auto">
-                                    {getLanguageStatus(lang)}
-                                  </span>
-                                </div>
-                              ))
-                          ) : (
-                            <p className="text-gray-400 text-sm">
-                              No language data available
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {analysis.languageInsight && (
-                      <>
-                        <div className="border-t border-[#30363d] my-3" />
-
-                        <p className="text-xs text-gray-500">
-                          AI Notes: {analysis.languageInsight}
-                        </p>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
+                <LanguageBreakdown
+                  languageBreakdown={githubData.languageBreakdown}
+                  totalLanguageBytes={githubData.totalLanguageBytes}
+                  languageInsight={analysis.languageInsight}
+                />
               </div>
 
               {/* Employability */}

@@ -1,11 +1,11 @@
 // OpenRouter API configuration
-import { formatEducation } from '@/utils/formatEducation';
+import { formatEducation } from "@/utils/formatEducation";
 
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
-const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 if (!OPENROUTER_API_KEY) {
-  console.error('Missing VITE_OPENROUTER_API_KEY environment variable');
+  console.error("Missing VITE_OPENROUTER_API_KEY environment variable");
 }
 
 /**
@@ -13,22 +13,30 @@ if (!OPENROUTER_API_KEY) {
  */
 function safeParseJSON(raw) {
   // Attempt 1: parse as-is
-  try { return JSON.parse(raw); } catch {}
+  try {
+    return JSON.parse(raw);
+  } catch {}
 
   // Attempt 2: fix trailing commas
-  let cleaned = raw.replace(/,\s*([\]}])/g, '$1');
-  try { return JSON.parse(cleaned); } catch {}
+  let cleaned = raw.replace(/,\s*([\]}])/g, "$1");
+  try {
+    return JSON.parse(cleaned);
+  } catch {}
 
   // Attempt 3: remove control characters that break JSON strings
   cleaned = cleaned.replace(/[\x00-\x1F\x7F]/g, (ch) =>
-    ch === '\n' || ch === '\r' || ch === '\t' ? ch : ''
+    ch === "\n" || ch === "\r" || ch === "\t" ? ch : "",
   );
-  try { return JSON.parse(cleaned); } catch {}
+  try {
+    return JSON.parse(cleaned);
+  } catch {}
 
   // Attempt 4: use a regex to extract well-formed key-value pairs
   // Replace any unescaped backslashes that aren't valid JSON escapes
-  cleaned = cleaned.replace(/\\(?!["\\bfnrtu/])/g, '\\\\');
-  try { return JSON.parse(cleaned); } catch {}
+  cleaned = cleaned.replace(/\\(?!["\\bfnrtu/])/g, "\\\\");
+  try {
+    return JSON.parse(cleaned);
+  } catch {}
 
   return null;
 }
@@ -39,23 +47,23 @@ function safeParseJSON(raw) {
  * @param {string} systemPrompt - Optional system prompt for context
  * @returns {Promise<string>} - AI response text
  */
-export async function callOpenRouter(prompt, systemPrompt = '') {
+export async function callOpenRouter(prompt, systemPrompt = "") {
   try {
     const response = await fetch(OPENROUTER_API_URL, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'amicooked'
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": window.location.origin,
+        "X-Title": "amicooked",
       },
       body: JSON.stringify({
-        model: 'openrouter/free', // Auto-select model based on prompt
+        model: "openrouter/free", // Auto-select model based on prompt
         messages: [
-          ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
-          { role: 'user', content: prompt }
-        ]
-      })
+          ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
+          { role: "user", content: prompt },
+        ],
+      }),
     });
 
     if (!response.ok) {
@@ -65,7 +73,7 @@ export async function callOpenRouter(prompt, systemPrompt = '') {
     const data = await response.json();
     return data.choices[0].message.content;
   } catch (error) {
-    console.error('OpenRouter API error:', error);
+    console.error("OpenRouter API error:", error);
     throw error;
   }
 }
@@ -89,19 +97,20 @@ Higher scores are better. Consider the user's context when making recommendation
 
   // Build context string from profile
   const contextStr = `${formatEducation(userProfile.education)} (${userProfile.age} years old)`;
-  const experienceStr = userProfile.experienceYears?.replace(/_/g, ' ') || 'Unknown';
-  
+  const experienceStr =
+    userProfile.experienceYears?.replace(/_/g, " ") || "Unknown";
+
   const prompt = `Analyze this GitHub profile for a ${contextStr}:
 
 **User Profile:**
 - Age: ${userProfile.age}
 - Education: ${formatEducation(userProfile.education)}
 - Experience: ${experienceStr}
-- Current Status: ${userProfile.currentRole || 'Unknown'}
-- Career Goal: ${userProfile.careerGoal || 'Not specified'}
-- Technical Skills: ${userProfile.technicalSkills || 'Not specified'}
-${userProfile.technicalInterests ? `- Technical Interests: ${userProfile.technicalInterests}` : ''}
-${userProfile.hobbies ? `- Hobbies: ${userProfile.hobbies}` : ''}
+- Current Status: ${userProfile.currentRole || "Unknown"}
+- Career Goal: ${userProfile.careerGoal || "Not specified"}
+- Technical Skills: ${userProfile.technicalSkills || "Not specified"}
+${userProfile.technicalInterests ? `- Technical Interests: ${userProfile.technicalInterests}` : ""}
+${userProfile.hobbies ? `- Hobbies: ${userProfile.hobbies}` : ""}
 
 **GitHub Metrics:**
 - Total Repositories: ${githubData.totalRepos}
@@ -110,9 +119,9 @@ ${userProfile.hobbies ? `- Hobbies: ${userProfile.hobbies}` : ''}
 - Code Reviews: ${githubData.totalReviews || 0}
 - Stars Received: ${githubData.totalStars}
 - Forks: ${githubData.totalForks}
-- Top Languages: ${githubData.languages?.join(', ') || 'Unknown'}
+- Top Languages: ${githubData.languages?.join(", ") || "Unknown"}
 - Contribution Streak: ${githubData.streak || 0} days
-- Has README profiles: ${githubData.hasReadme ? 'Yes' : 'No'}
+- Has README profiles: ${githubData.hasReadme ? "Yes" : "No"}
 
 Provide your response in this exact JSON format:
 {
@@ -137,9 +146,9 @@ Provide your response in this exact JSON format:
       const result = safeParseJSON(jsonMatch[0]);
       if (result) return result;
     }
-    throw new Error('Could not parse AI response');
+    throw new Error("Could not parse AI response");
   } catch (error) {
-    console.error('AI analysis error:', error);
+    console.error("AI analysis error:", error);
     throw error;
   }
 }
@@ -161,7 +170,7 @@ export async function RecommendedProjects(githubData, userProfile) {
   - A 1-2 sentence explanation of how it aligns with the user's interests and goals
   - A list of 4-6 suggested technologies/tools with a short description of what each one is used for in the project
   
-  Return your answer as a JSON array like this:
+  Return your answer in this exact JSON array format:
 [
   {
     "name": "<project name>",
@@ -179,8 +188,9 @@ export async function RecommendedProjects(githubData, userProfile) {
 ]`;
 
   const contextStr = `${formatEducation(userProfile.education)} (${userProfile.age} years old)`;
-  const experienceStr = userProfile.experienceYears?.replace(/_/g, ' ') || 'Unknown';
-  const prompt = `User Profile:\n- Age: ${userProfile.age}\n- Education: ${formatEducation(userProfile.education)}\n- Experience: ${experienceStr}\n- Current Status: ${userProfile.currentRole || 'Unknown'}\n- Career Goal: ${userProfile.careerGoal || 'Not specified'}\n- Technical Skills: ${userProfile.technicalSkills || 'Not specified'}${userProfile.technicalInterests ? `\n- Technical Interests: ${userProfile.technicalInterests}` : ''}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ''}\n\nGitHub Skills:\n- Top Languages: ${githubData.languages?.join(', ') || 'Unknown'}\n\nSuggest four simple projects using skills the user has little or no experience with. Include detailed info for each project.\n\nIMPORTANT: Return ONLY valid JSON. No trailing commas. Use double quotes for all keys and string values. Avoid apostrophes (use \"is not\" instead of \"isn't\"). Spaces in names and descriptions are fine and expected.`;
+  const experienceStr =
+    userProfile.experienceYears?.replace(/_/g, " ") || "Unknown";
+  const prompt = `User Profile:\n- Age: ${userProfile.age}\n- Education: ${formatEducation(userProfile.education)}\n- Experience: ${experienceStr}\n- Current Status: ${userProfile.currentRole || "Unknown"}\n- Career Goal: ${userProfile.careerGoal || "Not specified"}\n- Technical Skills: ${userProfile.technicalSkills || "Not specified"}${userProfile.technicalInterests ? `\n- Technical Interests: ${userProfile.technicalInterests}` : ""}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ""}\n\nGitHub Skills:\n- Top Languages: ${githubData.languages?.join(", ") || "Unknown"}\n\nSuggest four simple projects using skills the user has little or no experience with. Include detailed info for each project.\n\nIMPORTANT: Return ONLY valid JSON. No trailing commas. Use double quotes for all keys and string values. Avoid apostrophes (use \"is not\" instead of \"isn't\"). Spaces in names and descriptions are fine and expected.`;
 
   try {
     const response = await callOpenRouter(prompt, systemPrompt);
@@ -189,9 +199,9 @@ export async function RecommendedProjects(githubData, userProfile) {
       const result = safeParseJSON(jsonMatch[0]);
       if (result && Array.isArray(result) && result.length > 0) return result;
     }
-    throw new Error('Could not parse AI project recommendations');
+    throw new Error("Could not parse AI project recommendations");
   } catch (error) {
-    console.error('AI project recommendation error:', error);
+    console.error("AI project recommendation error:", error);
     throw error;
   }
 }
