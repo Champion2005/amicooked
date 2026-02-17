@@ -331,7 +331,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
               )}
             </div>
 
-            {/* Saved Projects shortcut */}
+            {/* My Projects shortcut */}
             {onOpenSavedProjects && (
               <div className="px-3 py-3">
                 <button
@@ -339,7 +339,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                   className="w-full flex items-center gap-2 px-3 py-2.5 rounded-md text-sm text-yellow-400/80 hover:text-yellow-400 hover:bg-yellow-400/5 border border-transparent hover:border-yellow-400/20 transition-colors"
                 >
                   <Bookmark className="w-4 h-4" />
-                  <span>Saved Projects Chat</span>
+                  <span>My Projects</span>
                 </button>
               </div>
             )}
@@ -364,8 +364,8 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                   />
                 ))}
                 {loading && (
-                  <div className="flex justify-start">
-                    <div className="bg-[#161b22] border border-[#30363d] rounded-lg px-4 py-3">
+                  <div className="flex justify-center">
+                    <div className="px-4 py-3">
                       <div className="flex items-center gap-2 text-gray-400">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span className="text-sm">Thinking...</span>
@@ -383,7 +383,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                     ref={inputRef}
                     type="text"
                     placeholder="Type your message..."
-                    className="w-full pl-4 pr-12 py-3 rounded-full bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                    className="w-full pl-4 pr-12 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -437,7 +437,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                     ref={inputRef}
                     type="text"
                     placeholder="Ask something..."
-                    className="w-full pl-4 pr-12 py-3 rounded-full bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                    className="w-full pl-4 pr-12 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => {

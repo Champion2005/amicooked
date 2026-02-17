@@ -54,6 +54,7 @@ export default function Results() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [savedProjectsOpen, setSavedProjectsOpen] = useState(false);
+  const [initialProjectId, setInitialProjectId] = useState(null);
   const [savedProjectNames, setSavedProjectNames] = useState(new Set());
   const profileMenuRef = useRef(null);
 
@@ -95,6 +96,12 @@ export default function Results() {
     } catch (err) {
       console.error('Save error:', err);
     }
+  };
+
+  const handleProjectCardClick = (rec) => {
+    const slugId = slugify(rec.name);
+    setInitialProjectId(slugId);
+    setSavedProjectsOpen(true);
   };
 
   // Close profile menu on outside click
@@ -268,7 +275,7 @@ export default function Results() {
               <input
                 type="text"
                 placeholder="Ask AI Anything..."
-                className="w-full px-4 py-2 pr-12 rounded-full bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                className="w-full px-4 py-2 pr-12 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
                 value={headerInput}
                 onChange={(e) => setHeaderInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -298,7 +305,7 @@ export default function Results() {
                 setChatQuery("");
                 setChatOpen(true);
               }}
-              className="px-2.5 py-2 rounded-full border border-[#30363d] text-gray-400 hover:text-white hover:bg-[#1c2128] flex items-center gap-1 text-sm shrink-0"
+              className="px-2.5 py-2 rounded-md border border-[#30363d] text-gray-400 hover:text-white hover:bg-[#1c2128] flex items-center gap-1 text-sm shrink-0"
               title="Chat History"
             >
               <MessageSquare className="w-4 h-4" />
@@ -350,7 +357,7 @@ export default function Results() {
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#1c2128] hover:text-white transition-colors"
                 >
                   <Bookmark className="w-4 h-4" />
-                  Saved Projects
+                  My Projects
                 </button>
                 <button
                   onClick={() => {
@@ -438,7 +445,7 @@ export default function Results() {
                   onClick={() => setSavedProjectsOpen(true)}
                 >
                   <Bookmark className="w-4 h-4 mr-2" />
-                  Saved Projects
+                  My Projects
                 </Button>
 
                 <div className="space-y-4 text-sm">
@@ -598,7 +605,7 @@ export default function Results() {
                     <div
                       key={idx}
                       className="bg-[#0d1117] p-4 rounded-lg border border-[#30363d] cursor-pointer hover:bg-[#161b22] transition-colors group"
-                      onClick={() => setSelectedProject(rec)}
+                      onClick={() => handleProjectCardClick(rec)}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <h3 className="font-semibold text-white text-sm">
@@ -786,8 +793,8 @@ export default function Results() {
                   Employability
                 </h2>
 
-                <Card className="bg-[#0d1117] border-[#30363d] flex-1">
-                  <CardContent className="py-3">
+                <Card className="bg-[#0d1117] border-[#30363d] flex-1 flex flex-col">
+                  <CardContent className="py-3 flex flex-col h-full">
                     <div className="mb-3">
                       <p className="text-sm text-gray-400 mb-2">
                         Paste in Job Description:
@@ -801,7 +808,7 @@ export default function Results() {
 
                     <textarea
                       placeholder="Enter Text Here..."
-                      className="w-full h-24 px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
+                      className="w-full flex-1 min-h-24 px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
                       value={jobDescription}
                       onChange={(e) => setJobDescription(e.target.value)}
                     />
@@ -857,13 +864,18 @@ export default function Results() {
         onSaveChange={refreshSavedStatus}
       />
 
-      {/* Saved Projects Overlay */}
+      {/* My Projects Overlay */}
       <SavedProjectsOverlay
         isOpen={savedProjectsOpen}
-        onClose={() => setSavedProjectsOpen(false)}
+        onClose={() => {
+          setSavedProjectsOpen(false);
+          setInitialProjectId(null);
+        }}
         githubData={githubData}
         userProfile={userProfile}
         analysis={analysis}
+        recommendedProjects={recommendedProjects || []}
+        initialProjectId={initialProjectId}
       />
 
       {/* Reanalyze Confirmation */}
@@ -1000,4 +1012,11 @@ export default function Results() {
       </footer>
     </div>
   );
+}
+
+function slugify(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }

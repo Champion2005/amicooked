@@ -5,6 +5,8 @@ import {
   unsaveProject,
   addProjectMessage,
   getSavedProject,
+  saveProject,
+  isProjectSaved,
 } from "@/services/savedProjects";
 import { callOpenRouter } from "@/services/openrouter";
 import { formatEducation } from "@/utils/formatEducation";
@@ -22,13 +24,17 @@ import {
   ChevronUp,
   BookOpen,
   Wrench,
+  Star,
+  CheckSquare,
+  Square,
+  MoreVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import ChatMessage from "@/components/ChatMessage";
 
 /**
- * Full-screen overlay for saved projects — sidebar list + main chat area
- * mirroring the ChatPopup layout.
+ * Full-screen overlay for My Projects — sidebar list + main chat area
+ * with recommended projects section at the top.
  */
 export default function SavedProjectsOverlay({
   isOpen,
@@ -36,6 +42,8 @@ export default function SavedProjectsOverlay({
   githubData,
   userProfile,
   analysis,
+  recommendedProjects = [],
+  initialProjectId = null,
 }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +53,13 @@ export default function SavedProjectsOverlay({
   const [showSidebar, setShowSidebar] = useState(true);
   const [infoExpanded, setInfoExpanded] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null); // project to confirm-delete
+  const [bulkDeleteMode, setBulkDeleteMode] = useState(false); // selection mode active
+  const [selectedProjects, setSelectedProjects] = useState(new Set()); // selected project IDs
+  const [bulkDeleteTarget, setBulkDeleteTarget] = useState(null); // 'selected' or 'all'
+  const [showDeleteMenu, setShowDeleteMenu] = useState(false); // dropdown menu
+  const [recommendedSaveStatus, setRecommendedSaveStatus] = useState({}); // {projectName: boolean}
+  const [recommendedProjectsData, setRecommendedProjectsData] = useState([]); // Enriched with updatedAt
+  const [savingBookmark, setSavingBookmark] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const userId = auth.currentUser?.uid;
@@ -53,10 +68,65 @@ export default function SavedProjectsOverlay({
   useEffect(() => {
     if (isOpen && userId) {
       loadProjects();
-      setActiveProject(null);
+      loadRecommendedSaveStatus();
       setShowSidebar(true);
+      // Reset active project if no initial selection
+      if (!initialProjectId) {
+        setActiveProject(null);
+      }
     }
   }, [isOpen, userId]);
+  
+  // Handle initial project selection
+  useEffect(() => {
+    if (isOpen && initialProjectId && recommendedProjects.length > 0) {
+      const project = recommendedProjects.find((p) => slugify(p.name) === initialProjectId);
+      if (project) {
+        handleSelectRecommendedProject(project);
+      }
+    }
+  }, [isOpen, initialProjectId, recommendedProjects]);
+  
+  // Auto-select most recent project when opening without specific selection
+  useEffect(() => {
+    if (!isOpen || initialProjectId || activeProject) return;
+    
+    // Wait for data to load
+    if (loading || !userId) return;
+    
+    // Find most recent project across both recommended and saved
+    const allProjects = [...recommendedProjectsData, ...projects];
+    
+    if (allProjects.length === 0) return;
+    
+    // Sort by most recent (updatedAt descending, nulls last)
+    const sorted = allProjects.sort((a, b) => {
+      if (!a.updatedAt && !b.updatedAt) return 0;
+      if (!a.updatedAt) return 1;
+      if (!b.updatedAt) return -1;
+      return new Date(b.updatedAt) - new Date(a.updatedAt);
+    });
+    
+    const mostRecent = sorted[0];
+    
+    // Select the most recent project
+    if (mostRecent) {
+      // Check if it's a recommended project or saved project
+      const isRecommended = recommendedProjectsData.some(p => p.name === mostRecent.name);
+      if (isRecommended) {
+        handleSelectRecommendedProject(mostRecent);
+      } else {
+        handleSelectProject(mostRecent);
+      }
+    }
+  }, [isOpen, initialProjectId, activeProject, loading, recommendedProjectsData, projects, userId]);
+  
+  // Reload recommended save status when recommended projects change
+  useEffect(() => {
+    if (isOpen && userId && recommendedProjects.length > 0) {
+      loadRecommendedSaveStatus();
+    }
+  }, [recommendedProjects, isOpen, userId]);
 
   // Browser-back to close
   useEffect(() => {
@@ -83,9 +153,97 @@ export default function SavedProjectsOverlay({
       const data = await getSavedProjects(userId);
       setProjects(data);
     } catch (err) {
-      console.error("Failed to load saved projects:", err);
+      console.error("Failed to load projects:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadRecommendedSaveStatus = async () => {
+    if (!userId || !recommendedProjects.length) return;
+    const statusMap = {};
+    const enrichedProjects = [];
+    
+    await Promise.all(
+      recommendedProjects.map(async (rec) => {
+        const slugId = slugify(rec.name);
+        const savedProj = await getSavedProject(userId, slugId);
+        const saved = savedProj !== null;
+        statusMap[rec.name] = saved;
+        
+        // Enrich with updatedAt for sorting
+        enrichedProjects.push({
+          ...rec,
+          id: slugId,
+          updatedAt: savedProj?.updatedAt || null,
+          messages: savedProj?.messages || []
+        });
+      })
+    );
+    
+    // Sort by most recent (updatedAt descending, nulls last)
+    enrichedProjects.sort((a, b) => {
+      if (!a.updatedAt && !b.updatedAt) return 0;
+      if (!a.updatedAt) return 1;
+      if (!b.updatedAt) return -1;
+      return new Date(b.updatedAt) - new Date(a.updatedAt);
+    });
+    
+    setRecommendedSaveStatus(statusMap);
+    setRecommendedProjectsData(enrichedProjects);
+  };
+
+  const handleSelectRecommendedProject = async (proj) => {
+    if (!proj) return;
+    
+    // Check if this recommended project is saved
+    const slugId = slugify(proj.name);
+    const isSaved = await isProjectSaved(userId, proj.name);
+    
+    if (isSaved) {
+      // Load saved project with chat history
+      const savedProj = await getSavedProject(userId, slugId);
+      setActiveProject(savedProj || { ...proj, id: slugId, messages: [] });
+    } else {
+      // Show project info but no persisted chat yet
+      setActiveProject({ ...proj, id: slugId, messages: [] });
+    }
+    
+    if (window.innerWidth < 640) setShowSidebar(false);
+    setInfoExpanded(true);
+  };
+
+  const handleToggleRecommendedBookmark = async (proj) => {
+    if (!userId || savingBookmark) return;
+    
+    const isSaved = recommendedSaveStatus[proj.name];
+    setSavingBookmark(true);
+    
+    try {
+      if (isSaved) {
+        // Unsave
+        await unsaveProject(userId, slugify(proj.name));
+        setRecommendedSaveStatus(prev => ({ ...prev, [proj.name]: false }));
+        
+        // If this project is currently active and we just unsaved it, clear its messages
+        if (activeProject?.name === proj.name) {
+          setActiveProject(prev => ({ ...prev, messages: [] }));
+        }
+        
+        // Reload projects list
+        await loadProjects();
+      } else {
+        // Save
+        await saveProject(userId, proj);
+        setRecommendedSaveStatus(prev => ({ ...prev, [proj.name]: true }));
+        
+        // Reload projects list
+        await loadProjects();
+      }
+    } catch (err) {
+      console.error('Bookmark error:', err);
+    } finally {
+      setSavingBookmark(false);
     }
   };
 
@@ -111,6 +269,62 @@ export default function SavedProjectsOverlay({
     } finally {
       setDeleteTarget(null);
     }
+  };
+
+  const handleToggleSelectProject = (projectId) => {
+    setSelectedProjects(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(projectId)) {
+        newSet.delete(projectId);
+      } else {
+        newSet.add(projectId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleStartBulkDelete = (mode) => {
+    setBulkDeleteTarget(mode);
+    setShowDeleteMenu(false);
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (!bulkDeleteTarget) return;
+    
+    const projectsToDelete = bulkDeleteTarget === 'all' 
+      ? projects 
+      : projects.filter(p => selectedProjects.has(p.id));
+    
+    try {
+      // Delete all projects in parallel
+      await Promise.all(
+        projectsToDelete.map(proj => unsaveProject(userId, proj.id))
+      );
+      
+      // Update state
+      const deletedIds = new Set(projectsToDelete.map(p => p.id));
+      setProjects(prev => prev.filter(p => !deletedIds.has(p.id)));
+      
+      // Clear active project if it was deleted
+      if (activeProject && deletedIds.has(activeProject.id)) {
+        setActiveProject(null);
+        setShowSidebar(true);
+      }
+      
+      // Reset selection state
+      setSelectedProjects(new Set());
+      setBulkDeleteMode(false);
+    } catch (err) {
+      console.error("Bulk delete error:", err);
+    } finally {
+      setBulkDeleteTarget(null);
+    }
+  };
+
+  const handleCancelBulkMode = () => {
+    setBulkDeleteMode(false);
+    setSelectedProjects(new Set());
+    setShowDeleteMenu(false);
   };
 
   const handleBack = () => {
@@ -168,6 +382,18 @@ export default function SavedProjectsOverlay({
       { role: "user", content: userMsg, timestamp: new Date().toISOString() },
     ];
     setActiveProject((prev) => ({ ...prev, messages: newMessages }));
+
+    // Auto-save recommended project on first chat
+    const isSaved = await isProjectSaved(userId, activeProject.name);
+    if (!isSaved && activeProject.name) {
+      try {
+        await saveProject(userId, activeProject);
+        setRecommendedSaveStatus(prev => ({ ...prev, [activeProject.name]: true }));
+        await loadProjects(); // Refresh projects list
+      } catch (err) {
+        console.error('Auto-save failed:', err);
+      }
+    }
 
     setChatLoading(true);
     try {
@@ -230,6 +456,19 @@ export default function SavedProjectsOverlay({
       // Inline send
       const go = async () => {
         if (!activeProject) return;
+        
+        // Auto-save recommended project on first chat
+        const isSaved = await isProjectSaved(userId, activeProject.name);
+        if (!isSaved && activeProject.name) {
+          try {
+            await saveProject(userId, activeProject);
+            setRecommendedSaveStatus(prev => ({ ...prev, [activeProject.name]: true }));
+            await loadProjects(); // Refresh projects list
+          } catch (err) {
+            console.error('Auto-save failed:', err);
+          }
+        }
+        
         const newMessages = [
           ...(activeProject.messages || []),
           {
@@ -333,7 +572,7 @@ export default function SavedProjectsOverlay({
             </div>
             <div className="min-w-0">
               <h1 className="text-base sm:text-xl font-bold text-white truncate">
-                {activeProject ? activeProject.name : "Saved Projects"}
+                {activeProject ? activeProject.name : "My Projects"}
               </h1>
               <p className="text-xs text-gray-400 hidden sm:block">
                 {activeProject
@@ -358,13 +597,16 @@ export default function SavedProjectsOverlay({
                     <ChevronDown className="w-4 h-4" />
                   )}
                 </button>
-                <button
-                  onClick={() => setDeleteTarget(activeProject)}
-                  className="p-2 rounded-md text-gray-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-                  title="Delete project"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {/* Only show delete button for saved projects in list (not for current recommended projects) */}
+                {!recommendedProjects.some(rec => rec.name === activeProject.name) && (
+                  <button
+                    onClick={() => setDeleteTarget(activeProject)}
+                    className="p-2 rounded-md text-gray-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                    title="Delete project"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </>
             )}
             <button
@@ -378,71 +620,216 @@ export default function SavedProjectsOverlay({
 
         {/* Main Content */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar — Saved Projects List */}
+          {/* Sidebar — Projects List */}
           {showSidebar && (
             <div className="absolute inset-0 sm:relative sm:inset-auto w-full sm:w-80 border-r border-[#30363d] bg-[#161b22] flex flex-col shrink-0 z-10">
-              <div className="p-4 border-b border-[#30363d]">
-                <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
-                  Your Saved Projects
-                </h2>
-              </div>
               <div className="flex-1 overflow-y-auto">
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-6 h-6 animate-spin text-[#58a6ff]" />
                   </div>
-                ) : projects.length === 0 ? (
-                  <div className="text-center py-12 px-4">
-                    <FolderOpen className="w-10 h-10 text-gray-600 mx-auto mb-3" />
-                    <p className="text-gray-500 text-sm">
-                      No saved projects yet
-                    </p>
-                    <p className="text-gray-600 text-xs mt-1">
-                      Bookmark a project to save it here
-                    </p>
-                  </div>
                 ) : (
-                  <div className="space-y-1 p-2">
-                    {projects.map((proj) => (
-                      <div key={proj.id} className="group relative">
-                        <button
-                          onClick={() => handleSelectProject(proj)}
-                          className={`w-full text-left px-3 py-3 pr-8 rounded-md transition-colors ${
-                            activeProject?.id === proj.id
-                              ? "bg-[#1c2128] border border-[#58a6ff]/30"
-                              : "hover:bg-[#1c2128] border border-transparent"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Lightbulb className="w-3.5 h-3.5 text-[#238636] shrink-0" />
-                            <p className="text-sm text-white truncate">
-                              {proj.name}
-                            </p>
+                  <>
+                    {/* Recommended Projects Section */}
+                    {recommendedProjects && recommendedProjects.length > 0 && (
+                      <div className="border-b border-[#30363d]">
+                        <div className="p-4 pb-3">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+                              Recommended Projects
+                            </h2>
                           </div>
-                          <div className="flex items-center gap-2 mt-1 ml-5.5">
-                            <p className="text-xs text-gray-500">
-                              {proj.messages?.length || 0} messages
-                            </p>
-                            {proj.savedAt && (
-                              <span className="text-xs text-gray-600">
-                                · {formatTime(proj.savedAt)}
-                              </span>
-                            )}
+                          <div className="space-y-1">
+                            {recommendedProjectsData.map((rec, idx) => (
+                              <div key={idx} className="group relative">
+                                <button
+                                  onClick={() => handleSelectRecommendedProject(rec)}
+                                  className={`w-full text-left px-3 py-3 pr-9 rounded-md transition-colors ${
+                                    activeProject?.name === rec.name
+                                      ? "bg-[#1c2128] border border-[#58a6ff]/30"
+                                      : "hover:bg-[#1c2128] border border-transparent"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Lightbulb className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+                                    <p className="text-sm text-white truncate">
+                                      {rec.name}
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1 mt-1.5 ml-5.5">
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#0d1117] border border-[#30363d] text-green-400">
+                                      {rec.skill1}
+                                    </span>
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#0d1117] border border-[#30363d] text-blue-400">
+                                      {rec.skill2}
+                                    </span>
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#0d1117] border border-[#30363d] text-yellow-400">
+                                      {rec.skill3}
+                                    </span>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleRecommendedBookmark(rec);
+                                  }}
+                                  disabled={savingBookmark}
+                                  className={`absolute right-2 top-3 p-1 rounded transition-colors ${
+                                    recommendedSaveStatus[rec.name]
+                                      ? 'text-yellow-400 hover:text-yellow-500'
+                                      : 'text-gray-600 hover:text-yellow-400 opacity-0 group-hover:opacity-100'
+                                  }`}
+                                  title={recommendedSaveStatus[rec.name] ? 'Saved' : 'Save project'}
+                                >
+                                  <Bookmark className={`w-3.5 h-3.5 ${recommendedSaveStatus[rec.name] ? 'fill-current' : ''}`} />
+                                </button>
+                              </div>
+                            ))}
                           </div>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteTarget(proj);
-                          }}
-                          className="absolute right-2 top-3 p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100"
-                          title="Delete project"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                    
+                    {/* Saved Projects Section */}
+                    <div>
+                      <div className="p-4 pb-3">
+                        <div className="flex items-center justify-between mb-3">
+                          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+                            Saved
+                          </h2>
+                          
+                          {/* Delete menu - only show if there are saved projects */}
+                          {projects.length > 0 && (
+                            <div className="relative">
+                              {bulkDeleteMode ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-gray-400">
+                                    {selectedProjects.size} selected
+                                  </span>
+                                  <button
+                                    onClick={handleCancelBulkMode}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-[#1c2128] transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={() => handleStartBulkDelete('selected')}
+                                    disabled={selectedProjects.size === 0}
+                                    className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-400/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => setShowDeleteMenu(!showDeleteMenu)}
+                                    className="p-1 rounded text-gray-400 hover:text-white hover:bg-[#1c2128] transition-colors"
+                                    title="Delete options"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                  </button>
+                                  
+                                  {showDeleteMenu && (
+                                    <>
+                                      <div 
+                                        className="fixed inset-0 z-10" 
+                                        onClick={() => setShowDeleteMenu(false)}
+                                      />
+                                      <div className="absolute right-0 top-8 z-20 w-48 bg-[#0d1117] border border-[#30363d] rounded-lg shadow-xl py-1">
+                                        <button
+                                          onClick={() => {
+                                            setBulkDeleteMode(true);
+                                            setShowDeleteMenu(false);
+                                          }}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-[#1c2128] hover:text-white transition-colors text-left"
+                                        >
+                                          <CheckSquare className="w-4 h-4" />
+                                          Select Projects
+                                        </button>
+                                        <button
+                                          onClick={() => handleStartBulkDelete('all')}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-400/10 hover:text-red-300 transition-colors text-left"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                          Delete All Saved
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {projects.length === 0 ? (
+                          <div className="text-center py-8 px-4">
+                            <FolderOpen className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                            <p className="text-gray-500 text-xs">
+                              No saved projects
+                            </p>
+                            <p className="text-gray-600 text-[10px] mt-1">
+                              Bookmark projects to save them
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            {projects.map((proj) => (
+                              <div key={proj.id} className="group relative">
+                                <button
+                                  onClick={() => bulkDeleteMode ? handleToggleSelectProject(proj.id) : handleSelectProject(proj)}
+                                  className={`w-full text-left px-3 py-3 ${bulkDeleteMode ? 'pr-3' : 'pr-8'} rounded-md transition-colors ${
+                                    activeProject?.id === proj.id && !bulkDeleteMode
+                                      ? "bg-[#1c2128] border border-[#58a6ff]/30"
+                                      : "hover:bg-[#1c2128] border border-transparent"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {bulkDeleteMode ? (
+                                      selectedProjects.has(proj.id) ? (
+                                        <CheckSquare className="w-4 h-4 text-[#58a6ff] shrink-0" />
+                                      ) : (
+                                        <Square className="w-4 h-4 text-gray-500 shrink-0" />
+                                      )
+                                    ) : (
+                                      <Lightbulb className="w-3.5 h-3.5 text-[#238636] shrink-0" />
+                                    )}
+                                    <p className="text-sm text-white truncate">
+                                      {proj.name}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1 ml-5.5">
+                                    <p className="text-xs text-gray-500">
+                                      {proj.messages?.length || 0} messages
+                                    </p>
+                                    {proj.savedAt && (
+                                      <span className="text-xs text-gray-600">
+                                        · {formatTime(proj.savedAt)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </button>
+                                {!bulkDeleteMode && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteTarget(proj);
+                                    }}
+                                    className="absolute right-2 top-3 p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100"
+                                    title="Delete project"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -568,8 +955,8 @@ export default function SavedProjectsOverlay({
                         />
                       ))}
                       {chatLoading && (
-                        <div className="flex justify-start">
-                          <div className="bg-[#161b22] border border-[#30363d] rounded-lg px-4 py-3">
+                        <div className="flex justify-center">
+                          <div className="px-4 py-3">
                             <div className="flex items-center gap-2 text-gray-400">
                               <Loader2 className="w-4 h-4 animate-spin" />
                               <span className="text-sm">Thinking...</span>
@@ -589,7 +976,7 @@ export default function SavedProjectsOverlay({
                       ref={inputRef}
                       type="text"
                       placeholder={`Ask about ${activeProject.name}...`}
-                      className="w-full pl-4 pr-12 py-3 rounded-full bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                      className="w-full pl-4 pr-12 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -672,6 +1059,63 @@ export default function SavedProjectsOverlay({
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkDeleteTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setBulkDeleteTarget(null)}
+          />
+          <div className="relative bg-[#161b22] border border-[#30363d] rounded-xl p-6 max-w-md mx-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-2">
+              {bulkDeleteTarget === 'all' 
+                ? `Delete All ${projects.length} Projects?` 
+                : `Delete ${selectedProjects.size} Project${selectedProjects.size !== 1 ? 's' : ''}?`}
+            </h3>
+            <p className="text-sm text-gray-400 mb-3">
+              This will permanently delete the following projects and their entire chat histories:
+            </p>
+            <div className="max-h-48 overflow-y-auto mb-4 bg-[#0d1117] rounded-lg border border-[#30363d] p-3">
+              <ul className="space-y-1.5">
+                {(bulkDeleteTarget === 'all' 
+                  ? projects 
+                  : projects.filter(p => selectedProjects.has(p.id))
+                ).map((proj) => (
+                  <li key={proj.id} className="flex items-start gap-2 text-sm">
+                    <span className="text-red-400 mt-0.5">•</span>
+                    <span className="text-white font-medium">{proj.name}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="text-sm text-gray-500 mb-6">
+              This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setBulkDeleteTarget(null)}
+                className="flex-1 px-4 py-2 rounded-md border border-[#30363d] text-gray-300 hover:bg-[#1c2128] text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmBulkDelete}
+                className="flex-1 px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm transition-colors"
+              >
+                Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
+}
+
+function slugify(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }

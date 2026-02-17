@@ -320,7 +320,7 @@ export default function ProjectPopup({
                   }
                 }}
                 placeholder="Ask about this project..."
-                className="w-full pl-4 pr-12 py-3 rounded-full bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                className="w-full pl-4 pr-12 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
               />
               <button
                 onClick={handleAsk}

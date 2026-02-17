@@ -48,7 +48,7 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-10 sm:pb-16 text-center">
-        <div className="inline-block mb-4 sm:mb-6 px-3 sm:px-4 py-1.5 rounded-full border border-[#30363d] bg-[#161b22] text-xs sm:text-sm text-gray-400">
+        <div className="inline-block mb-4 sm:mb-6 px-3 sm:px-4 py-1.5 rounded-md border border-[#30363d] bg-[#161b22] text-xs sm:text-sm text-gray-400">
           🔥 Stop guessing. Start building what matters.
         </div>
         <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold leading-tight mb-4 sm:mb-6">
