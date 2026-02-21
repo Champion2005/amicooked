@@ -56,6 +56,7 @@ export default function Results() {
   const [savedProjectsOpen, setSavedProjectsOpen] = useState(false);
   const [initialProjectId, setInitialProjectId] = useState(null);
   const [savedProjectNames, setSavedProjectNames] = useState(new Set());
+  const [metricPopupOpen, setMetricPopupOpen] = useState(false);
   const profileMenuRef = useRef(null);
 
   // Load saved project status for bookmark icons
@@ -576,6 +577,16 @@ export default function Results() {
                         <span className={`text-xs font-semibold ${getCookedColor(analysis.cookedLevel)}`}>
                           {analysis.levelName}
                         </span>
+                        {analysis.categoryScores && (
+                          <button
+                            onClick={() => setMetricPopupOpen(true)}
+                            className="mt-0.5 flex items-center gap-1 text-[10px] text-gray-500 hover:text-[#58a6ff] transition-colors"
+                            title="View score breakdown"
+                          >
+                            <Info className="w-3 h-3" />
+                            <span>Breakdown</span>
+                          </button>
+                        )}
                       </div>
                     );
                   })()}
@@ -937,6 +948,71 @@ export default function Results() {
               >
                 Sign Out
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Metric Breakdown Popup */}
+      {metricPopupOpen && analysis.categoryScores && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setMetricPopupOpen(false)}
+          />
+          <div className="relative bg-[#161b22] border border-[#30363d] rounded-xl p-5 max-w-sm w-full mx-4 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-white">Score Breakdown</h3>
+              <button
+                onClick={() => setMetricPopupOpen(false)}
+                className="text-gray-500 hover:text-white transition-colors text-lg leading-none"
+              >
+                &times;
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              Your overall score of{" "}
+              <span className={`font-bold ${getCookedColor(analysis.cookedLevel)}`}>
+                {analysis.cookedLevel}/10
+              </span>{" "}
+              ({analysis.levelName}) is computed as a weighted average of four categories.
+            </p>
+            <div className="space-y-3">
+              {([
+                { key: "activity", label: "Activity", color: "bg-blue-500" },
+                { key: "skillSignals", label: "Skill Signals", color: "bg-purple-500" },
+                { key: "growth", label: "Growth", color: "bg-green-500" },
+                { key: "collaboration", label: "Collaboration", color: "bg-yellow-500" },
+              ]).map(({ key, label, color }) => {
+                const cat = analysis.categoryScores[key];
+                if (!cat) return null;
+                return (
+                  <div key={key}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-300 font-medium">
+                        {label}
+                        <span className="ml-1 text-[10px] text-gray-500">({cat.weight}% weight)</span>
+                      </span>
+                      <span className="text-sm font-bold text-white">{cat.score}/100</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-[#1f2831] rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${color} rounded-full transition-all duration-500`}
+                        style={{ width: `${cat.score}%` }}
+                      />
+                    </div>
+                    {cat.notes && (
+                      <p className="text-[10px] text-gray-500 mt-1 leading-tight">{cat.notes}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 pt-3 border-t border-[#30363d] flex items-center justify-between">
+              <span className="text-xs text-gray-500">Weighted total</span>
+              <span className={`text-sm font-bold ${getCookedColor(analysis.cookedLevel)}`}>
+                {analysis.cookedLevel}/10 — {analysis.levelName}
+              </span>
             </div>
           </div>
         </div>

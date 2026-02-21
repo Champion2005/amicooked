@@ -1,11 +1,126 @@
 // OpenRouter API configuration
 import { formatEducation } from "@/utils/formatEducation";
+import { getAgentInstructions } from "@/config/agent-instructions";
 
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
+
+// ─── Deterministic post-processing ───────────────────────────────────────────
+
+const CATEGORY_WEIGHTS = { activity: 40, skillSignals: 30, growth: 15, collaboration: 15 };
+
+/** Normalise AI key aliases (e.g. skill_signals → skillSignals) */
+const KEY_ALIASES = {
+  skill_signals: "skillSignals",
+  "skillsignals": "skillSignals",
+  skills: "skillSignals",
+  collab: "collaboration",
+};
+
+function deriveLevelName(level) {
+  if (level >= 9) return "Cooking";
+  if (level >= 7) return "Toasted";
+  if (level >= 5) return "Cooked";
+  if (level >= 3) return "Well-Done";
+  return "Burnt";
+}
+
+/**
+ * Validate and normalise the raw AI response:
+ * - Renames aliased category keys
+ * - Clamps scores to 0-100
+ * - Fills any missing category with a fair neutral default
+ * - Computes cookedLevel and levelName deterministically from the weighted average
+ */
+function normalizeAnalysis(raw) {
+  const rawCats = raw.categoryScores || {};
+
+  // Normalise keys the AI might vary
+  const renamed = {};
+  for (const [k, v] of Object.entries(rawCats)) {
+    const canonical = KEY_ALIASES[k.toLowerCase().replace(/[\s_-]/g, "")] || k;
+    renamed[canonical] = v;
+  }
+
+  // Build validated categories — fill missing ones with 40 (below-average default)
+  const categories = {};
+  for (const [key, weight] of Object.entries(CATEGORY_WEIGHTS)) {
+    const cat = renamed[key] || {};
+    const raw_score = typeof cat.score === "number" ? cat.score : 40;
+    categories[key] = {
+      score: Math.min(100, Math.max(0, Math.round(raw_score))),
+      weight,
+      notes: (cat.notes || "").trim(),
+    };
+  }
+
+  // Derive cookedLevel deterministically: weighted average of 0-100 scores → 0-10
+  const weightedAvg = Object.entries(CATEGORY_WEIGHTS).reduce(
+    (sum, [key, w]) => sum + categories[key].score * (w / 100),
+    0
+  );
+  const cookedLevel = Math.min(10, Math.max(0, Math.round(weightedAvg / 10)));
+  const levelName = deriveLevelName(cookedLevel);
+
+  return { ...raw, cookedLevel, levelName, categoryScores: categories };
+}
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 if (!OPENROUTER_API_KEY) {
   console.error("Missing VITE_OPENROUTER_API_KEY environment variable");
+}
+
+/**
+ * Format all GitHub metrics into a structured prompt section.
+ * Covers every field the agent instructions score formula requires:
+ *   Activity (40%) | Skill Signals (30%) | Growth (15%) | Collaboration (15%)
+ */
+export function formatGitHubMetrics(githubData, userProfile) {
+  const ed = formatEducation(userProfile.education);
+  const exp = userProfile.experienceYears?.replace(/_/g, " ") || "Unknown";
+
+  return `
+## USER PROFILE
+- Age: ${userProfile.age}
+- Education: ${ed}
+- Experience: ${exp}
+- Current Status: ${userProfile.currentRole || "Unknown"}
+- Career Goal: ${userProfile.careerGoal || "Not specified"}
+- Technical Skills: ${userProfile.technicalSkills || "Not specified"}${userProfile.technicalInterests ? `\n- Technical Interests: ${userProfile.technicalInterests}` : ""}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ""}
+
+## GITHUB METRICS
+
+### Activity (40% of score)
+- Commits last 365 days: ${githubData.commitsLast365 ?? githubData.totalCommits}
+- Commits last 90 days: ${githubData.commitsLast90 ?? "N/A"}
+- Previous year commits: ${githubData.prevYearCommits ?? "N/A"}
+- Active weeks %: ${githubData.activeWeeksPct ?? "N/A"}% (out of 52 weeks)
+- Avg commits per active week: ${githubData.avgCommitsPerActiveWeek ?? "N/A"}
+- Std deviation per week: ${githubData.stdDevPerWeek ?? "N/A"} (lower = more consistent)
+- Longest inactive gap: ${githubData.longestInactiveGap ?? "N/A"} days
+- Contribution streak: ${githubData.streak ?? 0} days
+
+### Collaboration (15% of score)
+- Total PRs created: ${githubData.totalPRs ?? 0}
+- Merged PRs: ${githubData.mergedPRs ?? "N/A"}
+- Open issues: ${githubData.openIssues ?? "N/A"}
+- Closed issues: ${githubData.closedIssues ?? "N/A"}
+- Issues closed ratio: ${githubData.issuesClosedRatio ?? "N/A"} (closed / opened+1)
+
+### Skill Signals (30% of score)
+- Total repositories: ${githubData.totalRepos}
+- Unique languages: ${githubData.languageCount ?? githubData.languages?.length ?? "N/A"}
+- Top languages: ${githubData.languages?.join(", ") || "Unknown"}
+- Top language dominance: ${githubData.topLanguageDominancePct ?? "N/A"}% of codebase
+- Tech domain breakdown (% codebase): ${githubData.categoryPercentages ? Object.entries(githubData.categoryPercentages).map(([k,v]) => `${k}: ${v}%`).join(", ") : "N/A"}
+- Repos by dominant domain: ${githubData.repoCategoryBreakdown ? Object.entries(githubData.repoCategoryBreakdown).map(([k,v]) => `${k}: ${v}`).join(", ") : "N/A"}
+- Stars received: ${githubData.totalStars}
+- Forks: ${githubData.totalForks}
+
+### Growth (15% of score)
+- Commit velocity trend: ${githubData.commitVelocityTrend ?? "N/A"} (>1 = accelerating vs prior year)
+- Activity momentum ratio: ${githubData.activityMomentumRatio ?? "N/A"} (~1 = steady, >1 = ramping up recently)
+- Domain diversity change: ${githubData.domainDiversityChange ?? "N/A"} distinct tech domains added vs prior year
+`.trim();
 }
 
 /**
@@ -85,66 +200,39 @@ export async function callOpenRouter(prompt, systemPrompt = "") {
  * @returns {Promise<Object>} - { cookedLevel, summary, recommendations }
  */
 export async function analyzeCookedLevel(githubData, userProfile) {
-  const systemPrompt = `You are an expert technical recruiter analyzing GitHub profiles to determine employability. 
-Your job is to be brutally honest and provide actionable feedback. The "Cooked Level" scale is:
-- 9-10: "Cooking" / Ahead of the curve
-- 7-8: "Toasted" / Slightly behind
-- 5-6: "Cooked" / Concerning gaps
-- 3-4: "Well-Done" / Significant issues
-- 1-2: "Burnt" / Unemployable without major changes
+  const systemPrompt = getAgentInstructions();
 
-Higher scores are better. Consider the user's context when making recommendations - tailor suggestions to their interests, experience level, and career goals.`;
+  const prompt = `Analyze this GitHub profile. Score each of the four categories independently on a 0-100 scale using the calibration anchors in your instructions.
 
-  // Build context string from profile
-  const contextStr = `${formatEducation(userProfile.education)} (${userProfile.age} years old)`;
-  const experienceStr =
-    userProfile.experienceYears?.replace(/_/g, " ") || "Unknown";
+${formatGitHubMetrics(githubData, userProfile)}
 
-  const prompt = `Analyze this GitHub profile for a ${contextStr}:
-
-**User Profile:**
-- Age: ${userProfile.age}
-- Education: ${formatEducation(userProfile.education)}
-- Experience: ${experienceStr}
-- Current Status: ${userProfile.currentRole || "Unknown"}
-- Career Goal: ${userProfile.careerGoal || "Not specified"}
-- Technical Skills: ${userProfile.technicalSkills || "Not specified"}
-${userProfile.technicalInterests ? `- Technical Interests: ${userProfile.technicalInterests}` : ""}
-${userProfile.hobbies ? `- Hobbies: ${userProfile.hobbies}` : ""}
-
-**GitHub Metrics:**
-- Total Repositories: ${githubData.totalRepos}
-- Total Commits (last year): ${githubData.totalCommits}
-- Pull Requests: ${githubData.totalPRs}
-- Code Reviews: ${githubData.totalReviews || 0}
-- Stars Received: ${githubData.totalStars}
-- Forks: ${githubData.totalForks}
-- Top Languages: ${githubData.languages?.join(", ") || "Unknown"}
-- Contribution Streak: ${githubData.streak || 0} days
-- Has README profiles: ${githubData.hasReadme ? "Yes" : "No"}
-
-Provide your response in this exact JSON format:
+Return ONLY valid JSON matching this exact structure (no cookedLevel, no levelName — the system computes those):
 {
-  "cookedLevel": <number 0-10>,
-  "levelName": "<e.g., Toasted>",
   "summary": "<1-2 medium length sentence honest assessment>",
   "recommendations": [
     "<specific actionable task 1>",
     "<specific actionable task 2>",
     "<specific actionable task 3>"
   ],
-  "projectsInsight": "<1 sentence insight about the recommended projects and how they'll help>",
+  "projectsInsight": "<1 sentence insight about the recommended projects and how they will help>",
   "languageInsight": "<1 sentence insight about their language stack and specialization>",
-  "activityInsight": "<1 sentence insight about their contribution patterns and consistency>"
-}`;
+  "activityInsight": "<1 sentence insight about their contribution patterns and consistency>",
+  "categoryScores": {
+    "activity": { "score": <integer 0-100>, "notes": "<1 sentence on main driver>" },
+    "skillSignals": { "score": <integer 0-100>, "notes": "<1 sentence on main driver>" },
+    "growth": { "score": <integer 0-100>, "notes": "<1 sentence on main driver>" },
+    "collaboration": { "score": <integer 0-100>, "notes": "<1 sentence on main driver>" }
+  }
+}
+
+All four categoryScores keys are REQUIRED. Use the calibration anchors in the system prompt to avoid inflated scores — most real-world profiles score 30-70 per category, not 90+.`;
 
   try {
     const response = await callOpenRouter(prompt, systemPrompt);
-    // Parse JSON from response (handle potential markdown code blocks)
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      const result = safeParseJSON(jsonMatch[0]);
-      if (result) return result;
+      const parsed = safeParseJSON(jsonMatch[0]);
+      if (parsed) return normalizeAnalysis(parsed);
     }
     throw new Error("Could not parse AI response");
   } catch (error) {
@@ -160,17 +248,18 @@ Provide your response in this exact JSON format:
  * @returns {Promise<Array>} - Array of project objects with detailed info
  */
 export async function RecommendedProjects(githubData, userProfile) {
-  const systemPrompt = `You are an expert technical mentor. 
-  Suggest four simple project ideas for the user based on their education level, technical interests, years of experience, career goal, current status, and, if relevant, hobbies and interests. 
-  Each project should use skills or technologies the user has little or no experience with, to help them grow.
-  For each project, provide:
-  - A short name
-  - Three key skills/tags (just the tool/framework name, e.g. "React", "Docker")
-  - A 2-3 sentence overview of what the project is and what the user will learn
-  - A 1-2 sentence explanation of how it aligns with the user's interests and goals
-  - A list of 4-6 suggested technologies/tools with a short description of what each one is used for in the project
-  
-  Return your answer in this exact JSON array format:
+  // Use comprehensive agent instructions for consistent recommendations
+  const systemPrompt = `${getAgentInstructions()}
+
+# PROJECT RECOMMENDATION MODE
+Suggest 3-4 simple project ideas based on the user's profile. Each project should:
+- Target specific skill gaps or growth areas
+- Use technologies the user has little experience with
+- Be scoped appropriately (2-8 weeks completion time)
+- Have clear learning outcomes and career relevance
+- Use 70% familiar tech, 30% new tech
+
+Return your answer in this exact JSON array format:
 [
   {
     "name": "<project name>",
@@ -187,10 +276,11 @@ export async function RecommendedProjects(githubData, userProfile) {
   ...
 ]`;
 
-  const contextStr = `${formatEducation(userProfile.education)} (${userProfile.age} years old)`;
-  const experienceStr =
-    userProfile.experienceYears?.replace(/_/g, " ") || "Unknown";
-  const prompt = `User Profile:\n- Age: ${userProfile.age}\n- Education: ${formatEducation(userProfile.education)}\n- Experience: ${experienceStr}\n- Current Status: ${userProfile.currentRole || "Unknown"}\n- Career Goal: ${userProfile.careerGoal || "Not specified"}\n- Technical Skills: ${userProfile.technicalSkills || "Not specified"}${userProfile.technicalInterests ? `\n- Technical Interests: ${userProfile.technicalInterests}` : ""}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ""}\n\nGitHub Skills:\n- Top Languages: ${githubData.languages?.join(", ") || "Unknown"}\n\nSuggest four simple projects using skills the user has little or no experience with. Include detailed info for each project.\n\nIMPORTANT: Return ONLY valid JSON. No trailing commas. Use double quotes for all keys and string values. Avoid apostrophes (use \"is not\" instead of \"isn't\"). Spaces in names and descriptions are fine and expected.`;
+  const prompt = `Based on this user's full profile and all their GitHub metrics, suggest 3-4 project ideas that target their specific skill gaps.
+
+${formatGitHubMetrics(githubData, userProfile)}
+
+IMPORTANT: Return ONLY valid JSON. No trailing commas. Use double quotes for all keys and string values. Avoid apostrophes (use "is not" instead of "isn't").`;
 
   try {
     const response = await callOpenRouter(prompt, systemPrompt);
