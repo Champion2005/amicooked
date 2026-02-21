@@ -29,7 +29,6 @@ import {
   Square,
   MoreVertical,
 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
 import ChatMessage from "@/components/ChatMessage";
 
 /**
@@ -41,7 +40,6 @@ export default function SavedProjectsOverlay({
   onClose,
   githubData,
   userProfile,
-  analysis,
   recommendedProjects = [],
   initialProjectId = null,
 }) {
@@ -168,9 +166,8 @@ export default function SavedProjectsOverlay({
       recommendedProjects.map(async (rec) => {
         const slugId = slugify(rec.name);
         const savedProj = await getSavedProject(userId, slugId);
-        const saved = savedProj !== null;
-        statusMap[rec.name] = saved;
-        
+        statusMap[rec.name] = savedProj !== null;
+
         // Enrich with updatedAt for sorting
         enrichedProjects.push({
           ...rec,
@@ -447,92 +444,6 @@ export default function SavedProjectsOverlay({
     }
   };
 
-  const handleSuggestionClick = async (suggestion) => {
-    setInput(suggestion);
-    // Auto-send after a tick so input is set
-    setTimeout(() => {
-      const fakeInput = suggestion;
-      setInput("");
-      // Inline send
-      const go = async () => {
-        if (!activeProject) return;
-        
-        // Auto-save recommended project on first chat
-        const isSaved = await isProjectSaved(userId, activeProject.name);
-        if (!isSaved && activeProject.name) {
-          try {
-            await saveProject(userId, activeProject);
-            setRecommendedSaveStatus(prev => ({ ...prev, [activeProject.name]: true }));
-            await loadProjects(); // Refresh projects list
-          } catch (err) {
-            console.error('Auto-save failed:', err);
-          }
-        }
-        
-        const newMessages = [
-          ...(activeProject.messages || []),
-          {
-            role: "user",
-            content: fakeInput,
-            timestamp: new Date().toISOString(),
-          },
-        ];
-        setActiveProject((prev) => ({ ...prev, messages: newMessages }));
-        setChatLoading(true);
-        try {
-          await addProjectMessage(userId, activeProject.id, "user", fakeInput);
-          let contextualPrompt = fakeInput;
-          if (newMessages.length > 1) {
-            const recent = newMessages
-              .slice(-6, -1)
-              .map(
-                (m) =>
-                  `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`,
-              )
-              .join("\n");
-            contextualPrompt = `Previous conversation:\n${recent}\n\nUser's latest message: ${fakeInput}`;
-          }
-          const response = await callOpenRouter(
-            contextualPrompt,
-            buildSystemPrompt(),
-          );
-          await addProjectMessage(
-            userId,
-            activeProject.id,
-            "assistant",
-            response,
-          );
-          setActiveProject((prev) => ({
-            ...prev,
-            messages: [
-              ...(prev.messages || []),
-              {
-                role: "assistant",
-                content: response,
-                timestamp: new Date().toISOString(),
-              },
-            ],
-          }));
-        } catch {
-          setActiveProject((prev) => ({
-            ...prev,
-            messages: [
-              ...(prev.messages || []),
-              {
-                role: "assistant",
-                content: "Sorry, something went wrong.",
-                timestamp: new Date().toISOString(),
-              },
-            ],
-          }));
-        } finally {
-          setChatLoading(false);
-        }
-      };
-      go();
-    }, 0);
-  };
-
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
@@ -543,15 +454,6 @@ export default function SavedProjectsOverlay({
 
   const stack = activeProject?.suggestedStack || [];
   const messages = activeProject?.messages || [];
-
-  const suggestions = activeProject
-    ? [
-        `How do I get started with ${activeProject.name}?`,
-        `What should I build first?`,
-        `How long would this take a beginner?`,
-        `What resources should I use to learn ${activeProject.skill1}?`,
-      ]
-    : [];
 
   return (
     <>
@@ -690,7 +592,7 @@ export default function SavedProjectsOverlay({
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Saved Projects Section */}
                     <div>
                       <div className="p-4 pb-3">
@@ -737,7 +639,7 @@ export default function SavedProjectsOverlay({
                                         className="fixed inset-0 z-10" 
                                         onClick={() => setShowDeleteMenu(false)}
                                       />
-                                      <div className="absolute right-0 top-8 z-20 w-48 bg-[#0d1117] border border-[#30363d] rounded-lg shadow-xl py-1">
+                                      <div className="absolute right-0 top-8 z-20 w-48 bg-[#0d1117] border border-[#303d] rounded-lg shadow-xl py-1">
                                         <button
                                           onClick={() => {
                                             setBulkDeleteMode(true);
@@ -841,7 +743,7 @@ export default function SavedProjectsOverlay({
               <>
                 {/* Collapsible project info */}
                 {infoExpanded && (
-                  <div className="px-4 sm:px-5 py-4 space-y-4 border-b border-[#30363d] overflow-y-auto max-h-[40vh] shrink-0 bg-[#0d1117]">
+                  <div className="px-4 sm:px-5 py-4 space-y-4 border-b border-[#30363d] overflow-y-auto max-h-[50vh] shrink-0 bg-[#0d1117]">
                     <div>
                       <div className="flex items-center gap-2 mb-1.5">
                         <BookOpen className="w-3.5 h-3.5 text-[#58a6ff]" />
@@ -929,18 +831,7 @@ export default function SavedProjectsOverlay({
                           Get help planning, building, or learning the
                           technologies for this project.
                         </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto px-4 sm:px-0">
-                          {suggestions.map((suggestion, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => handleSuggestionClick(suggestion)}
-                              disabled={chatLoading}
-                              className="text-left px-4 py-3 rounded-lg border border-[#30363d] bg-[#161b22] hover:bg-[#1c2128] text-sm text-gray-300 hover:text-white transition-colors disabled:opacity-50"
-                            >
-                              {suggestion}
-                            </button>
-                          ))}
-                        </div>
+                        {/* Starter suggestion buttons removed to reduce UI clutter */}
                       </div>
                     </div>
                   ) : (
@@ -1078,7 +969,7 @@ export default function SavedProjectsOverlay({
             </p>
             <div className="max-h-48 overflow-y-auto mb-4 bg-[#0d1117] rounded-lg border border-[#30363d] p-3">
               <ul className="space-y-1.5">
-                {(bulkDeleteTarget === 'all' 
+                {(bulkDeleteTarget === 'all'
                   ? projects 
                   : projects.filter(p => selectedProjects.has(p.id))
                 ).map((proj) => (

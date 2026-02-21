@@ -651,104 +651,105 @@ export default function Results() {
             <Card className="bg-[#0d1117] pt-0 border-[#30363d] w-full">
               <CardContent className="p-3 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 items-start">
                 {/* LEFT — HEATMAP */}
-                <div className="min-w-0 overflow-x-auto">
+                <div className="min-w-0 overflow-hidden">
                   <div className="space-y-1">
                     {heatmap.weeks.length === 0 ? (
-                      <div className="text-center py-6">
-                        <p className="text-gray-400 text-xs">
-                          No contribution data available
-                        </p>
-                      </div>
+                        <div className="text-center py-6">
+                          <p className="text-gray-400 text-xs">
+                            No contribution data available
+                          </p>
+                        </div>
                     ) : (
-                      <>
-                        {/* Month labels */}
-                        <div className="ml-[30px] mb-1">
-                          <div className="flex">
-                            {(() => {
-                              const months = [];
+                        <>
+                          {/* Month labels */}
+                          <div className="ml-[30px] mb-1">
+                            <div className="flex">
+                              {(() => {
+                                const months = [];
 
-                              heatmap.weeks.forEach((week, i) => {
-                                const date = new Date(
-                                  week.contributionDays[0].date,
-                                );
-                                const month = date.toLocaleString("en-US", {
-                                  month: "short",
+                                heatmap.weeks.forEach((week, i) => {
+                                  const date = new Date(
+                                      week.contributionDays[0].date,
+                                  );
+                                  const month = date.toLocaleString("en-US", {
+                                    month: "short",
+                                  });
+
+                                  if (
+                                      !months.length ||
+                                      months[months.length - 1].name !== month
+                                  ) {
+                                    months.push({ name: month, weeks: 1 });
+                                  } else {
+                                    months[months.length - 1].weeks++;
+                                  }
                                 });
 
-                                if (
-                                  !months.length ||
-                                  months[months.length - 1].name !== month
-                                ) {
-                                  months.push({ name: month, weeks: 1 });
-                                } else {
-                                  months[months.length - 1].weeks++;
-                                }
-                              });
-
-                              return months.map((m, i) => (
-                                <div
-                                  key={i}
-                                  className="text-[10px] text-gray-500"
-                                  style={{
-                                    width: `${m.weeks * 14}px`,
-                                  }}
-                                >
-                                  {m.name}
-                                </div>
-                              ));
-                            })()}
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <div className="flex flex-col justify-between mt-3 text-[10px] text-gray-500 h-[84px] shrink-0">
-                            {["Mon", "", "Wed", "", "Fri", "", ""].map(
-                              (d, i) => (
-                                <div key={i}>{d}</div>
-                              ),
-                            )}
+                                return months.map((m, i) => (
+                                    <div
+                                        key={i}
+                                        className="text-[10px] text-gray-500"
+                                        style={{
+                                          width: `${m.weeks * 14}px`,
+                                        }}
+                                    >
+                                      {m.name}
+                                    </div>
+                                ));
+                              })()}
+                            </div>
                           </div>
 
-                          {/* Heatmap */}
-                          <div className="flex gap-[2px]">
-                            {heatmap.weeks.map((week, weekIndex) => (
-                                <div
-                                  key={weekIndex}
-                                  className="flex flex-col gap-[2px]"
-                                >
-                                  {week.contributionDays.map(
-                                    (day, dayIndex) => {
-                                      const getIntensity = (count) => {
-                                        if (count === 0) return "bg-[#151b23]";
-                                        if (count < 3) return "bg-[#023a16]";
-                                        if (count < 6) return "bg-[#17682d]";
-                                        if (count < 10) return "bg-[#186d2e]";
-                                        return "bg-[#57d463]";
-                                      };
+                          <div className="flex gap-2">
+                            <div className="flex flex-col justify-between mt-3 text-[10px] text-gray-500 h-[84px] shrink-0">
+                              {["Mon", "", "Wed", "", "Fri", "", ""].map(
+                                  (d, i) => (
+                                      <div key={i}>{d}</div>
+                                  ),
+                              )}
+                            </div>
 
-                                      return (
-                                        <div
-                                          key={dayIndex}
-                                          title={`${day.contributionCount} contributions on ${day.date}`}
-                                          className={`w-3 h-3 rounded-[2px] ${getIntensity(
-                                            day.contributionCount,
-                                          )} transition-transform duration-150 hover:scale-125`}
-                                        />
-                                      );
-                                    },
-                                  )}
-                                </div>
+                            {/* Heatmap */}
+                            <div className="flex gap-[2px] scale-[0.9] origin-top-left">
+                              {heatmap.weeks.map((week, weekIndex) => (
+                                  <div
+                                      key={weekIndex}
+                                      className="flex flex-col gap-[2px]"
+                                  >
+                                    {week.contributionDays.map(
+                                        (day, dayIndex) => {
+                                          const getIntensity = (count) => {
+                                            if (count === 0) return "bg-[#151b23]";
+                                            if (count < 3) return "bg-[#023a16]";
+                                            if (count < 6) return "bg-[#17682d]";
+                                            if (count < 10) return "bg-[#186d2e]";
+                                            return "bg-[#57d463]";
+                                          };
+
+                                          return (
+                                              <div
+                                                  key={dayIndex}
+                                                  title={`${day.contributionCount} contributions on ${day.date}`}
+                                                  className={`w-3 h-3 rounded-[2px] ${getIntensity(
+                                                      day.contributionCount,
+                                                  )} transition-transform duration-150 hover:scale-125`}
+                                              />
+                                          );
+                                        },
+                                    )}
+                                  </div>
                               ))}
+                            </div>
                           </div>
-                        </div>
-                      </>
+                        </>
                     )}
                   </div>
                 </div>
 
+
                 {/* RIGHT — STATS */}
                 <div className="mt-0 md:mt-4 w-full md:w-[220px]">
-                  <div className="space-y-[6px] pr-3 text-xs text-gray-400">
+                  <div className="space-y-[2px] pr-3 text-xs text-gray-400">
                     {statItems.map((item, i) => (
                       <div
                         key={i}
