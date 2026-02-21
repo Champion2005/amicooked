@@ -34,6 +34,8 @@ export default function Dashboard() {
     "💡 Tip: If you encounter any issues or have feedback, please reach out to us. We're here to help you succeed!",
     "💡 Tip: The AI is most effective when it has a complete profile to analyze. Make sure to fill out all sections of your profile for the best insights!",
     "💡 Tip: Don't be discouraged by critical feedback. The AI is designed to help you identify areas for improvement, and every developer has room to grow!",
+    "💡 Tip: Use the recommended projects as a starting point for learning new skills and building your portfolio. They're tailored to your profile and career goals!",
+    "💡 Tip: Constantly reanalyze your profile to get updated insights, track your progress, and see new features as we roll them out."
   ];
 
   // Rotate tips while loading
