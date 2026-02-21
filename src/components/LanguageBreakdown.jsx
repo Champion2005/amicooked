@@ -39,11 +39,13 @@ function timeAgo(dateString) {
 
 export default function LanguageBreakdown({
   languageBreakdown = [],
-  totalLanguageBytes = 0,
   languageInsight = null,
 }) {
-  const [showAll, setShowAll] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  // single toggle: see more shows all languages AND details
+  const [showMore, setShowMore] = useState(false);
+
+  // Only show the top N languages by default
+  const MAX_VISIBLE = 5;
 
   if (!languageBreakdown || languageBreakdown.length === 0) {
     return (
@@ -55,9 +57,9 @@ export default function LanguageBreakdown({
     );
   }
 
-  const displayedLanguages = showAll
+  const displayedLanguages = showMore
     ? languageBreakdown
-    : languageBreakdown.slice(0, 8);
+    : languageBreakdown.slice(0, MAX_VISIBLE);
 
   return (
     <Card className="bg-[#0d1117] border-[#30363d]">
@@ -98,10 +100,10 @@ export default function LanguageBreakdown({
               />
             </div>
 
-            {/* Expanded details */}
+            {/* Expanded details are shown when `showMore` is true */}
             <div
               className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                showDetails
+                showMore
                   ? "max-h-[2000px] opacity-100"
                   : "max-h-0 opacity-0"
               }`}
@@ -115,29 +117,18 @@ export default function LanguageBreakdown({
           </div>
         ))}
 
-        {/* Show all toggle */}
-        {languageBreakdown.length > 8 && (
+        {/* Single See more toggle that expands list + details */}
+        {languageBreakdown.length > MAX_VISIBLE && (
           <button
-            onClick={() => setShowAll(!showAll)}
+            onClick={() => setShowMore(!showMore)}
             className="flex items-center gap-1.5 text-sm font-semibold text-[#58a6ff] hover:text-[#79c0ff] transition-colors cursor-pointer pt-1"
           >
-            {showAll ? "Show less" : `Show all (${languageBreakdown.length})`}
+            {showMore ? "See less" : `See more (${languageBreakdown.length - MAX_VISIBLE})`}
             <ChevronDown
-              className={`w-4 h-4 transition-transform duration-300 ${showAll ? "rotate-180" : ""}`}
+              className={`w-4 h-4 transition-transform duration-300 ${showMore ? "rotate-180" : ""}`}
             />
           </button>
         )}
-
-        {/* More details toggle */}
-        <button
-          onClick={() => setShowDetails(!showDetails)}
-          className="flex items-center gap-1.5 text-sm font-semibold text-[#58a6ff] hover:text-[#79c0ff] transition-colors cursor-pointer"
-        >
-          {showDetails ? "Less Details" : "More Details"}
-          <ChevronDown
-            className={`w-4 h-4 transition-transform duration-300 ${showDetails ? "rotate-180" : ""}`}
-          />
-        </button>
 
         {/* AI Notes */}
         {languageInsight && (
