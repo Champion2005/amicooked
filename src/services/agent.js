@@ -3,7 +3,7 @@
  * Orchestrates analysis using comprehensive instructions, conversation memory, and pluggable skills
  */
 
-import { callOpenRouter } from './openrouter';
+import { callOpenRouter, formatGitHubMetrics } from './openrouter';
 import { getAgentInstructions, getAnalysisModeInstructions } from '@/config/agent-instructions';
 import { getChat, addMessage } from './chat';
 import { skills } from './skills';
@@ -36,12 +36,13 @@ class AgentMemory {
   }
 
   /**
-   * Set user context (GitHub data, profile)
+   * Set user context (GitHub data, profile, and pre-computed analysis)
    */
-  setContext(githubData, userProfile) {
+  setContext(githubData, userProfile, analysis = null) {
     this.userContext = {
       githubData,
       userProfile,
+      analysis,
       timestamp: new Date().toISOString()
     };
   }
@@ -66,31 +67,32 @@ class AgentMemory {
   }
 
   /**
-   * Get formatted context for AI
+   * Get formatted context for AI — uses the canonical formatGitHubMetrics for consistency,
+   * then appends pre-computed analysis results so the model never needs to re-score.
    */
   getFormattedContext() {
     if (!this.userContext) return '';
 
-    const { githubData, userProfile } = this.userContext;
-    return `
-# USER PROFILE CONTEXT
-- Age: ${userProfile.age}
-- Education: ${userProfile.education}
-- Experience: ${userProfile.experienceYears?.replace(/_/g, ' ') || 'Unknown'}
-- Current Status: ${userProfile.currentRole || 'Unknown'}
-- Career Goal: ${userProfile.careerGoal || 'Not specified'}
-- Technical Skills: ${userProfile.technicalSkills || 'Not specified'}
-${userProfile.technicalInterests ? `- Technical Interests: ${userProfile.technicalInterests}` : ''}
+    const { githubData, userProfile, analysis } = this.userContext;
+    let ctx = formatGitHubMetrics(githubData, userProfile);
 
-# GITHUB METRICS
-- Total Repositories: ${githubData.totalRepos}
-- Total Commits (last year): ${githubData.totalCommits}
-- Pull Requests: ${githubData.totalPRs}
-- Code Reviews: ${githubData.totalReviews || 0}
-- Stars Received: ${githubData.totalStars}
-- Contribution Streak: ${githubData.streak || 0} days
-- Top Languages: ${githubData.languages?.join(', ') || 'Unknown'}
-`;
+    if (analysis) {
+      ctx += `\n\n## CURRENT ANALYSIS RESULTS (pre-computed — do not re-score)`;
+      ctx += `\n- Cooked Level: ${analysis.cookedLevel}/10 (${analysis.levelName})`;
+      ctx += `\n- Summary: ${analysis.summary}`;
+      if (analysis.categoryScores) {
+        ctx += `\n- Category Scores:`;
+        for (const [key, cat] of Object.entries(analysis.categoryScores)) {
+          ctx += `\n  - ${key}: ${cat.score}/100 (${cat.weight}% weight) — ${cat.notes}`;
+        }
+      }
+      if (analysis.recommendations?.length) {
+        ctx += `\n- Recommendations already given to user:`;
+        analysis.recommendations.forEach(r => { ctx += `\n  • ${r}`; });
+      }
+    }
+
+    return ctx;
   }
 
   /**
@@ -145,9 +147,9 @@ export class AnalysisAgent {
   /**
    * Initialize agent with user context
    */
-  async initialize(githubData, userProfile, chatId = null, userId = null) {
-    this.memory.setContext(githubData, userProfile);
-    
+  async initialize(githubData, userProfile, analysis = null, chatId = null, userId = null) {
+    this.memory.setContext(githubData, userProfile, analysis);
+
     // Load existing conversation if chatId provided
     if (chatId && userId) {
       await this.memory.loadFromChat(userId, chatId);
@@ -263,7 +265,7 @@ export class AnalysisAgent {
 
     // Add current user message
     prompt += `# CURRENT USER MESSAGE\n${userMessage}\n\n`;
-    prompt += 'Respond based on the context, conversation history, and any skill results. Be helpful, specific, and consistent with previous analysis.';
+    prompt += 'Respond conversationally using the context and conversation history above. Reference the pre-computed Cooked Level and category scores — do not re-score the user. Be helpful, specific to their actual metrics, and give actionable advice.';
 
     // Call LLM
     const response = await callOpenRouter(prompt, systemPrompt);
@@ -339,24 +341,24 @@ export function createAgent() {
 }
 
 /**
- * Convenience function: Analyze profile with agent (backwards compatible)
+ * Convenience function: Analyze profile with agent
  */
 export async function analyzeWithAgent(githubData, userProfile, previousAnalysis = null) {
   const agent = createAgent();
-  await agent.initialize(githubData, userProfile);
-  
+  await agent.initialize(githubData, userProfile, null);
+
   if (previousAnalysis) {
     agent.memory.setPreviousAnalysis(previousAnalysis);
   }
-  
+
   return await agent.analyzeProfile();
 }
 
 /**
- * Convenience function: Get recommendations with agent (backwards compatible)
+ * Convenience function: Get recommendations with agent
  */
 export async function recommendWithAgent(githubData, userProfile) {
   const agent = createAgent();
-  await agent.initialize(githubData, userProfile);
+  await agent.initialize(githubData, userProfile, null);
   return await agent.recommendProjects();
 }

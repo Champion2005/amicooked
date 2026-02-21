@@ -1,6 +1,7 @@
 // OpenRouter API configuration
 import { formatEducation } from "@/utils/formatEducation";
 import { getAgentInstructions } from "@/config/agent-instructions";
+import { getAnalysisModeInstructions } from "../config/agent-instructions";
 
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
 
@@ -11,9 +12,14 @@ const CATEGORY_WEIGHTS = { activity: 40, skillSignals: 30, growth: 15, collabora
 /** Normalise AI key aliases (e.g. skill_signals → skillSignals) */
 const KEY_ALIASES = {
   skill_signals: "skillSignals",
-  "skillsignals": "skillSignals",
+  skillsignals: "skillSignals",
+  skill: "skillSignals",
   skills: "skillSignals",
+  skillsignal: "skillSignals",
   collab: "collaboration",
+  collaborations: "collaboration",
+  grow: "growth",
+  activities: "activity",
 };
 
 function deriveLevelName(level) {
@@ -24,30 +30,61 @@ function deriveLevelName(level) {
   return "Burnt";
 }
 
+const REQUIRED_CATS = Object.keys(CATEGORY_WEIGHTS);
+
+/**
+ * Returns the list of category keys that are missing or have no valid numeric score.
+ */
+function missingCategories(rawCats) {
+  const renamed = renameKeys(rawCats);
+  return REQUIRED_CATS.filter((key) => {
+    const cat = renamed[key];
+    return !cat || typeof cat.score !== "number" || isNaN(cat.score);
+  });
+}
+
+/** Apply KEY_ALIASES normalization to a raw categoryScores object */
+function renameKeys(rawCats) {
+  const out = {};
+  for (const [k, v] of Object.entries(rawCats || {})) {
+    const canonical =
+      KEY_ALIASES[k.toLowerCase().replace(/[\s_-]/g, "")] || k;
+    out[canonical] = v;
+  }
+  return out;
+}
+
 /**
  * Validate and normalise the raw AI response:
  * - Renames aliased category keys
  * - Clamps scores to 0-100
- * - Fills any missing category with a fair neutral default
- * - Computes cookedLevel and levelName deterministically from the weighted average
+ * - For any still-missing category, derives a fallback from the mean of
+ *   present scores (never an arbitrary constant)
+ * - Computes cookedLevel and levelName deterministically
  */
 function normalizeAnalysis(raw) {
-  const rawCats = raw.categoryScores || {};
+  const renamed = renameKeys(raw.categoryScores || {});
 
-  // Normalise keys the AI might vary
-  const renamed = {};
-  for (const [k, v] of Object.entries(rawCats)) {
-    const canonical = KEY_ALIASES[k.toLowerCase().replace(/[\s_-]/g, "")] || k;
-    renamed[canonical] = v;
-  }
+  // Collect the scores that ARE present and valid
+  const presentScores = REQUIRED_CATS
+    .map((key) => renamed[key]?.score)
+    .filter((s) => typeof s === "number" && !isNaN(s))
+    .map((s) => Math.min(100, Math.max(0, Math.round(s))));
 
-  // Build validated categories — fill missing ones with 40 (below-average default)
+  // Fallback = mean of present scores, or a neutral 50 if nothing at all came back
+  const fallback =
+    presentScores.length > 0
+      ? Math.round(presentScores.reduce((a, b) => a + b, 0) / presentScores.length)
+      : 50;
+
   const categories = {};
   for (const [key, weight] of Object.entries(CATEGORY_WEIGHTS)) {
     const cat = renamed[key] || {};
-    const raw_score = typeof cat.score === "number" ? cat.score : 40;
+    const rawScore = typeof cat.score === "number" && !isNaN(cat.score)
+      ? cat.score
+      : fallback;
     categories[key] = {
-      score: Math.min(100, Math.max(0, Math.round(raw_score))),
+      score: Math.min(100, Math.max(0, Math.round(rawScore))),
       weight,
       notes: (cat.notes || "").trim(),
     };
@@ -208,7 +245,7 @@ ${formatGitHubMetrics(githubData, userProfile)}
 
 Return ONLY valid JSON matching this exact structure (no cookedLevel, no levelName — the system computes those):
 {
-  "summary": "<1-2 medium length sentence honest assessment>",
+  "summary": "<1-2 medium length sentence honest assessment (less statistics and more plain English)>",
   "recommendations": [
     "<specific actionable task 1>",
     "<specific actionable task 2>",
@@ -230,10 +267,51 @@ All four categoryScores keys are REQUIRED. Use the calibration anchors in the sy
   try {
     const response = await callOpenRouter(prompt, systemPrompt);
     const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = safeParseJSON(jsonMatch[0]);
-      if (parsed) return normalizeAnalysis(parsed);
+    let parsed = jsonMatch ? safeParseJSON(jsonMatch[0]) : null;
+
+    if (parsed) {
+      const missing = missingCategories(parsed.categoryScores || {});
+
+      // If some categories didn't come back, do one targeted retry for just those
+      if (missing.length > 0) {
+        console.warn("[analysis] Missing categories after first pass:", missing, "— retrying");
+        const retryPrompt = `The previous analysis was missing scores for: ${missing.join(", ")}.
+
+Using the same GitHub profile data below, return ONLY a JSON object with just the missing categoryScores keys — nothing else.
+
+${formatGitHubMetrics(githubData, userProfile)}
+
+Respond with ONLY this JSON (no extra text):
+{
+  "categoryScores": {
+${missing.map((k) => `    "${k}": { "score": <integer 0-100>, "notes": "<1 sentence>" }`).join(",\n")}
+  }
+}`;
+
+        try {
+          const retryResp = await callOpenRouter(retryPrompt, systemPrompt);
+          const retryMatch = retryResp.match(/\{[\s\S]*\}/);
+          if (retryMatch) {
+            const retryParsed = safeParseJSON(retryMatch[0]);
+            if (retryParsed?.categoryScores) {
+              // Merge retry scores into the original parsed object
+              parsed = {
+                ...parsed,
+                categoryScores: {
+                  ...(parsed.categoryScores || {}),
+                  ...retryParsed.categoryScores,
+                },
+              };
+            }
+          }
+        } catch (retryErr) {
+          console.warn("[analysis] Retry failed, normalizing with fallback:", retryErr);
+        }
+      }
+
+      return normalizeAnalysis(parsed);
     }
+
     throw new Error("Could not parse AI response");
   } catch (error) {
     console.error("AI analysis error:", error);
@@ -249,15 +327,16 @@ All four categoryScores keys are REQUIRED. Use the calibration anchors in the sy
  */
 export async function RecommendedProjects(githubData, userProfile) {
   // Use comprehensive agent instructions for consistent recommendations
-  const systemPrompt = `${getAgentInstructions()}
+  const systemPrompt = `${getAnalysisModeInstructions("PROJECT_RECOMMENDATION")}\n\n
 
 # PROJECT RECOMMENDATION MODE
-Suggest 3-4 simple project ideas based on the user's profile. Each project should:
+Suggest 4 simple project ideas based on the user's profile. Each project should:
 - Target specific skill gaps or growth areas
 - Use technologies the user has little experience with
 - Be scoped appropriately (2-8 weeks completion time)
 - Have clear learning outcomes and career relevance
 - Use 70% familiar tech, 30% new tech
+- Provide a suggested tech stack with 3-6 technologies for each project
 
 Return your answer in this exact JSON array format:
 [

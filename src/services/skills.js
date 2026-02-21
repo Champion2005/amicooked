@@ -1,127 +1,38 @@
 /**
  * Skills System for Analysis Agent
- * Pluggable skills that the agent can execute to perform specific analysis tasks
+ * Pluggable skills that the agent can execute to perform specific analysis tasks.
+ *
+ * analyzeProfile and recommendProjects delegate directly to the canonical
+ * openrouter.js functions so all scoring, normalisation, and prompt logic
+ * lives in exactly one place.
  */
 
-import { callOpenRouter, formatGitHubMetrics } from './openrouter';
+import { callOpenRouter, formatGitHubMetrics, analyzeCookedLevel, RecommendedProjects } from './openrouter';
 import { getAgentInstructions } from '@/config/agent-instructions';
 
 /**
  * Skill: Analyze GitHub Profile
- * Generates comprehensive "Cooked Level" analysis with recommendations
+ * Delegates to the canonical analyzeCookedLevel which runs normalizeAnalysis.
  */
 const analyzeProfileSkill = {
   name: 'analyzeProfile',
   description: 'Perform comprehensive GitHub profile analysis with Cooked Level scoring',
-  
-  async execute({ githubData, userProfile, previousAnalysis = null }) {
-    const systemPrompt = getAgentInstructions();
 
-    let prompt = `Analyze this GitHub profile and apply your full scoring formula (Activity 40%, Skill Signals 30%, Growth 15%, Collaboration 15%).
-
-${formatGitHubMetrics(githubData, userProfile)}
-`;
-
-    if (previousAnalysis) {
-      prompt += `\n## PREVIOUS ANALYSIS (for comparison)
-- Previous Cooked Level: ${previousAnalysis.cookedLevel}/10 (${previousAnalysis.levelName})
-- Previous Summary: ${previousAnalysis.summary}
-- Date: ${previousAnalysis.timestamp || 'Unknown'}
-- Prev Recommendations: ${JSON.stringify(previousAnalysis.recommendations)}
-
-Note any improvements or regressions.
-`;
-    }
-
-    prompt += `
-Provide your analysis in this exact JSON format:
-{
-  "cookedLevel": <number 0-10>,
-  "levelName": "<e.g., Toasted, Cooking, etc>",
-  "summary": "<1-2 sentences honest assessment>",
-  "recommendations": [
-    "<specific actionable task 1>",
-    "<specific actionable task 2>",
-    "<specific actionable task 3>"
-  ],
-  "projectsInsight": "<1 sentence insight about recommended projects>",
-  "languageInsight": "<1 sentence insight about their language stack>",
-  "activityInsight": "<1 sentence insight about contribution patterns>"
-}`;
-
-    try {
-      const response = await callOpenRouter(prompt, systemPrompt);
-      
-      // Parse JSON from response
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
-        return result;
-      }
-      throw new Error('Could not parse analysis response');
-    } catch (error) {
-      console.error('Error in analyzeProfile skill:', error);
-      throw error;
-    }
+  async execute({ githubData, userProfile }) {
+    return await analyzeCookedLevel(githubData, userProfile);
   }
 };
 
 /**
  * Skill: Recommend Projects
- * Generates personalized project recommendations based on gaps and goals
+ * Delegates to the canonical RecommendedProjects function.
  */
 const recommendProjectsSkill = {
   name: 'recommendProjects',
   description: 'Generate tailored project recommendations to address skill gaps',
-  
+
   async execute({ githubData, userProfile }) {
-    const systemPrompt = `${getAgentInstructions()}
-
-# ADDITIONAL CONTEXT FOR PROJECT RECOMMENDATIONS
-Your task is to suggest 3-4 specific project ideas. Each project should:
-- Target a clear skill gap or growth area identified from the full metrics below
-- Be scoped appropriately (2-8 weeks for completion)
-- Use 70% familiar technologies and 30% new ones
-- Have clear learning outcomes
-- Be portfolio-worthy
-
-Focus on practical, achievable projects that will make the user more hireable.`;
-
-    const prompt = `Generate project recommendations based on this user's complete profile and GitHub metrics:
-
-${formatGitHubMetrics(githubData, userProfile)}
-
-Suggest 3-4 projects that address their specific gaps. Return ONLY valid JSON:
-[
-  {
-    "name": "<project name>",
-    "skill1": "<skill/tech 1>",
-    "skill2": "<skill/tech 2>",
-    "skill3": "<skill/tech 3>",
-    "overview": "<2-3 sentences: what is this project and what will they learn>",
-    "alignment": "<1-2 sentences: why this fits their goals and interests>",
-    "suggestedStack": [
-      { "name": "<technology>", "description": "<what it's used for>" }
-    ]
-  }
-]`;
-
-    try {
-      const response = await callOpenRouter(prompt, systemPrompt);
-      
-      // Parse JSON array from response
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
-        if (Array.isArray(result)) {
-          return result;
-        }
-      }
-      throw new Error('Could not parse project recommendations');
-    } catch (error) {
-      console.error('Error in recommendProjects skill:', error);
-      throw error;
-    }
+    return await RecommendedProjects(githubData, userProfile);
   }
 };
 

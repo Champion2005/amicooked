@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { auth } from '@/config/firebase';
 import logo from '@/assets/amicooked_logo.png';
-import { callOpenRouter } from '@/services/openrouter';
+import { createAgent } from '@/services/agent';
 import { createChat, addMessage, getUserChats } from '@/services/chat';
 import { 
   X, Send, MessageSquare, Plus, Loader2, ChevronLeft, Flame, Bookmark 
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { formatEducation } from '@/utils/formatEducation';
 import ChatMessage from '@/components/ChatMessage';
 
 /**
@@ -29,15 +28,19 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
   const [showSidebar, setShowSidebar] = useState(true);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const agentRef = useRef(null);
   const hasHandledInitialQuery = useRef(false);
 
   const userId = auth.currentUser?.uid;
 
-  // Load chat history on open
+  // Load chat history and initialise agent on open
   useEffect(() => {
     if (isOpen && userId) {
       loadChats();
       hasHandledInitialQuery.current = false;
+      // Create a fresh agent with full context (including pre-computed analysis)
+      agentRef.current = createAgent();
+      agentRef.current.initialize(githubData, userProfile, analysis);
     }
   }, [isOpen, userId]);
 
@@ -88,59 +91,13 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
     }
   };
 
-  const buildSystemPrompt = () => {
-    const parts = [
-      `You are an AI assistant for the AmICooked platform, helping developers improve their GitHub profiles and career prospects.`,
-      `Be concise, helpful, and brutally honest when needed. Use a casual but professional tone.`
-    ];
-
-    if (analysis) {
-      parts.push(`\nThe user's current Cooked Level is ${analysis.cookedLevel}/10 (${analysis.levelName}).`);
-      parts.push(`AI Summary: ${analysis.summary}`);
+  const getAIResponse = async (userMessage) => {
+    if (!agentRef.current) {
+      agentRef.current = createAgent();
+      await agentRef.current.initialize(githubData, userProfile, analysis);
     }
-
-    if (userProfile) {
-      parts.push(`\nUser Profile:`);
-      if (userProfile.age) parts.push(`- Age: ${userProfile.age}`);
-      if (userProfile.education) parts.push(`- Education: ${formatEducation(userProfile.education)}`);
-      if (userProfile.experienceYears) parts.push(`- Experience: ${userProfile.experienceYears.replace(/_/g, ' ')}`);
-      if (userProfile.careerGoal) parts.push(`- Career Goal: ${userProfile.careerGoal}`);
-      if (userProfile.technicalInterests) parts.push(`- Technical Interests: ${userProfile.technicalInterests}`);
-      if (userProfile.currentRole) parts.push(`- Current Status: ${userProfile.currentRole}`);
-    }
-
-    if (githubData) {
-      parts.push(`\nGitHub Stats:`);
-      parts.push(`- Repos: ${githubData.totalRepos}, Commits: ${githubData.totalCommits}, PRs: ${githubData.totalPRs}`);
-      parts.push(`- Stars: ${githubData.totalStars}, Streak: ${githubData.streak} days`);
-      parts.push(`- Top Languages: ${githubData.languages?.join(', ') || 'Unknown'}`);
-    }
-
-    return parts.join('\n');
-  };
-
-  const getAIResponse = async (messages) => {
-    const systemPrompt = buildSystemPrompt();
-
-    // Build conversation history for the API
-    const conversationMessages = messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }));
-
-    // Use callOpenRouter but we need the full conversation, so build the prompt
-    const lastUserMessage = conversationMessages[conversationMessages.length - 1].content;
-    
-    // Include recent conversation context in the prompt
-    let contextualPrompt = lastUserMessage;
-    if (conversationMessages.length > 1) {
-      const recentHistory = conversationMessages.slice(-6, -1)
-        .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-        .join('\n');
-      contextualPrompt = `Previous conversation:\n${recentHistory}\n\nUser's latest message: ${lastUserMessage}`;
-    }
-
-    return await callOpenRouter(contextualPrompt, systemPrompt);
+    const result = await agentRef.current.processMessage(userMessage, 'QUICK_CHAT');
+    return result.response;
   };
 
   const handleNewChatWithQuery = async (query) => {
@@ -158,18 +115,17 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       setActiveChat({ id: chatId, title: query.trim().substring(0, 50), messages: newMessages });
       if (window.innerWidth < 640) setShowSidebar(false);
 
-      // Get AI response
-      const response = await getAIResponse(newMessages);
-      
+      // Get AI response via agent (has full context + analysis)
+      const response = await getAIResponse(query.trim());
+
       await addMessage(userId, chatId, 'assistant', response);
-      
+
       const updatedMessages = [
         ...newMessages,
         { role: 'assistant', content: response, timestamp: new Date().toISOString() }
       ];
       setActiveChat(prev => ({ ...prev, messages: updatedMessages }));
-      
-      // Refresh chat list
+
       await loadChats();
     } catch (error) {
       console.error('Error starting chat:', error);
@@ -194,10 +150,11 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
     try {
       await addMessage(userId, activeChat.id, 'user', userMessage);
 
-      const response = await getAIResponse(newMessages);
-      
+      // Agent already holds conversation history for this session
+      const response = await getAIResponse(userMessage);
+
       await addMessage(userId, activeChat.id, 'assistant', response);
-      
+
       const updatedMessages = [
         ...newMessages,
         { role: 'assistant', content: response, timestamp: new Date().toISOString() }
@@ -228,6 +185,13 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       title: chat.title,
       messages: chat.messages || []
     });
+    // Sync agent memory with this chat's history so follow-up replies are consistent
+    if (agentRef.current) {
+      agentRef.current.memory.clearHistory();
+      (chat.messages || []).slice(-10).forEach(m => {
+        agentRef.current.memory.addMessage(m.role, m.content);
+      });
+    }
     if (window.innerWidth < 640) setShowSidebar(false);
   };
 
@@ -235,6 +199,8 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
     setActiveChat(null);
     setShowSidebar(true);
     setInput('');
+    // Reset conversation history, keep context (githubData/analysis stay in agent)
+    agentRef.current?.memory.clearHistory();
   };
 
   const handleClose = () => {
@@ -407,16 +373,16 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                   <div className="w-20 h-20 rounded-full bg-[#161b22] border border-[#30363d] flex items-center justify-center mx-auto mb-4">
                     <MessageSquare className="w-10 h-10 text-gray-600" />
                   </div>
-                  <h2 className="text-xl font-semibold text-white mb-2">Ask AI Anything</h2>
+                  <h2 className="text-xl font-semibold text-white mb-2">Ask your Agent anything</h2>
                   <p className="text-gray-400 text-sm max-w-md">
                     Ask about your GitHub profile, get career advice, project ideas, or help understanding your Cooked Level.
                   </p>
                   <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto px-4 sm:px-0">
                     {[
-                      'How can I improve my GitHub profile?',
+                      'What are my biggest skill gaps?',
                       'What projects should I build next?',
-                      'How do I stand against my peers?',
-                      'What skills am I missing?'
+                      'What skills am I missing?',
+                      'Give me a 3-month learning roadmap'
                     ].map((suggestion, idx) => (
                       <button
                         key={idx}

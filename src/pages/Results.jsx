@@ -57,6 +57,7 @@ export default function Results() {
   const [initialProjectId, setInitialProjectId] = useState(null);
   const [savedProjectNames, setSavedProjectNames] = useState(new Set());
   const [metricPopupOpen, setMetricPopupOpen] = useState(false);
+  const [statsPopupOpen, setStatsPopupOpen] = useState(false);
   const profileMenuRef = useRef(null);
 
   // Load saved project status for bookmark icons
@@ -275,7 +276,7 @@ export default function Results() {
             <div className="relative flex-1 min-w-0">
               <input
                 type="text"
-                placeholder="Ask AI Anything..."
+                placeholder="Ask your AI agent about your profile..."
                 className="w-full px-4 py-2 pr-12 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
                 value={headerInput}
                 onChange={(e) => setHeaderInput(e.target.value)}
@@ -488,7 +489,7 @@ export default function Results() {
           <div className="lg:col-span-9 space-y-6">
             <div>
             <h2 className="text-lg font-semibold text-white mb-2">
-              AI Summary
+              Agent Summary
             </h2>
 
             <Card className="bg-[#0d1117] pt-5 border-[#30363d] overflow-hidden">
@@ -597,9 +598,12 @@ export default function Results() {
 
             <div>
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-semibold text-white">
-                Recommended Projects
-              </h2>
+              <div>
+                <h2 className="text-lg font-semibold text-white">
+                  Recommended Projects
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">Chosen by the agent to close your top skill gaps</p>
+              </div>
               {/* <button
                 onClick={() => setSavedProjectsOpen(true)}
                 className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-yellow-400 transition-colors"
@@ -659,6 +663,17 @@ export default function Results() {
             </Card>
             </div>
 
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-lg font-semibold text-white">GitHub Activity</h2>
+                <button
+                  onClick={() => setStatsPopupOpen(true)}
+                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#58a6ff] transition-colors"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                  View all statistics
+                </button>
+              </div>
             <Card className="bg-[#0d1117] pt-0 border-[#30363d] w-full">
               <CardContent className="p-3 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 items-start">
                 {/* LEFT — HEATMAP */}
@@ -759,9 +774,15 @@ export default function Results() {
 
 
                 {/* RIGHT — STATS */}
-                <div className="mt-0 md:mt-4 w-full md:w-[220px]">
-                  <div className="space-y-[2px] pr-3 text-xs text-gray-400">
-                    {statItems.map((item, i) => (
+                <div className="mt-0 md:mt-4 w-full md:w-[190px] shrink-0">
+                  <div className="space-y-[6px] pr-3 text-xs text-gray-400">
+                    {[
+                      { label: "Commits (365d)", value: githubData.commitsLast365, tip: "Total commit contributions in the last 365 days" },
+                      { label: "Active Weeks", value: `${githubData.activeWeeksPct}%`, tip: "% of the past 52 weeks with at least one contribution" },
+                      { label: "Streak", value: `${githubData.streak}d`, tip: "Current consecutive days with at least one contribution" },
+                      { label: "Velocity Trend", value: githubData.commitVelocityTrend >= 1 ? `↑ ${githubData.commitVelocityTrend}×` : `↓ ${githubData.commitVelocityTrend}×`, tip: "Commits this year ÷ last year — >1 means accelerating" },
+                      { label: "Merged PRs", value: `${githubData.mergedPRs} / ${githubData.totalPRs}`, tip: "Merged pull requests out of total PRs opened" },
+                    ].map((item, i) => (
                       <div
                         key={i}
                         className="flex items-center justify-between gap-2"
@@ -770,7 +791,7 @@ export default function Results() {
                           {item.label}
                           <span className="relative group">
                             <Info className="w-3 h-3 text-gray-600 hover:text-gray-400 cursor-help" />
-                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-48 px-2 py-1.5 text-[10px] text-gray-200 bg-[#1c2128] border border-[#30363d] rounded-md shadow-lg z-10 text-center leading-tight">
+                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-48 px-2 py-1.5 text-[10px] text-gray-200 bg-[#1c2128] border border-[#30363d] rounded-md shadow-lg z-10 text-center leading-tight pointer-events-none">
                               {item.tip}
                             </span>
                           </span>
@@ -784,6 +805,7 @@ export default function Results() {
                 </div>
               </CardContent>
             </Card>
+            </div>
 
             <div className="flex flex-col md:flex-row gap-6">
               {/* Languages */}
@@ -809,7 +831,7 @@ export default function Results() {
                   <CardContent className="py-3 flex flex-col h-full">
                     <div className="mb-3">
                       <p className="text-sm text-gray-400 mb-2">
-                        Paste in Job Description:
+                        Paste a Job Description:
                       </p>
 
                       <p className="text-xs text-gray-500">
@@ -1014,6 +1036,184 @@ export default function Results() {
               <span className={`text-sm font-bold ${getCookedColor(analysis.cookedLevel)}`}>
                 {analysis.cookedLevel}/10 — {analysis.levelName}
               </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GitHub Statistics Popup */}
+      {statsPopupOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setStatsPopupOpen(false)}
+          />
+          <div className="relative bg-[#161b22] border border-[#30363d] rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col">
+            {/* Popup Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#30363d] shrink-0">
+              <div>
+                <h3 className="text-base font-bold text-white">GitHub Statistics</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Every metric fed to the AI to generate your analysis</p>
+              </div>
+              <button
+                onClick={() => setStatsPopupOpen(false)}
+                className="text-gray-500 hover:text-white transition-colors text-xl leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Scrollable content */}
+            <div className="overflow-y-auto px-6 py-4 space-y-5">
+
+              {/* Activity */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                  <h4 className="text-sm font-semibold text-white">Activity <span className="font-normal text-gray-500">(40% of score)</span></h4>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { label: "Commits (365d)", value: githubData.commitsLast365, desc: "Commit contributions this year" },
+                    { label: "Commits (90d)", value: githubData.commitsLast90, desc: "Contributions in the last 90 days" },
+                    { label: "Prev Year Commits", value: githubData.prevYearCommits, desc: "Commits in the year prior — baseline for velocity" },
+                    { label: "Active Weeks", value: `${githubData.activeWeeksPct}%`, desc: "% of 52 weeks with ≥1 contribution" },
+                    { label: "Avg / Active Week", value: githubData.avgCommitsPerActiveWeek, desc: "Commits per week when active" },
+                    { label: "Std Dev / Week", value: githubData.stdDevPerWeek, desc: "Lower = more consistent cadence" },
+                    { label: "Longest Inactive Gap", value: `${githubData.longestInactiveGap}d`, desc: "Longest stretch without a contribution" },
+                    { label: "Current Streak", value: `${githubData.streak}d`, desc: "Consecutive days with contributions" },
+                    { label: "Total Contributions", value: githubData.totalContributions, desc: "All GitHub contribution events this year" },
+                  ].map((s, i) => (
+                    <div key={i} className="bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-gray-500 mb-0.5">{s.label}</p>
+                      <p className="text-sm font-bold text-white">{s.value}</p>
+                      <p className="text-[10px] text-gray-600 mt-0.5 leading-tight">{s.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Skill Signals */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+                  <h4 className="text-sm font-semibold text-white">Skill Signals <span className="font-normal text-gray-500">(30% of score)</span></h4>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
+                  {[
+                    { label: "Language Count", value: githubData.languageCount, desc: "Unique languages across all repos" },
+                    { label: "Top Lang Dominance", value: `${githubData.topLanguageDominancePct}%`, desc: "% of codebase bytes in your #1 language" },
+                    { label: "Total Language Bytes", value: githubData.totalLanguageBytes?.toLocaleString(), desc: "Total bytes of code across all repos" },
+                  ].map((s, i) => (
+                    <div key={i} className="bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-gray-500 mb-0.5">{s.label}</p>
+                      <p className="text-sm font-bold text-white">{s.value}</p>
+                      <p className="text-[10px] text-gray-600 mt-0.5 leading-tight">{s.desc}</p>
+                    </div>
+                  ))}
+                </div>
+                {githubData.languages?.length > 0 && (
+                  <div className="bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 mb-2">
+                    <p className="text-[10px] text-gray-500 mb-1">Top Languages (by repo count)</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {githubData.languages.map((lang, i) => (
+                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-[#1c2128] border border-[#30363d] text-gray-300">{lang}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {githubData.categoryPercentages && Object.keys(githubData.categoryPercentages).length > 0 && (
+                  <div className="bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2">
+                    <p className="text-[10px] text-gray-500 mb-2">Tech Domain Breakdown (% of codebase)</p>
+                    <div className="space-y-1.5">
+                      {Object.entries(githubData.categoryPercentages)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([cat, pct], i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className="text-[10px] text-gray-400 w-20 capitalize shrink-0">{cat}</span>
+                            <div className="flex-1 h-1 bg-[#1f2831] rounded-full overflow-hidden">
+                              <div className="h-full bg-purple-500/60 rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-[10px] text-white w-8 text-right shrink-0">{pct}%</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Growth */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                  <h4 className="text-sm font-semibold text-white">Growth <span className="font-normal text-gray-500">(15% of score)</span></h4>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { label: "Velocity Trend", value: `${githubData.commitVelocityTrend}×`, desc: "Commits this year ÷ last year — >1 accelerating" },
+                    { label: "Momentum Ratio", value: githubData.activityMomentumRatio, desc: "(Last 90d × 4) ÷ last 365d — >1 ramping up" },
+                    { label: "Domain Diversity Δ", value: githubData.domainDiversityChange > 0 ? `+${githubData.domainDiversityChange}` : githubData.domainDiversityChange, desc: "New tech domains explored vs prior year" },
+                  ].map((s, i) => (
+                    <div key={i} className="bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-gray-500 mb-0.5">{s.label}</p>
+                      <p className={`text-sm font-bold ${
+                        s.label === 'Velocity Trend' ? (githubData.commitVelocityTrend >= 1 ? 'text-green-400' : 'text-red-400') :
+                        s.label === 'Momentum Ratio' ? (githubData.activityMomentumRatio >= 1 ? 'text-green-400' : 'text-orange-400') :
+                        s.label === 'Domain Diversity Δ' ? (githubData.domainDiversityChange > 0 ? 'text-green-400' : githubData.domainDiversityChange < 0 ? 'text-red-400' : 'text-white') :
+                        'text-white'
+                      }`}>{s.value}</p>
+                      <p className="text-[10px] text-gray-600 mt-0.5 leading-tight">{s.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Collaboration */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-2 h-2 rounded-full bg-yellow-500 shrink-0" />
+                  <h4 className="text-sm font-semibold text-white">Collaboration <span className="font-normal text-gray-500">(15% of score)</span></h4>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { label: "Total PRs", value: githubData.totalPRs, desc: "All pull requests ever opened" },
+                    { label: "Merged PRs", value: githubData.mergedPRs, desc: "Pull requests that were merged" },
+                    { label: "Open Issues", value: githubData.openIssues, desc: "Currently open issues" },
+                    { label: "Closed Issues", value: githubData.closedIssues, desc: "Issues resolved" },
+                    { label: "Issues Closed Ratio", value: githubData.issuesClosedRatio, desc: "Closed ÷ (open + 1) — higher is better" },
+                  ].map((s, i) => (
+                    <div key={i} className="bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-gray-500 mb-0.5">{s.label}</p>
+                      <p className="text-sm font-bold text-white">{s.value}</p>
+                      <p className="text-[10px] text-gray-600 mt-0.5 leading-tight">{s.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Repository Overview */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
+                  <h4 className="text-sm font-semibold text-white">Repository Overview</h4>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { label: "Total Repos", value: githubData.totalRepos, desc: "Public repos owned" },
+                    { label: "Total Stars", value: githubData.totalStars, desc: "Stars received across all repos" },
+                    { label: "Total Forks", value: githubData.totalForks, desc: "Times your repos were forked" },
+                    { label: "Commits in Repos", value: githubData.totalCommitsInRepos?.toLocaleString(), desc: "Total commits across all repo histories" },
+                  ].map((s, i) => (
+                    <div key={i} className="bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-gray-500 mb-0.5">{s.label}</p>
+                      <p className="text-sm font-bold text-white">{s.value}</p>
+                      <p className="text-[10px] text-gray-600 mt-0.5 leading-tight">{s.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-[10px] text-gray-600 text-center pb-1">All data sourced from the GitHub GraphQL API at time of analysis.</p>
             </div>
           </div>
         </div>

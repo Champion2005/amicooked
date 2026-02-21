@@ -274,8 +274,8 @@ export const ANALYSIS_MODES = {
   },
   
   QUICK_CHAT: {
-    focus: "Answer specific questions about profile or recommendations",
-    additionalContext: "User is asking a follow-up question. Be concise but helpful. Reference their profile data when relevant. Maintain consistency with previous recommendations."
+    focus: "Conversational follow-up about profile or recommendations",
+    additionalContext: "The user's analysis is already computed and included in the context — DO NOT re-score or recalculate their Cooked Level or category scores. Reference their actual pre-computed scores and recommendations. Be concise and direct. Answer their specific question and give actionable next steps where relevant."
   },
   
   PROJECT_RECOMMENDATION: {
@@ -286,7 +286,7 @@ export const ANALYSIS_MODES = {
 
 /**
  * Get instructions for a specific analysis mode
- * @param {string} mode - One of the ANALYSIS_MODES keys
+ * @param {string} mode - One of the ANALYSIS_MODES keys (e.g., 'INITIAL_ASSESSMENT', 'PROGRESS_CHECK', 'QUICK_CHAT', 'PROJECT_RECOMMENDATION')
  * @returns {string} Mode-specific instructions to append
  */
 export function getAnalysisModeInstructions(mode = 'INITIAL_ASSESSMENT') {

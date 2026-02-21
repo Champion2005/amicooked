@@ -109,19 +109,19 @@ export default function Landing() {
               <ul className="space-y-3 text-gray-400">
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-1">✓</span>
-                  AI analyzes your profile against industry standards
+                  Agent scores you across 4 weighted dimensions: Activity, Skill Signals, Growth & Collaboration
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-1">✓</span>
-                  Get project ideas tailored to your career goals
+                  Analysis adjusts for your education level, experience, and career goal
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-1">✓</span>
-                  Paste any job description and see where you stand
+                  Paste any job description to see exactly where you stand
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-1">✓</span>
-                  Actionable steps to close your skill gaps
+                  Specific project recommendations chosen to close your top gaps — not generic tutorials
                 </li>
               </ul>
             </CardContent>
@@ -133,7 +133,7 @@ export default function Landing() {
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         <h2 className="text-2xl sm:text-3xl font-bold text-center mb-3">How it works</h2>
         <p className="text-gray-400 text-center mb-12 max-w-xl mx-auto">
-          Connect your GitHub, tell us your goals, and get a clear picture of where you stand and what to build next.
+          Connect your GitHub, tell us your goals, and get a deep analysis — scored, explained, and remembered by an agent that stays in context throughout your session.
         </p>
 
         <div className="grid md:grid-cols-3 gap-6">
@@ -142,9 +142,9 @@ export default function Landing() {
               <div className="w-12 h-12 rounded-lg bg-[#0d1117] border border-[#30363d] flex items-center justify-center mb-4">
                 <BrainCircuit className="w-6 h-6 text-[#58a6ff]" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">AI Profile Analysis</h3>
+              <h3 className="text-lg font-semibold mb-2">4-Dimensional Scoring</h3>
               <p className="text-sm text-gray-400 leading-relaxed">
-                We scan your repos, commits, languages, and activity patterns to calculate your "Cooked Level" — a brutally honest score of your GitHub health.
+                Your commits, repos, languages, and collaboration history are scored across Activity, Skill Signals, Growth, and Collaboration — weighted and calibrated to your career context.
               </p>
             </CardContent>
           </Card>
@@ -154,9 +154,9 @@ export default function Landing() {
               <div className="w-12 h-12 rounded-lg bg-[#0d1117] border border-[#30363d] flex items-center justify-center mb-4">
                 <FolderGit2 className="w-6 h-6 text-green-400" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">Recommended Projects</h3>
+              <h3 className="text-lg font-semibold mb-2">Gap-Targeted Projects</h3>
               <p className="text-sm text-gray-400 leading-relaxed">
-                Get project ideas matched to your interests and skill gaps — not generic todo apps, but projects that fill the holes recruiters notice.
+                Project recommendations are generated from your actual gaps and career goal — scoped to your level, using tech that moves the needle for the roles you're targeting.
               </p>
             </CardContent>
           </Card>
@@ -166,9 +166,9 @@ export default function Landing() {
               <div className="w-12 h-12 rounded-lg bg-[#0d1117] border border-[#30363d] flex items-center justify-center mb-4">
                 <Target className="w-6 h-6 text-orange-400" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">Job Fit Checker</h3>
+              <h3 className="text-lg font-semibold mb-2">Job Fit via AI Chat</h3>
               <p className="text-sm text-gray-400 leading-relaxed">
-                Paste any job description and instantly see how your GitHub stacks up — plus specific steps to close the gap and increase your chances.
+                Paste any job description into the chat and the agent — already loaded with your full profile — will tell you exactly where you match, where you fall short, and what to do about it.
               </p>
             </CardContent>
           </Card>
@@ -180,9 +180,9 @@ export default function Landing() {
               <div className="w-12 h-12 rounded-lg bg-[#0d1117] border border-[#30363d] flex items-center justify-center mb-4">
                 <TrendingUp className="w-6 h-6 text-purple-400" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">Track Your Progress</h3>
+              <h3 className="text-lg font-semibold mb-2">Progress Comparison</h3>
               <p className="text-sm text-gray-400 leading-relaxed">
-                Come back anytime to see your contribution heatmap, updated stats, and how your Cooked Level changes as you improve.
+                Reanalyze anytime and the agent compares your new scores to your previous assessment — calling out what improved, what stalled, and updating your recommendations accordingly.
               </p>
             </CardContent>
           </Card>
@@ -192,9 +192,9 @@ export default function Landing() {
               <div className="w-12 h-12 rounded-lg bg-[#0d1117] border border-[#30363d] flex items-center justify-center mb-4">
                 <Lightbulb className="w-6 h-6 text-yellow-400" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">AI Career Coach</h3>
+              <h3 className="text-lg font-semibold mb-2">Context-Aware Agent Chat</h3>
               <p className="text-sm text-gray-400 leading-relaxed">
-                Chat with an AI that knows your profile inside-out. Ask for advice on what to learn, what to build, or how to position yourself.
+                The AI chat runs on a stateful agent — it holds your full GitHub context, your scores, and the conversation history, so every answer is specific to your actual profile, not generic advice.
               </p>
             </CardContent>
           </Card>
@@ -206,7 +206,7 @@ export default function Landing() {
               </div>
               <h3 className="text-lg font-semibold mb-2">No Sugarcoating</h3>
               <p className="text-sm text-gray-400 leading-relaxed">
-                We tell you exactly where you stand. Whether you're cooking or cooked, you'll know — and you'll know how to fix it.
+                The agent is calibrated to be brutally honest — scores are anchored to real benchmarks and adjusted for context. You'll know exactly where you stand and why.
               </p>
             </CardContent>
           </Card>
@@ -220,7 +220,7 @@ export default function Landing() {
             Ready to find out if you're <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">cooked</span>?
           </h2>
           <p className="text-gray-400 max-w-lg mx-auto mb-8">
-            Connect your GitHub and get your personalized analysis in under a minute. It's free, fast, and might just save your job search.
+            Connect your GitHub and get a full 4-dimension breakdown, project roadmap, and a context-aware AI ready to answer anything about your profile — in under a minute.
           </p>
           <Button
             onClick={handleGitHubSignIn}
@@ -246,7 +246,7 @@ export default function Landing() {
                 <span className="text-white font-semibold">AmICooked?</span>
               </div>
               <p className="text-gray-500 text-xs leading-relaxed">
-                AI-powered GitHub profile analysis to help you level up your developer career.
+                Context-aware agent analysis of your GitHub — scored, personalized, and actionable.
               </p>
             </div>
 
