@@ -155,7 +155,7 @@ function processGitHubData(viewer) {
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
   // ─── ACTIVITY METRICS ────────────────────────────────────────────────────────
-  const commitsLast365 = viewer.currentYear.totalCommitContributions;
+  const commitsLast365 = allDays.reduce((s, d) => s + d.contributionCount, 0);
   const commitsLast90 = allDays
     .filter(d => new Date(d.date) >= ninetyDaysAgo)
     .reduce((s, d) => s + d.contributionCount, 0);
@@ -292,8 +292,9 @@ function processGitHubData(viewer) {
 
   // ─── GROWTH METRICS ──────────────────────────────────────────────────────────
   const prevYearCommits = viewer.previousYear.totalCommitContributions;
-  const commitVelocityTrend = parseFloat((commitsLast365 / (prevYearCommits + 1)).toFixed(2));
-  const activityMomentumRatio = parseFloat(((commitsLast90 * 4) / (commitsLast365 + 1)).toFixed(2));
+  const thisYearCommits = viewer.currentYear.contributionCalendar.totalContributions;
+  const commitVelocityTrend = parseFloat((thisYearCommits / (prevYearCommits + 1)).toFixed(2));
+  const activityMomentumRatio = parseFloat(((commitsLast90 * 4) / (thisYearCommits + 1)).toFixed(2));
 
   // ─── COLLABORATION METRICS ───────────────────────────────────────────────────
   const totalPRs = viewer.allPRs.totalCount;

@@ -125,11 +125,20 @@ export default function ProjectPopup({
     } catch { /* non-critical */ }
   };
 
+  const formatTime = (timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${dateStr} ${timeStr}`;
+  };
+
   const handleAsk = async () => {
     if (!question.trim() || loading) return;
     const userMsg = question.trim();
     setQuestion('');
-    const newMessages = [...messages, { role: 'user', content: userMsg }];
+    const userTimestamp = new Date().toISOString();
+    const newMessages = [...messages, { role: 'user', content: userMsg, timestamp: userTimestamp }];
     setMessages(newMessages);
 
     // Auto-save project on first chat
@@ -141,20 +150,42 @@ export default function ProjectPopup({
         agentRef.current = createAgent();
         await agentRef.current.initialize(githubData, userProfile, analysis);
       }
-      const result = await agentRef.current.processProjectMessage(userMsg, project);
-      const response = result.response;
-      const updatedMessages = [...newMessages, { role: 'assistant', content: response }];
-      setMessages(updatedMessages);
+      
+      // Don't set assistant timestamp yet — wait until streaming completes
+      const assistantMessage = { role: 'assistant', content: '' };
+      setMessages(prev => [...prev, assistantMessage]);
+
+      // Stream the response
+      let fullResponse = '';
+      await agentRef.current.processProjectMessage(userMsg, project, (chunk) => {
+        fullResponse += chunk;
+        // Update the assistant message in real-time as chunks arrive
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            content: fullResponse
+          };
+          return updated;
+        });
+      });
+
+      // Set timestamp after streaming completes
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1].timestamp = new Date().toISOString();
+        return updated;
+      });
 
       // Persist both messages
       const projectId = slugify(project.name);
       if (userId) {
         await addProjectMessage(userId, projectId, 'user', userMsg).catch(() => {});
-        await addProjectMessage(userId, projectId, 'assistant', response).catch(() => {});
+        await addProjectMessage(userId, projectId, 'assistant', fullResponse).catch(() => {});
       }
     } catch (error) {
       console.error('Project chat error:', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong. Please try again.' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong. Please try again.', timestamp: new Date().toISOString() }]);
     } finally {
       setLoading(false);
     }
@@ -272,6 +303,8 @@ export default function ProjectPopup({
                 key={i}
                 role={msg.role}
                 content={msg.content}
+                timestamp={msg.timestamp}
+                formatTime={formatTime}
               />
             ))}
             {loading && (

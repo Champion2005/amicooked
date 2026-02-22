@@ -91,12 +91,12 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
     }
   };
 
-  const getAIResponse = async (userMessage) => {
+  const getAIResponse = async (userMessage, onChunk) => {
     if (!agentRef.current) {
       agentRef.current = createAgent();
       await agentRef.current.initialize(githubData, userProfile, analysis);
     }
-    const result = await agentRef.current.processMessage(userMessage, 'QUICK_CHAT');
+    const result = await agentRef.current.processMessage(userMessage, 'QUICK_CHAT', onChunk);
     return result.response;
   };
 
@@ -108,34 +108,46 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       const context = { githubData, userProfile, analysis };
       const chatId = await createChat(userId, query.trim(), context);
 
+      const userTimestamp = new Date().toISOString();
       const newMessages = [
-        { role: 'user', content: query.trim(), timestamp: new Date().toISOString() }
+        { role: 'user', content: query.trim(), timestamp: userTimestamp }
       ];
 
-      setActiveChat({ id: chatId, title: query.trim().substring(0, 50), messages: newMessages });
+      // Don't set assistant timestamp yet — wait until streaming completes
+      const assistantMessage = { role: 'assistant', content: '' };
+      setActiveChat({ id: chatId, title: query.trim().substring(0, 50), messages: [...newMessages, assistantMessage] });
       if (window.innerWidth < 640) setShowSidebar(false);
 
-      // Get AI response via agent (has full context + analysis)
-      const response = await getAIResponse(query.trim());
+      // Get AI response via agent with streaming
+      let fullResponse = '';
+      await getAIResponse(query.trim(), (chunk) => {
+        fullResponse += chunk;
+        // Update the assistant message in real-time as chunks arrive
+        setActiveChat(prev => {
+          if (!prev) return prev;
+          const updated = [...prev.messages];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            content: fullResponse
+          };
+          return { ...prev, messages: updated };
+        });
+      });
 
-      await addMessage(userId, chatId, 'assistant', response);
+      // Set timestamp after streaming completes
+      setActiveChat(prev => {
+        if (!prev) return prev;
+        const updated = [...prev.messages];
+        updated[updated.length - 1].timestamp = new Date().toISOString();
+        return { ...prev, messages: updated };
+      });
 
-      const updatedMessages = [
-        ...newMessages,
-        { role: 'assistant', content: response, timestamp: new Date().toISOString() }
-      ];
-      setActiveChat(prev => ({ ...prev, messages: updatedMessages }));
-
+      await addMessage(userId, chatId, 'assistant', fullResponse);
       await loadChats();
     } catch (error) {
       console.error('Error starting chat:', error);
-      if (activeChat || newMessages) {
-        const errorMessages = [
-          ...(newMessages || []),
-          { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.', timestamp: new Date().toISOString() }
-        ];
-        setActiveChat(prev => prev ? { ...prev, messages: errorMessages } : null);
-      }
+      const errorMsg = { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.', timestamp: new Date().toISOString() };
+      setActiveChat(prev => prev ? { ...prev, messages: [...prev.messages, errorMsg] } : null);
     } finally {
       setLoading(false);
     }
@@ -147,9 +159,10 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
     const userMessage = input.trim();
     setInput('');
 
+    const userTimestamp = new Date().toISOString();
     const newMessages = [
       ...activeChat.messages,
-      { role: 'user', content: userMessage, timestamp: new Date().toISOString() }
+      { role: 'user', content: userMessage, timestamp: userTimestamp }
     ];
     setActiveChat(prev => ({ ...prev, messages: newMessages }));
 
@@ -157,23 +170,40 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
     try {
       await addMessage(userId, activeChat.id, 'user', userMessage);
 
+      // Don't set assistant timestamp yet — wait until streaming completes
+      const assistantMessage = { role: 'assistant', content: '' };
+      const messagesWithAssistant = [...newMessages, assistantMessage];
+      setActiveChat(prev => ({ ...prev, messages: messagesWithAssistant }));
+
       // Agent already holds conversation history for this session
-      const response = await getAIResponse(userMessage);
+      let fullResponse = '';
+      await getAIResponse(userMessage, (chunk) => {
+        fullResponse += chunk;
+        // Update the assistant message in real-time as chunks arrive
+        setActiveChat(prev => {
+          if (!prev) return prev;
+          const updated = [...prev.messages];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            content: fullResponse
+          };
+          return { ...prev, messages: updated };
+        });
+      });
 
-      await addMessage(userId, activeChat.id, 'assistant', response);
+      // Set timestamp after streaming completes
+      setActiveChat(prev => {
+        if (!prev) return prev;
+        const updated = [...prev.messages];
+        updated[updated.length - 1].timestamp = new Date().toISOString();
+        return { ...prev, messages: updated };
+      });
 
-      const updatedMessages = [
-        ...newMessages,
-        { role: 'assistant', content: response, timestamp: new Date().toISOString() }
-      ];
-      setActiveChat(prev => ({ ...prev, messages: updatedMessages }));
+      await addMessage(userId, activeChat.id, 'assistant', fullResponse);
     } catch (error) {
       console.error('Error sending message:', error);
-      const errorMessages = [
-        ...newMessages,
-        { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.', timestamp: new Date().toISOString() }
-      ];
-      setActiveChat(prev => ({ ...prev, messages: errorMessages }));
+      const errorMsg = { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.', timestamp: new Date().toISOString() };
+      setActiveChat(prev => ({ ...prev, messages: [...prev.messages, errorMsg] }));
     } finally {
       setLoading(false);
     }
@@ -220,7 +250,9 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
     const date = new Date(timestamp);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${dateStr} ${timeStr}`;
   };
 
   if (!isOpen) return null;
@@ -336,10 +368,10 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                     formatTime={formatTime}
                   />
                 ))}
-                {loading && (
-                  <div className="flex justify-center">
+                {loading && activeChat.messages.length > 0 && activeChat.messages[activeChat.messages.length - 1]?.role === 'assistant' && !activeChat.messages[activeChat.messages.length - 1]?.content && (
+                  <div className="flex justify-start">
                     <div className="px-4 py-3">
-                        <div className="flex items-center gap-2 text-muted-foreground">
+                      <div className="flex items-center gap-2 text-muted-foreground">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span className="text-sm">Thinking...</span>
                       </div>

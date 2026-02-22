@@ -212,9 +212,10 @@ function safeParseJSON(raw) {
  * Call OpenRouter API with auto model selection
  * @param {string} prompt - The prompt to send to the AI
  * @param {string} systemPrompt - Optional system prompt for context
+ * @param {Function} onChunk - Optional callback for streaming chunks: (text) => void
  * @returns {Promise<string>} - AI response text
  */
-export async function callOpenRouter(prompt, systemPrompt = "") {
+export async function callOpenRouter(prompt, systemPrompt = "", onChunk = null) {
   try {
     const response = await fetch(OPENROUTER_API_URL, {
       method: "POST",
@@ -225,7 +226,8 @@ export async function callOpenRouter(prompt, systemPrompt = "") {
         "X-Title": "amicooked",
       },
       body: JSON.stringify({
-        model: "openrouter/free", // Auto-select model based on prompt
+        model: "meta-llama/llama-4-scout", // Auto-select model based on prompt
+        stream: !!onChunk, // Enable streaming if callback provided
         messages: [
           ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
           { role: "user", content: prompt },
@@ -237,6 +239,46 @@ export async function callOpenRouter(prompt, systemPrompt = "") {
       throw new Error(`OpenRouter API error: ${response.status}`);
     }
 
+    // Streaming mode
+    if (onChunk) {
+      let fullText = "";
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const data = line.slice(6);
+              if (data === "[DONE]") continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                const content = parsed.choices?.[0]?.delta?.content;
+                if (content) {
+                  fullText += content;
+                  onChunk(content);
+                }
+              } catch (e) {
+                // Ignore JSON parse errors for malformed SSE lines
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      return fullText;
+    }
+
+    // Non-streaming mode (backwards compatible)
     const data = await response.json();
     return data.choices[0].message.content;
   } catch (error) {
@@ -305,7 +347,7 @@ ${missing.map((k) => `    "${k}": { "score": <integer 0-100>, "notes": "<1 sente
  * Phase 2: Given pre-computed category scores, ask the AI for the
  * summary, recommendations, and insights.
  */
-async function fetchSynthesis(githubData, userProfile, categoryScores) {
+async function fetchSynthesis(githubData, userProfile, categoryScores, onChunk = null) {
   const systemPrompt = getChatInstructions() + getAnalysisModeInstructions("SYNTHESIS");
   const metricsBlock = formatGitHubMetrics(githubData, userProfile);
 
@@ -330,7 +372,12 @@ Return ONLY this JSON (no extra text):
   "activityInsight": "<1 sentence on contribution patterns>"
 }`;
 
-  const response = await callOpenRouter(prompt, systemPrompt);
+  let fullResponse = "";
+  const response = await callOpenRouter(prompt, systemPrompt, (chunk) => {
+    fullResponse += chunk;
+    if (onChunk) onChunk(chunk);
+  });
+
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   const parsed = jsonMatch ? safeParseJSON(jsonMatch[0]) : null;
   if (!parsed) throw new Error("Phase 2: Could not parse synthesis response");
@@ -342,15 +389,16 @@ Return ONLY this JSON (no extra text):
  * Two-phase approach: score first, then synthesize summary/recommendations/insights.
  * @param {Object} githubData - User's GitHub metrics
  * @param {Object} userProfile - User's profile data (age, education, interests, etc.)
+ * @param {Function} onSynthesisChunk - Optional callback for streaming synthesis chunks
  * @returns {Promise<Object>} - { cookedLevel, levelName, summary, recommendations, categoryScores, ... }
  */
-export async function analyzeCookedLevel(githubData, userProfile) {
+export async function analyzeCookedLevel(githubData, userProfile, onSynthesisChunk = null) {
   try {
     // Phase 1 — Scoring
     const rawCategoryScores = await fetchCategoryScores(githubData, userProfile);
 
-    // Phase 2 — Synthesis (summary, recommendations, insights)
-    const synthesis = await fetchSynthesis(githubData, userProfile, rawCategoryScores);
+    // Phase 2 — Synthesis (summary, recommendations, insights) with optional streaming
+    const synthesis = await fetchSynthesis(githubData, userProfile, rawCategoryScores, onSynthesisChunk);
 
     // Combine and normalize
     const combined = { ...synthesis, categoryScores: rawCategoryScores };
@@ -365,9 +413,10 @@ export async function analyzeCookedLevel(githubData, userProfile) {
  * Get recommended projects from AI based on user profile and GitHub data
  * @param {Object} githubData - User's GitHub metrics
  * @param {Object} userProfile - User's profile data
+ * @param {Function} onChunk - Optional callback for streaming chunks
  * @returns {Promise<Array>} - Array of project objects with detailed info
  */
-export async function getRecommendedProjects(githubData, userProfile) {
+export async function getRecommendedProjects(githubData, userProfile, onChunk = null) {
   const systemPrompt = getChatInstructions() + getAnalysisModeInstructions("PROJECT_RECOMMENDATION");
 
   const prompt = `Suggest exactly 4 projects targeting this user's skill gaps.
@@ -377,7 +426,7 @@ ${formatGitHubMetrics(githubData, userProfile)}
 Return ONLY a JSON array of exactly 4 projects matching the format in your instructions. No trailing commas. Double quotes only.`;
 
   try {
-    const response = await callOpenRouter(prompt, systemPrompt);
+    const response = await callOpenRouter(prompt, systemPrompt, onChunk);
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const result = safeParseJSON(jsonMatch[0]);

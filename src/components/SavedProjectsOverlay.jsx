@@ -350,9 +350,10 @@ export default function SavedProjectsOverlay({
     const userMsg = input.trim();
     setInput("");
 
+    const userTimestamp = new Date().toISOString();
     const newMessages = [
       ...(activeProject.messages || []),
-      { role: "user", content: userMsg, timestamp: new Date().toISOString() },
+      { role: "user", content: userMsg, timestamp: userTimestamp },
     ];
     setActiveProject((prev) => ({ ...prev, messages: newMessages }));
 
@@ -377,21 +378,35 @@ export default function SavedProjectsOverlay({
       if (!agentRef.current) {
         initAgentForProject(newMessages.slice(0, -1));
       }
-      const result = await agentRef.current.processProjectMessage(userMsg, activeProject);
-      const response = result.response;
+      
+      // Don't set assistant timestamp yet — wait until streaming completes
+      const assistantMessage = { role: "assistant", content: "" };
+      setActiveProject((prev) => ({ ...prev, messages: [...newMessages, assistantMessage] }));
+
+      // Stream the response
+      let fullResponse = '';
+      await agentRef.current.processProjectMessage(userMsg, activeProject, (chunk) => {
+        fullResponse += chunk;
+        // Update the assistant message in real-time as chunks arrive
+        setActiveProject(prev => {
+          const updated = [...prev.messages];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            content: fullResponse
+          };
+          return { ...prev, messages: updated };
+        });
+      });
+
+      // Set timestamp after streaming completes
+      setActiveProject(prev => {
+        const updated = [...prev.messages];
+        updated[updated.length - 1].timestamp = new Date().toISOString();
+        return { ...prev, messages: updated };
+      });
 
       // Persist AI response
-      await addProjectMessage(userId, activeProject.id, "assistant", response);
-
-      const updatedMessages = [
-        ...newMessages,
-        {
-          role: "assistant",
-          content: response,
-          timestamp: new Date().toISOString(),
-        },
-      ];
-      setActiveProject((prev) => ({ ...prev, messages: updatedMessages }));
+      await addProjectMessage(userId, activeProject.id, "assistant", fullResponse);
     } catch (error) {
       console.error("Project chat error:", error);
       setActiveProject((prev) => ({
@@ -413,7 +428,9 @@ export default function SavedProjectsOverlay({
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const timeStr = date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+    return `${dateStr} ${timeStr}`;
   };
 
   if (!isOpen) return null;
@@ -811,12 +828,12 @@ export default function SavedProjectsOverlay({
                           formatTime={formatTime}
                         />
                       ))}
-                      {chatLoading && (
-                        <div className="flex justify-center">
+                      {chatLoading && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && !messages[messages.length - 1]?.content && (
+                        <div className="flex justify-start">
                           <div className="px-4 py-3">
                             <div className="flex items-center gap-2 text-muted-foreground">
                               <Loader2 className="w-4 h-4 animate-spin" />
-                              <span className="text-sm">Thinking...</span>
+                              <span className="text-sm">Streaming...</span>
                             </div>
                           </div>
                         </div>
