@@ -223,6 +223,83 @@ export function getAgentInstructions() {
 }
 
 /**
+ * Scoring-only instructions — Phase 1 of the two-phase analysis.
+ * Focuses purely on producing consistent, calibrated categoryScores.
+ */
+const SCORING_INSTRUCTIONS = `
+# ROLE
+Expert technical recruiter with 15+ years at FAANG companies. You evaluate GitHub profiles with extreme precision. Your category scores are the foundation of a developer's employability rating.
+
+# YOUR ONLY JOB IN THIS CALL
+Score the four categories below using the calibration anchors. Output ONLY a JSON object with categoryScores. No summary. No recommendations. No insights.
+
+# SCORING WEIGHTS & CATEGORIES
+- Activity (40%): Commit frequency, consistency, gaps, active weeks, PRs merged
+- Skill Signals (30%): Language breadth, tech domain coverage, alignment with career goal
+- Growth (15%): Commit velocity trend vs prior year, new domains added, momentum ratio
+- Collaboration (15%): PRs created/merged, issue engagement, team repos
+
+# CONTEXT ADJUSTMENTS
+Adjust scores relative to the user's stated experience, education, and career goal:
+- High school / early undergrad: lower bar — even small projects count
+- Bootcamp / recent grad: expect concentrated recent activity, 3-5 polished projects
+- Senior (5+ years): high bar — expect OSS contributions, architectural work
+- FAANG goal: exceptional breadth and depth required
+- Startup goal: shipping velocity and ownership matter more
+- Frontend/Backend/ML goals: domain alignment is critical
+
+# CALIBRATION ANCHORS (score each category 0-100 — these are NOT averages, score independently)
+
+Activity:
+  0-20: No commits in 365 days
+  21-40: Sporadic commits, gaps >90 days, very low total
+  41-60: Moderate consistency, some gaps, reasonable volume
+  61-80: Good consistency (<30 day gaps), active weeks >50%, solid volume
+  81-100: Near-daily commits, active weeks >80%, strong PR output
+
+Skill Signals:
+  0-20: 1-2 languages, same domain, no meaningful projects
+  21-40: Few languages, limited domains, misaligned with goal
+  41-60: Moderate breadth, partial goal alignment
+  61-80: Good breadth, goal-aligned, 4+ languages, solid repos
+  81-100: Exceptional breadth and depth, strong goal alignment
+
+Growth:
+  0-20: Declining velocity or <0.5x prior year, no new domains
+  21-40: Flat trajectory, minimal expansion
+  41-60: Slight positive trend, some new domains
+  61-80: Acceleration (velocity >1.2x), 1-2 new domains this year
+  81-100: Strong acceleration (>2x), rapid domain expansion
+
+Collaboration:
+  0-20: No PRs, no issues, solo only
+  21-40: <2 PRs, very few issues
+  41-60: Some PRs and issues, limited external contributions
+  61-80: Regular PRs, good issue engagement, some team repos
+  81-100: High PR volume, strong issues, clear team collaboration
+
+# OUTPUT FORMAT
+Return ONLY this JSON — no extra text, no markdown:
+{
+  "categoryScores": {
+    "activity":      { "score": <integer 0-100>, "notes": "<1 sentence: main driver>" },
+    "skillSignals":  { "score": <integer 0-100>, "notes": "<1 sentence: main driver>" },
+    "growth":        { "score": <integer 0-100>, "notes": "<1 sentence: main driver>" },
+    "collaboration": { "score": <integer 0-100>, "notes": "<1 sentence: main driver>" }
+  }
+}
+
+ALL FOUR keys are required. Missing any key will break the application.
+`;
+
+/**
+ * Get scoring-only instructions for Phase 1 of the two-phase analysis.
+ */
+export function getScoringInstructions() {
+  return SCORING_INSTRUCTIONS;
+}
+
+/**
  * Trimmed instructions for conversational calls — no scoring schema or JSON format.
  * Use for chat, project chat, and project recommendations.
  */
@@ -272,6 +349,24 @@ export const ANALYSIS_MODES = {
     additionalContext: "First analysis. Be thorough. Set baseline expectations. Focus on quick wins and long-term strategy."
   },
 
+  SYNTHESIS: {
+    focus: "Summary and recommendations from pre-computed scores",
+    additionalContext: `The four category scores have already been computed and are provided in the prompt. DO NOT re-score.
+Using those scores and the GitHub metrics, generate:
+- A concise honest summary (1-2 sentences)
+- 3 specific actionable recommendations targeting the weakest categories
+- Three one-sentence insights (projects, language, activity)
+
+Return ONLY this JSON — no extra text:
+{
+  "summary": "<1-2 sentence honest assessment>",
+  "recommendations": ["<specific task with tech + timeline>", "<task 2>", "<task 3>"],
+  "projectsInsight": "<1 sentence on how recommended projects help>",
+  "languageInsight": "<1 sentence on their language stack>",
+  "activityInsight": "<1 sentence on contribution patterns>"
+}`
+  },
+
   PROGRESS_COMPARISON: {
     focus: "Progress comparison",
     additionalContext: "Compare current metrics to previous analysis. Celebrate improvements. Be constructive about regressions. Check if previous recommendations were followed. Give updated next steps."
@@ -293,7 +388,7 @@ export const ANALYSIS_MODES = {
 - 70% familiar tech, 30% new
 - Completable in 2-8 weeks
 - Clear learning outcomes
-- 3-6 technologies in suggested stack
+- suggestedStack MUST contain between 3 and 6 items — no fewer than 3, no more than 6
 
 Return JSON array:
 [{
@@ -301,8 +396,14 @@ Return JSON array:
   "skill1": "<skill>", "skill2": "<skill>", "skill3": "<skill>",
   "overview": "<2-3 sentence overview>",
   "alignment": "<1-2 sentence fit explanation>",
-  "suggestedStack": [{ "name": "<tech>", "description": "<role in project>" }]
-}]`
+  "suggestedStack": [
+    { "name": "<tech>", "description": "<role in project>" },
+    { "name": "<tech>", "description": "<role in project>" },
+    { "name": "<tech>", "description": "<role in project>" }
+  ]
+}]
+
+CRITICAL: Every project's suggestedStack must have AT LEAST 3 and AT MOST 6 entries. This is a hard requirement.`
   },
 
   LEARNING_PATH: {

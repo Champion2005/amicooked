@@ -24,6 +24,7 @@ import {
   Info,
   Bookmark,
   CreditCard,
+  BarChart2,
 } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/config/firebase";
@@ -117,6 +118,20 @@ export default function Results() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Lock body scroll whenever any popup/overlay is open
+  useEffect(() => {
+    const anyOpen =
+      chatOpen ||
+      !!selectedProject ||
+      showReanalyzeConfirm ||
+      showSignOutConfirm ||
+      savedProjectsOpen ||
+      metricPopupOpen ||
+      statsPopupOpen;
+    document.body.style.overflow = anyOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [chatOpen, selectedProject, showReanalyzeConfirm, showSignOutConfirm, savedProjectsOpen, metricPopupOpen, statsPopupOpen]);
+
   useEffect(() => {
     if (!githubData || !analysis) {
       navigate("/dashboard");
@@ -142,6 +157,82 @@ export default function Results() {
     } catch (error) {
       console.error("Sign out error:", error);
     }
+  };
+
+  // Single source of truth for the category score breakdown UI
+  const renderBreakdown = () => {
+    if (!analysis.categoryScores) return null;
+    const categories = [
+      { key: "activity",      label: "Activity",      cssColor: "#3b82f6", textColor: "text-cat-activity" },
+      { key: "skillSignals",  label: "Skill Signals", cssColor: "#a855f7", textColor: "text-cat-skills"   },
+      { key: "growth",        label: "Growth",        cssColor: "#22c55e", textColor: "text-cat-growth"   },
+      { key: "collaboration", label: "Collaboration", cssColor: "#eab308", textColor: "text-cat-collab"  },
+    ];
+    const ringColor =
+      analysis.cookedLevel >= 9 ? "#22c55e" :
+      analysis.cookedLevel >= 7 ? "#eab308" :
+      analysis.cookedLevel >= 5 ? "#f97316" :
+      analysis.cookedLevel >= 3 ? "#ef4444" : "#dc2626";
+    return (
+      <>
+        {/* 2x2 Donut Ring Grid */}
+        <div className="grid grid-cols-2 gap-5 mb-5">
+          {categories.map(({ key, label, cssColor, textColor }) => {
+            const cat = analysis.categoryScores[key];
+            if (!cat) return null;
+            const size = 88; const strokeW = 7;
+            const r = (size - strokeW) / 2;
+            const circ = 2 * Math.PI * r;
+            const offset = circ * (1 - cat.score / 100);
+            const tierLabel = cat.score >= 80 ? "Excellent" : cat.score >= 60 ? "Good" : cat.score >= 40 ? "Fair" : "Needs Work";
+            const tierColor = cat.score >= 80 ? "text-green-400" : cat.score >= 60 ? "text-yellow-400" : cat.score >= 40 ? "text-orange-400" : "text-red-400";
+            return (
+              <div key={key} className="bg-background rounded-lg border border-border p-4 flex flex-col items-center text-center">
+                <div className="relative w-20 h-20 mb-2">
+                  <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full -rotate-90">
+                    <circle cx={size/2} cy={size/2} r={r} fill="none" className="stroke-track" strokeWidth={strokeW} />
+                    <circle cx={size/2} cy={size/2} r={r} fill="none" strokeWidth={strokeW} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} className="transition-all duration-700" style={{ stroke: cssColor }} />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className={`text-lg font-bold ${textColor}`}>{cat.score}</span>
+                  </div>
+                </div>
+                <p className="text-sm font-semibold text-foreground mb-0.5">{label}</p>
+                <p className="text-[10px] text-muted-foreground mb-1">{cat.weight}% weight</p>
+                <span className={`text-[10px] font-semibold ${tierColor} px-2 py-0.5 rounded-full bg-surface`}>{tierLabel}</span>
+                {cat.notes && <p className="text-[10px] text-muted-foreground mt-2 leading-tight">{cat.notes}</p>}
+              </div>
+            );
+          })}
+        </div>
+        {/* Overall Score Summary */}
+        <div className="bg-background rounded-lg border border-border px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {(() => {
+              const s = 48; const sw = 4; const rv = (s - sw) / 2;
+              const cv = 2 * Math.PI * rv;
+              const ov = cv * (1 - analysis.cookedLevel / 10);
+              return (
+                <div className="relative w-10 h-10 shrink-0">
+                  <svg viewBox={`0 0 ${s} ${s}`} className="w-full h-full -rotate-90">
+                    <circle cx={s/2} cy={s/2} r={rv} fill="none" className="stroke-track" strokeWidth={sw} />
+                    <circle cx={s/2} cy={s/2} r={rv} fill="none" strokeWidth={sw} strokeLinecap="round" strokeDasharray={cv} strokeDashoffset={ov} style={{ stroke: ringColor }} />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-sm font-bold text-foreground">{analysis.cookedLevel}</span>
+                  </div>
+                </div>
+              );
+            })()}
+            <div>
+              <p className="text-xs text-muted-foreground">Weighted Total</p>
+              <p className={`text-sm font-bold ${getCookedColor(analysis.cookedLevel)}`}>{analysis.levelName}</p>
+            </div>
+          </div>
+          <span className={`text-lg font-bold ${getCookedColor(analysis.cookedLevel)}`}>{analysis.cookedLevel}/10</span>
+        </div>
+      </>
+    );
   };
 
   const getCookedColor = (level) => {
@@ -313,7 +404,10 @@ export default function Results() {
               </button>
 
               {profileMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-52 bg-card border border-border rounded-lg shadow-xl py-1 z-50">
+                  <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-xl py-1.5 z-50">
+
+                    {/* Profile */}
+                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground/50 px-4 pt-2 pb-1">Profile</p>
                     <button
                         onClick={() => {
                           setProfileMenuOpen(false);
@@ -329,17 +423,45 @@ export default function Results() {
                             },
                           });
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
                     >
                       <User className="w-4 h-4" />
                       Edit Profile
                     </button>
+
+                    {/* Analysis */}
+                    <div className="border-t border-border/50 my-1.5" />
+                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground/50 px-4 pb-1">Analysis</p>
+                    <button
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          setStatsPopupOpen(true);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
+                    >
+                      <BarChart2 className="w-4 h-4" />
+                      View Statistics
+                    </button>
+                    <button
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          setShowReanalyzeConfirm(true);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Reanalyze
+                    </button>
+
+                    {/* Projects & Account */}
+                    <div className="border-t border-border/50 my-1.5" />
+                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground/50 px-4 pb-1">Projects & Account</p>
                     <button
                         onClick={() => {
                           setProfileMenuOpen(false);
                           setSavedProjectsOpen(true);
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
                     >
                       <Bookmark className="w-4 h-4" />
                       My Projects
@@ -349,28 +471,20 @@ export default function Results() {
                           setProfileMenuOpen(false);
                           navigate("/pricing");
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
                     >
                       <CreditCard className="w-4 h-4" />
                       Pricing
                     </button>
-                    <button
-                        onClick={() => {
-                          setProfileMenuOpen(false);
-                          setShowReanalyzeConfirm(true);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Reanalyze
-                    </button>
-                    <div className="border-t border-border my-1" />
+
+                    {/* Danger zone */}
+                    <div className="border-t border-border my-1.5" />
                     <button
                         onClick={() => {
                           setProfileMenuOpen(false);
                           setShowSignOutConfirm(true);
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
                       Sign Out
@@ -436,11 +550,20 @@ export default function Results() {
 
                   <Button
                       variant="outline"
-                      className="w-full mb-5 border-border text-foreground hover:bg-surface"
+                      className="w-full mb-2 border-border text-foreground hover:bg-surface"
                       onClick={() => setSavedProjectsOpen(true)}
                   >
                     <Bookmark className="w-4 h-4 mr-2" />
                     My Projects
+                  </Button>
+
+                  <Button
+                      variant="outline"
+                      className="w-full mb-5 border-border text-foreground hover:bg-surface"
+                      onClick={() => setStatsPopupOpen(true)}
+                  >
+                    <BarChart2 className="w-4 h-4 mr-2" />
+                    View Statistics
                   </Button>
 
                   <div className="space-y-4 text-sm">
@@ -1025,130 +1148,46 @@ export default function Results() {
                 &times;
               </button>
             </div>
-
-            {/* 2x2 Donut Ring Grid */}
-            <div className="grid grid-cols-2 gap-5 mb-5">
-              {([
-                { key: "activity",      label: "Activity",      cssColor: "#3b82f6", textColor: "text-cat-activity" },
-                { key: "skillSignals",  label: "Skill Signals", cssColor: "#a855f7", textColor: "text-cat-skills"   },
-                { key: "growth",        label: "Growth",        cssColor: "#22c55e", textColor: "text-cat-growth"   },
-                { key: "collaboration", label: "Collaboration", cssColor: "#eab308", textColor: "text-cat-collab"  },
-              ]).map(({ key, label, cssColor, textColor }) => {
-                const cat = analysis.categoryScores[key];
-                if (!cat) return null;
-                const size = 88;
-                const strokeW = 7;
-                const r = (size - strokeW) / 2;
-                const circ = 2 * Math.PI * r;
-                const pct = cat.score / 100;
-                const offset = circ * (1 - pct);
-                const tierLabel = cat.score >= 80 ? "Excellent" : cat.score >= 60 ? "Good" : cat.score >= 40 ? "Fair" : "Needs Work";
-                const tierColor = cat.score >= 80 ? "text-green-400" : cat.score >= 60 ? "text-yellow-400" : cat.score >= 40 ? "text-orange-400" : "text-red-400";
-                return (
-                  <div key={key} className="bg-background rounded-lg border border-border p-4 flex flex-col items-center text-center">
-                    {/* Donut ring */}
-                    <div className="relative w-20 h-20 mb-2">
-                      <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full -rotate-90">
-                        <circle cx={size/2} cy={size/2} r={r} fill="none" className="stroke-track" strokeWidth={strokeW} />
-                        <circle
-                          cx={size/2} cy={size/2} r={r}
-                          fill="none"
-                          strokeWidth={strokeW}
-                          strokeLinecap="round"
-                          strokeDasharray={circ}
-                          strokeDashoffset={offset}
-                          className="transition-all duration-700"
-                          style={{ stroke: cssColor }}
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className={`text-lg font-bold ${textColor}`}>{cat.score}</span>
-                      </div>
-                    </div>
-                    {/* Label */}
-                    <p className="text-sm font-semibold text-foreground mb-0.5">{label}</p>
-                    <p className="text-[10px] text-muted-foreground mb-1">{cat.weight}% weight</p>
-                    <span className={`text-[10px] font-semibold ${tierColor} px-2 py-0.5 rounded-full bg-surface`}>{tierLabel}</span>
-                    {cat.notes && (
-                      <p className="text-[10px] text-muted-foreground mt-2 leading-tight">{cat.notes}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Overall Score Summary */}
-            <div className="bg-background rounded-lg border border-border px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {(() => {
-                  const size = 48;
-                  const strokeW = 4;
-                  const r = (size - strokeW) / 2;
-                  const circ = 2 * Math.PI * r;
-                  const pct = analysis.cookedLevel / 10;
-                  const offset = circ * (1 - pct);
-                  const ringColor =
-                    analysis.cookedLevel >= 9 ? '#22c55e' :
-                    analysis.cookedLevel >= 7 ? '#eab308' :
-                    analysis.cookedLevel >= 5 ? '#f97316' :
-                    analysis.cookedLevel >= 3 ? '#ef4444' : '#dc2626';
-                  return (
-                    <div className="relative w-10 h-10 shrink-0">
-                      <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full -rotate-90">
-                        <circle cx={size/2} cy={size/2} r={r} fill="none" className="stroke-track" strokeWidth={strokeW} />
-                        <circle cx={size/2} cy={size/2} r={r} fill="none" strokeWidth={strokeW} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} style={{ stroke: ringColor }} />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-sm font-bold text-foreground">{analysis.cookedLevel}</span>
-                      </div>
-                    </div>
-                  );
-                })()}
-                <div>
-                  <p className="text-xs text-muted-foreground">Weighted Total</p>
-                  <p className={`text-sm font-bold ${getCookedColor(analysis.cookedLevel)}`}>{analysis.levelName}</p>
-                </div>
-              </div>
-              <span className={`text-lg font-bold ${getCookedColor(analysis.cookedLevel)}`}>
-                {analysis.cookedLevel}/10
-              </span>
-            </div>
+            {renderBreakdown()}
           </div>
         </div>
       )}
 
-      {/* GitHub Statistics Popup */}
+      {/* GitHub Statistics Popup — full screen */}
       {statsPopupOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => setStatsPopupOpen(false)}
-          />
-          <div className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col">
-            {/* Popup Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+        <div className="fixed inset-0 z-50 bg-card flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-8 py-5 border-b border-border shrink-0">
               <div>
-                <h3 className="text-base text-foreground">GitHub Statistics</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Every metric fed to the AI to generate your analysis</p>
+                <h3 className="text-xl font-semibold text-foreground">GitHub Statistics</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">Every metric fed to the AI to generate your analysis</p>
               </div>
               <button
                 onClick={() => setStatsPopupOpen(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors text-xl leading-none"
+                className="text-muted-foreground hover:text-foreground transition-colors text-2xl leading-none"
               >
                 &times;
               </button>
             </div>
 
             {/* Scrollable content */}
-            <div className="overflow-y-auto px-6 py-4 space-y-5">
+            <div className="overflow-y-auto px-8 py-8 space-y-10 w-full mx-auto">
+
+              {/* Score Breakdown — reuses metric popup content */}
+              {analysis.categoryScores && (
+                <div>
+                  <h4 className="text-base font-semibold text-foreground mb-4">Score Breakdown</h4>
+                  {renderBreakdown()}
+                </div>
+              )}
 
               {/* Activity */}
               <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2 h-2 rounded-full bg-cat-activity shrink-0" />
-                  <h4 className="text-sm font-semibold text-foreground">Activity <span className="font-normal text-muted-foreground">(40% of score)</span></h4>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-2.5 h-2.5 rounded-full bg-cat-activity shrink-0" />
+                  <h4 className="text-base font-semibold text-foreground">Activity <span className="font-normal text-muted-foreground">(40% of score)</span></h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
                     { label: "Commits (365d)", value: githubData.commitsLast365, desc: "Commit contributions this year" },
                     { label: "Commits (90d)", value: githubData.commitsLast90, desc: "Contributions in the last 90 days" },
@@ -1160,10 +1199,10 @@ export default function Results() {
                     { label: "Current Streak", value: `${githubData.streak}d`, desc: "Consecutive days with contributions" },
                     { label: "Total Contributions", value: githubData.totalContributions, desc: "All GitHub contribution events this year" },
                   ].map((s, i) => (
-                    <div key={i} className="bg-background border border-border rounded-lg px-3 py-2">
-                      <p className="text-[10px] text-muted-foreground mb-0.5">{s.label}</p>
-                      <p className="text-sm font-bold text-foreground">{s.value}</p>
-                      <p className="text-[10px] text-muted-foreground/60 mt-0.5 leading-tight">{s.desc}</p>
+                    <div key={i} className="bg-background border border-border rounded-lg px-4 py-3">
+                      <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
+                      <p className="text-base font-bold text-foreground">{s.value}</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1 leading-snug">{s.desc}</p>
                     </div>
                   ))}
                 </div>
@@ -1171,46 +1210,46 @@ export default function Results() {
 
               {/* Skill Signals */}
               <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2 h-2 rounded-full bg-cat-skills shrink-0" />
-                  <h4 className="text-sm font-semibold text-foreground">Skill Signals <span className="font-normal text-muted-foreground">(30% of score)</span></h4>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-2.5 h-2.5 rounded-full bg-cat-skills shrink-0" />
+                  <h4 className="text-base font-semibold text-foreground">Skill Signals <span className="font-normal text-muted-foreground">(30% of score)</span></h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
                   {[
                     { label: "Language Count", value: githubData.languageCount, desc: "Unique languages across all repos" },
                     { label: "Top Lang Dominance", value: `${githubData.topLanguageDominancePct}%`, desc: "% of codebase bytes in your #1 language" },
                     { label: "Total Language Bytes", value: githubData.totalLanguageBytes?.toLocaleString(), desc: "Total bytes of code across all repos" },
                   ].map((s, i) => (
-                    <div key={i} className="bg-background border border-border rounded-lg px-3 py-2">
-                      <p className="text-[10px] text-muted-foreground mb-0.5">{s.label}</p>
-                      <p className="text-sm font-bold text-foreground">{s.value}</p>
-                      <p className="text-[10px] text-muted-foreground/60 mt-0.5 leading-tight">{s.desc}</p>
+                    <div key={i} className="bg-background border border-border rounded-lg px-4 py-3">
+                      <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
+                      <p className="text-base font-bold text-foreground">{s.value}</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1 leading-snug">{s.desc}</p>
                     </div>
                   ))}
                 </div>
                 {githubData.languages?.length > 0 && (
-                  <div className="bg-background border border-border rounded-lg px-3 py-2 mb-2">
-                    <p className="text-[10px] text-muted-foreground mb-1">Top Languages (by repo count)</p>
-                    <div className="flex flex-wrap gap-1.5">
+                  <div className="bg-background border border-border rounded-lg px-4 py-3 mb-3">
+                    <p className="text-xs text-muted-foreground mb-2">Top Languages (by repo count)</p>
+                    <div className="flex flex-wrap gap-2">
                       {githubData.languages.map((lang, i) => (
-                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-surface border border-border text-muted-foreground">{lang}</span>
+                        <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-surface border border-border text-muted-foreground">{lang}</span>
                       ))}
                     </div>
                   </div>
                 )}
                 {githubData.categoryPercentages && Object.keys(githubData.categoryPercentages).length > 0 && (
-                  <div className="bg-background border border-border rounded-lg px-3 py-2">
-                    <p className="text-[10px] text-muted-foreground mb-2">Tech Domain Breakdown (% of codebase)</p>
-                    <div className="space-y-1.5">
+                  <div className="bg-background border border-border rounded-lg px-4 py-3">
+                    <p className="text-xs text-muted-foreground mb-3">Tech Domain Breakdown (% of codebase)</p>
+                    <div className="space-y-2">
                       {Object.entries(githubData.categoryPercentages)
                         .sort((a, b) => b[1] - a[1])
                         .map(([cat, pct], i) => (
-                          <div key={i} className="flex items-center gap-2">
-                            <span className="text-[10px] text-muted-foreground w-20 capitalize shrink-0">{cat}</span>
-                            <div className="flex-1 h-1 bg-track rounded-full overflow-hidden">
+                          <div key={i} className="flex items-center gap-3">
+                            <span className="text-xs text-muted-foreground w-24 capitalize shrink-0">{cat}</span>
+                            <div className="flex-1 h-1.5 bg-track rounded-full overflow-hidden">
                               <div className="h-full bg-cat-skills/60 rounded-full" style={{ width: `${pct}%` }} />
                             </div>
-                            <span className="text-[10px] text-foreground w-8 text-right shrink-0">{pct}%</span>
+                            <span className="text-xs text-foreground w-10 text-right shrink-0">{pct}%</span>
                           </div>
                         ))}
                     </div>
@@ -1220,25 +1259,25 @@ export default function Results() {
 
               {/* Growth */}
               <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2 h-2 rounded-full bg-cat-growth shrink-0" />
-                  <h4 className="text-sm font-semibold text-foreground">Growth <span className="font-normal text-muted-foreground">(15% of score)</span></h4>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-2.5 h-2.5 rounded-full bg-cat-growth shrink-0" />
+                  <h4 className="text-base font-semibold text-foreground">Growth <span className="font-normal text-muted-foreground">(15% of score)</span></h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
                     { label: "Velocity Trend", value: `${githubData.commitVelocityTrend}×`, desc: "Commits this year ÷ last year — >1 accelerating" },
                     { label: "Momentum Ratio", value: githubData.activityMomentumRatio, desc: "(Last 90d × 4) ÷ last 365d — >1 ramping up" },
                     { label: "Domain Diversity Δ", value: githubData.domainDiversityChange > 0 ? `+${githubData.domainDiversityChange}` : githubData.domainDiversityChange, desc: "New tech domains explored vs prior year" },
                   ].map((s, i) => (
-                    <div key={i} className="bg-background border border-border rounded-lg px-3 py-2">
-                      <p className="text-[10px] text-muted-foreground mb-0.5">{s.label}</p>
-                      <p className={`text-sm font-bold ${
+                    <div key={i} className="bg-background border border-border rounded-lg px-4 py-3">
+                      <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
+                      <p className={`text-base font-bold ${
                         s.label === 'Velocity Trend' ? (githubData.commitVelocityTrend >= 1 ? 'text-green-400' : 'text-red-400') :
                         s.label === 'Momentum Ratio' ? (githubData.activityMomentumRatio >= 1 ? 'text-green-400' : 'text-orange-400') :
                         s.label === 'Domain Diversity Δ' ? (githubData.domainDiversityChange > 0 ? 'text-green-400' : githubData.domainDiversityChange < 0 ? 'text-red-400' : 'text-foreground') :
                         'text-foreground'
                       }`}>{s.value}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{s.desc}</p>
+                      <p className="text-xs text-muted-foreground mt-1 leading-snug">{s.desc}</p>
                     </div>
                   ))}
                 </div>
@@ -1246,11 +1285,11 @@ export default function Results() {
 
               {/* Collaboration */}
               <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2 h-2 rounded-full bg-cat-collab shrink-0" />
-                  <h4 className="text-sm font-semibold text-foreground">Collaboration <span className="font-normal text-muted-foreground">(15% of score)</span></h4>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-2.5 h-2.5 rounded-full bg-cat-collab shrink-0" />
+                  <h4 className="text-base font-semibold text-foreground">Collaboration <span className="font-normal text-muted-foreground">(15% of score)</span></h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
                     { label: "Total PRs", value: githubData.totalPRs, desc: "All pull requests ever opened" },
                     { label: "Merged PRs", value: githubData.mergedPRs, desc: "Pull requests that were merged" },
@@ -1258,10 +1297,10 @@ export default function Results() {
                     { label: "Closed Issues", value: githubData.closedIssues, desc: "Issues resolved" },
                     { label: "Issues Closed Ratio", value: githubData.issuesClosedRatio, desc: "Closed ÷ (open + 1) — higher is better" },
                   ].map((s, i) => (
-                    <div key={i} className="bg-background border border-border rounded-lg px-3 py-2">
-                      <p className="text-[10px] text-muted-foreground mb-0.5">{s.label}</p>
-                      <p className="text-sm font-bold text-foreground">{s.value}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{s.desc}</p>
+                    <div key={i} className="bg-background border border-border rounded-lg px-4 py-3">
+                      <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
+                      <p className="text-base font-bold text-foreground">{s.value}</p>
+                      <p className="text-xs text-muted-foreground mt-1 leading-snug">{s.desc}</p>
                     </div>
                   ))}
                 </div>
@@ -1269,29 +1308,28 @@ export default function Results() {
 
               {/* Repository Overview */}
               <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2 h-2 rounded-full bg-muted-foreground shrink-0" />
-                  <h4 className="text-sm font-semibold text-foreground">Repository Overview</h4>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-2.5 h-2.5 rounded-full bg-muted-foreground shrink-0" />
+                  <h4 className="text-base font-semibold text-foreground">Repository Overview</h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
                     { label: "Total Repos", value: githubData.totalRepos, desc: "Public repos owned" },
                     { label: "Total Stars", value: githubData.totalStars, desc: "Stars received across all repos" },
                     { label: "Total Forks", value: githubData.totalForks, desc: "Times your repos were forked" },
                     { label: "Commits in Repos", value: githubData.totalCommitsInRepos?.toLocaleString(), desc: "Total commits across all repo histories" },
                   ].map((s, i) => (
-                    <div key={i} className="bg-background border border-border rounded-lg px-3 py-2">
-                      <p className="text-[10px] text-muted-foreground mb-0.5">{s.label}</p>
-                      <p className="text-sm font-bold text-foreground">{s.value}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{s.desc}</p>
+                    <div key={i} className="bg-background border border-border rounded-lg px-4 py-3">
+                      <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
+                      <p className="text-base font-bold text-foreground">{s.value}</p>
+                      <p className="text-xs text-muted-foreground mt-1 leading-snug">{s.desc}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <p className="text-[10px] text-muted-foreground text-center pb-1">All data sourced from the GitHub GraphQL API at time of analysis.</p>
+              <p className="text-xs text-muted-foreground text-center pb-2">All data sourced from the GitHub GraphQL API at time of analysis.</p>
             </div>
-          </div>
         </div>
       )}
 

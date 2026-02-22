@@ -289,7 +289,6 @@ export default function Pricing() {
                                         ${plan.ctaStyle}
                                     `}
                                 >
-                                    <Github className="w-4 h-4" />
                                     {plan.cta}
                                     <ArrowRight className={`w-4 h-4 transition-transform duration-200 ${isHovered ? 'translate-x-1' : ''}`} />
                                 </button>
