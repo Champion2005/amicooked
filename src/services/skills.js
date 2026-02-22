@@ -7,8 +7,8 @@
  * lives in exactly one place.
  */
 
-import { callOpenRouter, formatGitHubMetrics, analyzeCookedLevel, RecommendedProjects } from './openrouter';
-import { getAgentInstructions } from '@/config/agent-instructions';
+import { callOpenRouter, formatGitHubMetrics, analyzeCookedLevel, getRecommendedProjects } from './openrouter';
+import { getChatInstructions, getAnalysisModeInstructions } from '@/config/agent-instructions';
 
 /**
  * Skill: Analyze GitHub Profile
@@ -32,7 +32,7 @@ const recommendProjectsSkill = {
   description: 'Generate tailored project recommendations to address skill gaps',
 
   async execute({ githubData, userProfile }) {
-    return await RecommendedProjects(githubData, userProfile);
+    return await getRecommendedProjects(githubData, userProfile);
   }
 };
 
@@ -52,34 +52,26 @@ const compareProgressSkill = {
       };
     }
 
-    const systemPrompt = `${getAgentInstructions()}
+    const systemPrompt = getChatInstructions() + getAnalysisModeInstructions('PROGRESS_COMPARISON');
 
-# PROGRESS COMPARISON MODE
-You are comparing the user's current state to their previous analysis. Focus on:
-- What improved (be encouraging!)
-- What regressed or stagnated (be constructive)
-- Whether they followed previous recommendations
-- New gaps that emerged
-- Adjusted recommendations based on progress`;
+    const prompt = `Compare this user's current metrics to their previous analysis.
 
-    const prompt = `Compare this user's progress:
-
-## PREVIOUS ANALYSIS (${previousAnalysis.timestamp || 'Recent'})
-- Cooked Level: ${previousAnalysis.cookedLevel}/10 (${previousAnalysis.levelName})
+## PREVIOUS (${previousAnalysis.timestamp || 'Unknown date'})
+- Level: ${previousAnalysis.cookedLevel}/10 (${previousAnalysis.levelName})
 - Summary: ${previousAnalysis.summary}
-- Recommendations Given: ${JSON.stringify(previousAnalysis.recommendations)}
+- Recommendations: ${JSON.stringify(previousAnalysis.recommendations)}
 
-## CURRENT FULL METRICS
+## CURRENT
 ${formatGitHubMetrics(githubData, userProfile)}
 
-Provide a progress report in JSON format:
+Return JSON:
 {
-  "cookedLevel": <new score 0-10>,
+  "cookedLevel": <0-10>,
   "levelChange": <"positive" | "negative" | "neutral">,
-  "improvements": ["<specific improvement 1>", "<improvement 2>"],
+  "improvements": ["<improvement 1>", "<improvement 2>"],
   "regressions": ["<regression 1>"],
-  "summary": "<2-3 sentences on overall progress>",
-  "nextSteps": ["<updated recommendation 1>", "<recommendation 2>", "<recommendation 3>"]
+  "summary": "<2-3 sentences on progress>",
+  "nextSteps": ["<recommendation 1>", "<recommendation 2>", "<recommendation 3>"]
 }`;
 
     try {
@@ -106,21 +98,13 @@ const generateLearningPathSkill = {
   description: 'Create a structured learning roadmap based on user goals and current skills',
   
   async execute({ githubData, userProfile }) {
-    const systemPrompt = `${getAgentInstructions()}
+    const systemPrompt = getChatInstructions() + getAnalysisModeInstructions('LEARNING_PATH');
 
-# LEARNING PATH GENERATION
-Create a structured 3-6 month learning roadmap. Break it into phases:
-- Phase 1 (Month 1-2): Foundational skills or immediate gaps
-- Phase 2 (Month 3-4): Intermediate projects and depth
-- Phase 3 (Month 5-6): Advanced skills and portfolio polish
-
-Each phase should have 2-3 milestones with clear success criteria.`;
-
-    const prompt = `Create a learning roadmap for this user based on their full profile and GitHub metrics:
+    const prompt = `Create a personalized learning roadmap for this user.
 
 ${formatGitHubMetrics(githubData, userProfile)}
 
-Generate a 3-phase learning path in JSON:
+Return JSON:
 {
   "targetRole": "<role they're working toward>",
   "estimatedTimeframe": "<e.g., 3-6 months>",
@@ -128,18 +112,18 @@ Generate a 3-phase learning path in JSON:
     {
       "phase": 1,
       "duration": "<e.g., 8 weeks>",
-      "focus": "<theme of this phase>",
+      "focus": "<phase theme>",
       "milestones": [
         {
-          "title": "<milestone name>",
+          "title": "<milestone>",
           "skills": ["<skill 1>", "<skill 2>"],
-          "deliverable": "<what to build/achieve>",
+          "deliverable": "<what to build>",
           "successCriteria": "<how to know it's done>"
         }
       ]
     }
   ],
-  "resources": ["<recommended learning resource 1>", "<resource 2>"]
+  "resources": ["<resource 1>", "<resource 2>"]
 }`;
 
     try {
@@ -158,45 +142,6 @@ Generate a 3-phase learning path in JSON:
 };
 
 /**
- * Skill: Answer Specific Question
- * Provides context-aware answers to user questions about their profile
- */
-const answerQuestionSkill = {
-  name: 'answerQuestion',
-  description: 'Answer specific questions about profile, recommendations, or career advice',
-  
-  async execute({ question, githubData, userProfile, previousAnalysis }) {
-    const systemPrompt = `${getAgentInstructions()}
-
-# QUESTION ANSWERING MODE
-Answer the user's specific question using their profile context. Be:
-- Concise but complete
-- Data-driven (reference their actual metrics)
-- Actionable (give next steps if relevant)
-- Consistent with any previous analysis or recommendations`;
-
-    let contextInfo = '';
-    if (previousAnalysis) {
-      contextInfo = `\n## PREVIOUS ANALYSIS\n- Cooked Level: ${previousAnalysis.cookedLevel}/10\n- Key Recommendations: ${JSON.stringify(previousAnalysis.recommendations)}\n`;
-    }
-
-    const prompt = `User asks: "${question}"
-
-${formatGitHubMetrics(githubData, userProfile)}
-${contextInfo}
-Answer their question directly, referencing their actual metrics where relevant.`;
-
-    try {
-      const response = await callOpenRouter(prompt, systemPrompt);
-      return { answer: response };
-    } catch (error) {
-      console.error('Error in answerQuestion skill:', error);
-      throw error;
-    }
-  }
-};
-
-/**
  * Export all available skills
  */
 export const skills = {
@@ -204,7 +149,6 @@ export const skills = {
   recommendProjects: recommendProjectsSkill,
   compareProgress: compareProgressSkill,
   generateLearningPath: generateLearningPathSkill,
-  answerQuestion: answerQuestionSkill
 };
 
 /**

@@ -121,7 +121,7 @@ export async function getSavedProject(userId, projectId) {
 }
 
 // ── helpers ──────────────────────────────────────────────
-function slugify(name) {
+export function slugify(name) {
   return (name || 'project')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')

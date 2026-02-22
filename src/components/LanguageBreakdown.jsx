@@ -49,9 +49,9 @@ export default function LanguageBreakdown({
 
   if (!languageBreakdown || languageBreakdown.length === 0) {
     return (
-      <Card className="bg-[#0d1117] border-[#30363d]">
+      <Card className="bg-background border-border">
         <CardContent className="p-6">
-          <p className="text-gray-500 text-sm">No language data available</p>
+          <p className="text-muted-foreground text-sm">No language data available</p>
         </CardContent>
       </Card>
     );
@@ -62,7 +62,7 @@ export default function LanguageBreakdown({
     : languageBreakdown.slice(0, MAX_VISIBLE);
 
   return (
-    <Card className="bg-[#0d1117] border-[#30363d]">
+    <Card className="bg-background border-border">
       <CardContent className="p-6 space-y-3">
         {displayedLanguages.map((lang) => (
           <div key={lang.name} className="space-y-1">
@@ -73,24 +73,24 @@ export default function LanguageBreakdown({
                   className="w-3 h-3 rounded-full inline-block flex-shrink-0"
                   style={{ backgroundColor: lang.color }}
                 />
-                <span className="text-sm text-white font-medium">
+                <span className="text-sm text-foreground font-medium">
                   {lang.name}
                 </span>
                 {lang.category && (
                   <span
-                    className={`bg-[#1c2128] border border-[#30363d] text-[10px] px-1.5 py-0.5 rounded-full ${categoryColors[lang.category] || "text-gray-400"}`}
+                    className={`bg-surface border border-border text-[10px] px-1.5 py-0.5 rounded-full ${categoryColors[lang.category] || "text-muted-foreground"}`}
                   >
                     {lang.category}
                   </span>
                 )}
               </div>
-              <span className="text-xs text-gray-400 tabular-nums">
+              <span className="text-xs text-muted-foreground tabular-nums">
                 {lang.percentage.toFixed(1)}%
               </span>
             </div>
 
             {/* Progress bar */}
-            <div className="w-full h-2 bg-[#1f2831] rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-track rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{
@@ -108,7 +108,7 @@ export default function LanguageBreakdown({
                   : "max-h-0 opacity-0"
               }`}
             >
-              <div className="flex items-center gap-4 pt-1 pl-5 text-xs text-gray-500">
+              <div className="flex items-center gap-4 pt-1 pl-5 text-xs text-muted-foreground">
                 <span>{lang.repoCount} repos</span>
                 <span>{timeAgo(lang.lastUsed)}</span>
                 <span>{formatBytes(lang.bytes)}</span>
@@ -121,7 +121,7 @@ export default function LanguageBreakdown({
         {languageBreakdown.length > MAX_VISIBLE && (
           <button
             onClick={() => setShowMore(!showMore)}
-            className="flex items-center gap-1.5 text-sm font-semibold text-[#58a6ff] hover:text-[#79c0ff] transition-colors cursor-pointer pt-1"
+            className="flex items-center gap-1.5 text-sm font-semibold text-accent hover:text-accent-hover transition-colors cursor-pointer pt-1"
           >
             {showMore ? "See less" : `See more (${languageBreakdown.length - MAX_VISIBLE})`}
             <ChevronDown
@@ -132,8 +132,8 @@ export default function LanguageBreakdown({
 
         {/* AI Notes */}
         {languageInsight && (
-          <div className="border-t border-[#30363d] pt-3 mt-3">
-            <p className="text-xs text-gray-500">
+          <div className="border-t border-border pt-3 mt-3">
+            <p className="text-xs text-muted-foreground">
               AI Notes: {languageInsight}
             </p>
           </div>

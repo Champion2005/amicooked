@@ -4,7 +4,8 @@
  */
 
 import { callOpenRouter, formatGitHubMetrics } from './openrouter';
-import { getAgentInstructions, getAnalysisModeInstructions } from '@/config/agent-instructions';
+import { getChatInstructions, getAnalysisModeInstructions } from '@/config/agent-instructions';
+import { buildProjectSystemPrompt } from './projectChat';
 import { getChat, addMessage } from './chat';
 import { skills } from './skills';
 
@@ -77,8 +78,19 @@ class AgentMemory {
     let ctx = formatGitHubMetrics(githubData, userProfile);
 
     if (analysis) {
+      // Build a human-readable explanation of the level so the AI can't confuse the ordering
+      const levelOrder = { Burnt: 1, 'Well-Done': 2, Cooked: 3, Toasted: 4, Cooking: 5 };
+      const levelDescriptions = {
+        Cooking: 'top tier (9-10/10) — highly competitive',
+        Toasted: 'above average (7-8/10) — solid with some gaps',
+        Cooked: 'below average (5-6/10) — needs focused effort',
+        'Well-Done': 'significantly below average (3-4/10) — not yet competitive',
+        Burnt: 'near-dormant (1-2/10) — essentially no activity',
+      };
+      const levelDesc = levelDescriptions[analysis.levelName] || '';
       ctx += `\n\n## CURRENT ANALYSIS RESULTS (pre-computed — do not re-score)`;
-      ctx += `\n- Cooked Level: ${analysis.cookedLevel}/10 (${analysis.levelName})`;
+      ctx += `\n- Cooked Level: ${analysis.cookedLevel}/10 — Level Name: "${analysis.levelName}" (${levelDesc})`;
+      ctx += `\n- Scale reminder: Burnt < Well-Done < Cooked < Toasted < Cooking (higher = better)`;
       ctx += `\n- Summary: ${analysis.summary}`;
       if (analysis.categoryScores) {
         ctx += `\n- Category Scores:`;
@@ -157,35 +169,6 @@ export class AnalysisAgent {
   }
 
   /**
-   * Detect if user message requires skill execution
-   * Returns array of skill names to execute
-   */
-  detectRequiredSkills(userMessage) {
-    const message = userMessage.toLowerCase();
-    const requiredSkills = [];
-
-    // Simple keyword-based skill detection
-    // In production, you might use the LLM to determine this
-    if (message.includes('analyze') || message.includes('assessment') || message.includes('cooked level')) {
-      requiredSkills.push('analyzeProfile');
-    }
-    
-    if (message.includes('project') || message.includes('recommend')) {
-      requiredSkills.push('recommendProjects');
-    }
-    
-    if (message.includes('compare') || message.includes('progress')) {
-      requiredSkills.push('compareProgress');
-    }
-
-    if (message.includes('learning path') || message.includes('roadmap')) {
-      requiredSkills.push('generateLearningPath');
-    }
-
-    return requiredSkills;
-  }
-
-  /**
    * Execute a skill and return the result
    */
   async executeSkill(skillName, context) {
@@ -196,7 +179,6 @@ export class AnalysisAgent {
     }
 
     try {
-      console.log(`Executing skill: ${skillName}`);
       const result = await skill.execute(context);
       return result;
     } catch (error) {
@@ -206,76 +188,78 @@ export class AnalysisAgent {
   }
 
   /**
-   * Main agent loop: process user message with memory and skills
+   * Main agent loop: process user message with context and memory.
+   * Uses chat instructions (no scoring schema) — the LLM gets a clean
+   * conversational prompt with pre-computed analysis already in context.
    */
   async processMessage(userMessage, mode = 'QUICK_CHAT') {
-    // Add user message to memory
     this.memory.addMessage('user', userMessage);
 
-    // Detect required skills
-    const requiredSkills = this.detectRequiredSkills(userMessage);
+    // Chat instructions — no scoring schema or JSON format requirements
+    const systemPrompt = getChatInstructions() + getAnalysisModeInstructions(mode);
 
-    // Execute skills and collect results
-    const skillResults = [];
-    if (requiredSkills.length > 0) {
-      const context = {
-        githubData: this.memory.userContext?.githubData,
-        userProfile: this.memory.userContext?.userProfile,
-        previousAnalysis: this.memory.previousAnalysis
-      };
-
-      for (const skillName of requiredSkills) {
-        const result = await this.executeSkill(skillName, context);
-        if (result) {
-          skillResults.push({
-            skill: skillName,
-            result
-          });
-        }
-      }
-    }
-
-    // Build comprehensive prompt with instructions, memory, and skill results
-    const systemPrompt = getAgentInstructions() + getAnalysisModeInstructions(mode);
-    
     let prompt = '';
-    
-    // Add context if available
+
+    // Include pre-computed analysis + user context
     if (this.memory.userContext) {
       prompt += this.memory.getFormattedContext() + '\n\n';
     }
 
-    // Add previous analysis if in progress check mode
-    if (mode === 'PROGRESS_CHECK' && this.memory.previousAnalysis) {
+    // Include previous analysis for comparison modes
+    if (mode === 'PROGRESS_COMPARISON' && this.memory.previousAnalysis) {
       prompt += `# PREVIOUS ANALYSIS\n${JSON.stringify(this.memory.previousAnalysis, null, 2)}\n\n`;
     }
 
-    // Add conversation history
+    // Include conversation history for continuity
     if (this.memory.conversationHistory.length > 1) {
       prompt += `# CONVERSATION HISTORY\n${this.memory.getFormattedHistory()}\n\n`;
     }
 
-    // Add skill results if any
-    if (skillResults.length > 0) {
-      prompt += '# SKILL EXECUTION RESULTS\n';
-      skillResults.forEach(({ skill, result }) => {
-        prompt += `## ${skill}\n${JSON.stringify(result, null, 2)}\n\n`;
-      });
-    }
+    prompt += `# USER MESSAGE\n${userMessage}\n\nRespond based on the context above. Be specific to their actual metrics and give actionable advice.`;
 
-    // Add current user message
-    prompt += `# CURRENT USER MESSAGE\n${userMessage}\n\n`;
-    prompt += 'Respond conversationally using the context and conversation history above. Reference the pre-computed Cooked Level and category scores — do not re-score the user. Be helpful, specific to their actual metrics, and give actionable advice.';
-
-    // Call LLM
     const response = await callOpenRouter(prompt, systemPrompt);
-
-    // Add assistant response to memory
     this.memory.addMessage('assistant', response);
 
     return {
       response,
-      skillsUsed: requiredSkills,
+      memoryStatus: this.memory.getSummary()
+    };
+  }
+
+  /**
+   * Process a message in the context of a specific project.
+   * Uses buildProjectSystemPrompt (which already includes chat instructions +
+   * project details + user/GitHub context) and the agent's conversation memory
+   * for multi-turn continuity.
+   *
+   * @param {string} userMessage - The user's message
+   * @param {Object} project - The project being discussed
+   * @returns {{ response: string, memoryStatus: Object }}
+   */
+  async processProjectMessage(userMessage, project) {
+    this.memory.addMessage('user', userMessage);
+
+    const systemPrompt = buildProjectSystemPrompt(
+      project,
+      this.memory.userContext?.userProfile,
+      this.memory.userContext?.githubData,
+      this.memory.userContext?.analysis
+    );
+
+    let prompt = '';
+
+    // Include conversation history for continuity
+    if (this.memory.conversationHistory.length > 1) {
+      prompt += `# CONVERSATION HISTORY\n${this.memory.getFormattedHistory()}\n\n`;
+    }
+
+    prompt += `# USER MESSAGE\n${userMessage}\n\nRespond based on the project context above. Be specific and actionable.`;
+
+    const response = await callOpenRouter(prompt, systemPrompt);
+    this.memory.addMessage('assistant', response);
+
+    return {
+      response,
       memoryStatus: this.memory.getSummary()
     };
   }

@@ -1,13 +1,17 @@
 // OpenRouter API configuration
 import { formatEducation } from "@/utils/formatEducation";
-import { getAgentInstructions } from "@/config/agent-instructions";
-import { getAnalysisModeInstructions } from "../config/agent-instructions";
+import { getAgentInstructions, getChatInstructions, getAnalysisModeInstructions } from "@/config/agent-instructions";
 
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
 
 // ─── Deterministic post-processing ───────────────────────────────────────────
 
-const CATEGORY_WEIGHTS = { activity: 40, skillSignals: 30, growth: 15, collaboration: 15 };
+const CATEGORY_WEIGHTS = {
+  activity: 40,
+  skillSignals: 30,
+  growth: 15,
+  collaboration: 15,
+};
 
 /** Normalise AI key aliases (e.g. skill_signals → skillSignals) */
 const KEY_ALIASES = {
@@ -47,8 +51,7 @@ function missingCategories(rawCats) {
 function renameKeys(rawCats) {
   const out = {};
   for (const [k, v] of Object.entries(rawCats || {})) {
-    const canonical =
-      KEY_ALIASES[k.toLowerCase().replace(/[\s_-]/g, "")] || k;
+    const canonical = KEY_ALIASES[k.toLowerCase().replace(/[\s_-]/g, "")] || k;
     out[canonical] = v;
   }
   return out;
@@ -66,23 +69,23 @@ function normalizeAnalysis(raw) {
   const renamed = renameKeys(raw.categoryScores || {});
 
   // Collect the scores that ARE present and valid
-  const presentScores = REQUIRED_CATS
-    .map((key) => renamed[key]?.score)
+  const presentScores = REQUIRED_CATS.map((key) => renamed[key]?.score)
     .filter((s) => typeof s === "number" && !isNaN(s))
     .map((s) => Math.min(100, Math.max(0, Math.round(s))));
 
   // Fallback = mean of present scores, or a neutral 50 if nothing at all came back
   const fallback =
     presentScores.length > 0
-      ? Math.round(presentScores.reduce((a, b) => a + b, 0) / presentScores.length)
+      ? Math.round(
+          presentScores.reduce((a, b) => a + b, 0) / presentScores.length,
+        )
       : 50;
 
   const categories = {};
   for (const [key, weight] of Object.entries(CATEGORY_WEIGHTS)) {
     const cat = renamed[key] || {};
-    const rawScore = typeof cat.score === "number" && !isNaN(cat.score)
-      ? cat.score
-      : fallback;
+    const rawScore =
+      typeof cat.score === "number" && !isNaN(cat.score) ? cat.score : fallback;
     categories[key] = {
       score: Math.min(100, Math.max(0, Math.round(rawScore))),
       weight,
@@ -93,7 +96,7 @@ function normalizeAnalysis(raw) {
   // Derive cookedLevel deterministically: weighted average of 0-100 scores → 0-10
   const weightedAvg = Object.entries(CATEGORY_WEIGHTS).reduce(
     (sum, [key, w]) => sum + categories[key].score * (w / 100),
-    0
+    0,
   );
   const cookedLevel = Math.min(10, Math.max(0, Math.round(weightedAvg / 10)));
   const levelName = deriveLevelName(cookedLevel);
@@ -148,8 +151,20 @@ export function formatGitHubMetrics(githubData, userProfile) {
 - Unique languages: ${githubData.languageCount ?? githubData.languages?.length ?? "N/A"}
 - Top languages: ${githubData.languages?.join(", ") || "Unknown"}
 - Top language dominance: ${githubData.topLanguageDominancePct ?? "N/A"}% of codebase
-- Tech domain breakdown (% codebase): ${githubData.categoryPercentages ? Object.entries(githubData.categoryPercentages).map(([k,v]) => `${k}: ${v}%`).join(", ") : "N/A"}
-- Repos by dominant domain: ${githubData.repoCategoryBreakdown ? Object.entries(githubData.repoCategoryBreakdown).map(([k,v]) => `${k}: ${v}`).join(", ") : "N/A"}
+- Tech domain breakdown (% codebase): ${
+    githubData.categoryPercentages
+      ? Object.entries(githubData.categoryPercentages)
+          .map(([k, v]) => `${k}: ${v}%`)
+          .join(", ")
+      : "N/A"
+  }
+- Repos by dominant domain: ${
+    githubData.repoCategoryBreakdown
+      ? Object.entries(githubData.repoCategoryBreakdown)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ")
+      : "N/A"
+  }
 - Stars received: ${githubData.totalStars}
 - Forks: ${githubData.totalForks}
 
@@ -239,30 +254,26 @@ export async function callOpenRouter(prompt, systemPrompt = "") {
 export async function analyzeCookedLevel(githubData, userProfile) {
   const systemPrompt = getAgentInstructions();
 
-  const prompt = `Analyze this GitHub profile. Score each of the four categories independently on a 0-100 scale using the calibration anchors in your instructions.
+  const prompt = `Analyze this GitHub profile. Score all four categories (0-100) using the calibration anchors in your instructions.
 
 ${formatGitHubMetrics(githubData, userProfile)}
 
-Return ONLY valid JSON matching this exact structure (no cookedLevel, no levelName — the system computes those):
+Return ONLY valid JSON in this format, with no extra text:
 {
-  "summary": "<1-2 medium length sentence honest assessment (less statistics and more plain English)>",
-  "recommendations": [
-    "<specific actionable task 1>",
-    "<specific actionable task 2>",
-    "<specific actionable task 3>"
-  ],
-  "projectsInsight": "<1 sentence insight about the recommended projects and how they will help>",
-  "languageInsight": "<1 sentence insight about their language stack and specialization>",
-  "activityInsight": "<1 sentence insight about their contribution patterns and consistency>",
+  "summary": "<1-2 sentence plain-English assessment>",
+  "recommendations": ["<specific actionable task 1>", "<task 2>", "<task 3>"],
+  "projectsInsight": "<1 sentence on how recommended projects help>",
+  "languageInsight": "<1 sentence on language stack>",
+  "activityInsight": "<1 sentence on contribution patterns>",
   "categoryScores": {
-    "activity": { "score": <integer 0-100>, "notes": "<1 sentence on main driver>" },
-    "skillSignals": { "score": <integer 0-100>, "notes": "<1 sentence on main driver>" },
-    "growth": { "score": <integer 0-100>, "notes": "<1 sentence on main driver>" },
-    "collaboration": { "score": <integer 0-100>, "notes": "<1 sentence on main driver>" }
+    "activity": { "score": <0-100>, "notes": "<1 sentence>" },
+    "skillSignals": { "score": <0-100>, "notes": "<1 sentence>" },
+    "growth": { "score": <0-100>, "notes": "<1 sentence>" },
+    "collaboration": { "score": <0-100>, "notes": "<1 sentence>" }
   }
 }
 
-All four categoryScores keys are REQUIRED. Use the calibration anchors in the system prompt to avoid inflated scores — most real-world profiles score 30-70 per category, not 90+.`;
+All 4 categoryScores REQUIRED.`;
 
   try {
     const response = await callOpenRouter(prompt, systemPrompt);
@@ -274,7 +285,11 @@ All four categoryScores keys are REQUIRED. Use the calibration anchors in the sy
 
       // If some categories didn't come back, do one targeted retry for just those
       if (missing.length > 0) {
-        console.warn("[analysis] Missing categories after first pass:", missing, "— retrying");
+        console.warn(
+          "[analysis] Missing categories after first pass:",
+          missing,
+          "— retrying",
+        );
         const retryPrompt = `The previous analysis was missing scores for: ${missing.join(", ")}.
 
 Using the same GitHub profile data below, return ONLY a JSON object with just the missing categoryScores keys — nothing else.
@@ -305,7 +320,10 @@ ${missing.map((k) => `    "${k}": { "score": <integer 0-100>, "notes": "<1 sente
             }
           }
         } catch (retryErr) {
-          console.warn("[analysis] Retry failed, normalizing with fallback:", retryErr);
+          console.warn(
+            "[analysis] Retry failed, normalizing with fallback:",
+            retryErr,
+          );
         }
       }
 
@@ -325,48 +343,22 @@ ${missing.map((k) => `    "${k}": { "score": <integer 0-100>, "notes": "<1 sente
  * @param {Object} userProfile - User's profile data
  * @returns {Promise<Array>} - Array of project objects with detailed info
  */
-export async function RecommendedProjects(githubData, userProfile) {
-  // Use comprehensive agent instructions for consistent recommendations
-  const systemPrompt = `${getAnalysisModeInstructions("PROJECT_RECOMMENDATION")}\n\n
+export async function getRecommendedProjects(githubData, userProfile) {
+  const systemPrompt = getChatInstructions() + getAnalysisModeInstructions("PROJECT_RECOMMENDATION");
 
-# PROJECT RECOMMENDATION MODE
-Suggest 4 simple project ideas based on the user's profile. Each project should:
-- Target specific skill gaps or growth areas
-- Use technologies the user has little experience with
-- Be scoped appropriately (2-8 weeks completion time)
-- Have clear learning outcomes and career relevance
-- Use 70% familiar tech, 30% new tech
-- Provide a suggested tech stack with 3-6 technologies for each project
-
-Return your answer in this exact JSON array format:
-[
-  {
-    "name": "<project name>",
-    "skill1": "<skill1>",
-    "skill2": "<skill2>",
-    "skill3": "<skill3>",
-    "overview": "<2-3 sentence overview of the project and what the user will learn>",
-    "alignment": "<1-2 sentence explanation of how this aligns with user's interests/goals>",
-    "suggestedStack": [
-      { "name": "<technology name>", "description": "<what it's used for in this project>" },
-      ...
-    ]
-  },
-  ...
-]`;
-
-  const prompt = `Based on this user's full profile and all their GitHub metrics, suggest 3-4 project ideas that target their specific skill gaps.
+  const prompt = `Suggest exactly 4 projects targeting this user's skill gaps.
 
 ${formatGitHubMetrics(githubData, userProfile)}
 
-IMPORTANT: Return ONLY valid JSON. No trailing commas. Use double quotes for all keys and string values. Avoid apostrophes (use "is not" instead of "isn't").`;
+Return ONLY a JSON array of exactly 4 projects matching the format in your instructions. No trailing commas. Double quotes only.`;
 
   try {
     const response = await callOpenRouter(prompt, systemPrompt);
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const result = safeParseJSON(jsonMatch[0]);
-      if (result && Array.isArray(result) && result.length > 0) return result;
+      if (result && Array.isArray(result) && result.length > 0)
+        return result.slice(0, 4);
     }
     throw new Error("Could not parse AI project recommendations");
   } catch (error) {

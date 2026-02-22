@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { auth } from '@/config/firebase';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
+import { useToast } from '@/components/ui/Toast';
 import { getUserProfile, saveUserProfile } from '@/services/userProfile';
 import logo from '@/assets/amicooked_logo.png';
 import { Loader2, User, ArrowLeft } from 'lucide-react';
@@ -13,6 +14,7 @@ export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
 
   // Get return path from location state, default to dashboard
   const returnTo = location.state?.returnTo || '/dashboard';
@@ -71,7 +73,7 @@ export default function Profile() {
     // Validate required fields
     if (!formData.age || !formData.education || !formData.technicalSkills || 
         !formData.experienceYears || !formData.careerGoal || !formData.currentRole) {
-      alert('Please fill in all required fields');
+      toast.error('Please fill in all required fields');
       return;
     }
 
@@ -79,7 +81,7 @@ export default function Profile() {
       setLoading(true);
       // Save raw form data (keep education as the select value e.g. "high_school")
       await saveUserProfile(user.uid, formData);
-      alert(isEditing ? 'Profile updated successfully!' : 'Profile saved successfully!');
+      toast.success(isEditing ? 'Profile updated!' : 'Profile saved!');
       
       // If we have results data, pass it back when navigating to results
       if (resultsData && returnTo === '/results') {
@@ -94,7 +96,7 @@ export default function Profile() {
       }
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert('Failed to save profile. Please try again.');
+      toast.error('Failed to save profile. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -114,23 +116,23 @@ export default function Profile() {
 
   if (profileLoading) {
     return (
-      <div className="min-h-screen bg-[#0d1117] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#58a6ff]" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0d1117] flex items-center justify-center p-4">
-      <Card className="max-w-3xl w-full bg-[#161b22] border-[#30363d]">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="max-w-3xl w-full bg-card border-border">
         <CardHeader className="px-4 sm:px-6">
           <div className="flex justify-center mb-4">
             <img src={logo} alt="AmICooked" className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover" />
           </div>
-          <CardTitle className="text-2xl sm:text-3xl text-center text-white">
+          <CardTitle className="text-2xl sm:text-3xl text-center text-foreground">
             {isEditing ? "Edit Your Profile" : "Complete Your Profile"}
           </CardTitle>
-          <CardDescription className="text-center text-gray-400">
+          <CardDescription className="text-center text-muted-foreground">
             {isEditing 
               ? "Update your information to get better recommendations"
               : "Tell us about yourself so we can provide personalized recommendations"
@@ -142,7 +144,7 @@ export default function Profile() {
           <div className="space-y-4">
             {/* Age */}
             <div className="space-y-2">
-              <label htmlFor="age" className="text-sm font-medium text-gray-300">
+              <label htmlFor="age" className="text-sm font-medium text-foreground">
                 Age <span className="text-red-500">*</span>
               </label>
               <input
@@ -152,7 +154,7 @@ export default function Profile() {
                 min="13"
                 max="100"
                 placeholder="e.g., 21"
-                className="w-full px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
                 value={formData.age}
                 onChange={handleInputChange}
                 disabled={loading}
@@ -161,13 +163,13 @@ export default function Profile() {
 
             {/* Education Level */}
             <div className="space-y-2">
-              <label htmlFor="education" className="text-sm font-medium text-gray-300">
+              <label htmlFor="education" className="text-sm font-medium text-foreground">
                 Education Level <span className="text-red-500">*</span>
               </label>
               <select
                 id="education"
                 name="education"
-                className="w-full px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 value={formData.education}
                 onChange={handleInputChange}
                 disabled={loading}
@@ -187,7 +189,7 @@ export default function Profile() {
 
             {/* Technical Skills */}
             <div className="space-y-2">
-              <label htmlFor="technicalSkills" className="text-sm font-medium text-gray-300">
+              <label htmlFor="technicalSkills" className="text-sm font-medium text-foreground">
                 Technical Skills <span className="text-red-500">*</span>
               </label>
               <textarea
@@ -195,45 +197,45 @@ export default function Profile() {
                 name="technicalSkills"
                 rows="3"
                 placeholder="e.g., JavaScript, React, Python, SQL, Docker, Git"
-                className="w-full px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
+                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 value={formData.technicalSkills}
                 onChange={handleInputChange}
                 disabled={loading}
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 List languages, frameworks, and tools you have experience with
               </p>
             </div>
 
             {/* Technical Interests */}
             <div className="space-y-2">
-              <label htmlFor="technicalInterests" className="text-sm font-medium text-gray-300">
-                Technical Interests <span className="text-gray-500">(Optional)</span>
+              <label htmlFor="technicalInterests" className="text-sm font-medium text-foreground">
+                Technical Interests <span className="text-muted-foreground">(Optional)</span>
               </label>
               <textarea
                 id="technicalInterests"
                 name="technicalInterests"
                 rows="3"
                 placeholder="e.g., Web Development, Machine Learning, Cloud Computing, Mobile Apps"
-                className="w-full px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
+                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 value={formData.technicalInterests}
                 onChange={handleInputChange}
                 disabled={loading}
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Areas of tech you're passionate about or want to explore
               </p>
             </div>
 
             {/* Years of Experience */}
             <div className="space-y-2">
-              <label htmlFor="experienceYears" className="text-sm font-medium text-gray-300">
+              <label htmlFor="experienceYears" className="text-sm font-medium text-foreground">
                 Years of Coding Experience <span className="text-red-500">*</span>
               </label>
               <select
                 id="experienceYears"
                 name="experienceYears"
-                className="w-full px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 value={formData.experienceYears}
                 onChange={handleInputChange}
                 disabled={loading}
@@ -249,7 +251,7 @@ export default function Profile() {
 
             {/* Career Goal */}
             <div className="space-y-2">
-              <label htmlFor="careerGoal" className="text-sm font-medium text-gray-300">
+              <label htmlFor="careerGoal" className="text-sm font-medium text-foreground">
                 Career Goal <span className="text-red-500">*</span>
               </label>
               <input
@@ -257,19 +259,19 @@ export default function Profile() {
                 name="careerGoal"
                 type="text"
                 placeholder="e.g., Full-Stack Developer at FAANG, Startup Founder, Freelance Consultant"
-                className="w-full px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
                 value={formData.careerGoal}
                 onChange={handleInputChange}
                 disabled={loading}
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 What's your dream role or career path?
               </p>
             </div>
 
             {/* Current Role/Status */}
             <div className="space-y-2">
-              <label htmlFor="currentRole" className="text-sm font-medium text-gray-300">
+              <label htmlFor="currentRole" className="text-sm font-medium text-foreground">
                 Current Status <span className="text-red-500">*</span>
               </label>
               <input
@@ -277,7 +279,7 @@ export default function Profile() {
                 name="currentRole"
                 type="text"
                 placeholder="e.g., CS Student, Junior Developer, Career Switcher, Actively Job Hunting"
-                className="w-full px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
                 value={formData.currentRole}
                 onChange={handleInputChange}
                 disabled={loading}
@@ -286,20 +288,20 @@ export default function Profile() {
 
             {/* Hobbies (Optional) */}
             <div className="space-y-2">
-              <label htmlFor="hobbies" className="text-sm font-medium text-gray-300">
-                Hobbies & Interests <span className="text-gray-500">(Optional)</span>
+              <label htmlFor="hobbies" className="text-sm font-medium text-foreground">
+                Hobbies & Interests <span className="text-muted-foreground">(Optional)</span>
               </label>
               <textarea
                 id="hobbies"
                 name="hobbies"
                 rows="2"
                 placeholder="e.g., Gaming, Photography, Writing, Sports"
-                className="w-full px-4 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff] resize-none"
+                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 value={formData.hobbies}
                 onChange={handleInputChange}
                 disabled={loading}
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Helps us suggest projects that align with your interests
               </p>
             </div>
@@ -312,7 +314,7 @@ export default function Profile() {
                 onClick={handleCancel}
                 variant="outline"
                 disabled={loading}
-                className="flex-1 h-11 sm:h-12 text-base sm:text-lg border-[#30363d] text-gray-400 hover:text-white hover:bg-[#1c2128]"
+                className="flex-1 h-11 sm:h-12 text-base sm:text-lg border-border text-muted-foreground hover:text-foreground hover:bg-surface"
                 size="lg"
               >
                 <ArrowLeft className="mr-2 h-5 w-5" />
@@ -322,7 +324,7 @@ export default function Profile() {
             <Button 
               onClick={handleSaveProfile}
               disabled={loading || !formData.age || !formData.education || !formData.technicalSkills || !formData.experienceYears || !formData.careerGoal || !formData.currentRole}
-              className={`h-11 sm:h-12 text-base sm:text-lg bg-[#58a6ff] hover:bg-[#4a9aee] text-white ${!isEditing ? 'w-full' : 'flex-1'}`}
+              className={`h-11 sm:h-12 text-base sm:text-lg bg-primary hover:bg-primary-hover text-foreground ${!isEditing ? 'w-full' : 'flex-1'}`}
               size="lg"
             >
               {loading ? (
