@@ -1,6 +1,6 @@
 // OpenRouter API configuration
 import { formatEducation } from "@/utils/formatEducation";
-import { getAgentInstructions, getChatInstructions, getAnalysisModeInstructions } from "@/config/agent-instructions";
+import { getScoringInstructions, getChatInstructions, getAnalysisModeInstructions } from "@/config/agent-instructions";
 
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
 
@@ -246,55 +246,34 @@ export async function callOpenRouter(prompt, systemPrompt = "") {
 }
 
 /**
- * Generate "Cooked Level" and recommendations based on GitHub data
- * @param {Object} githubData - User's GitHub metrics
- * @param {Object} userProfile - User's profile data (age, education, interests, etc.)
- * @returns {Promise<Object>} - { cookedLevel, summary, recommendations }
+ * Phase 1: Ask the AI for category scores only.
+ * Returns a normalized categoryScores object.
  */
-export async function analyzeCookedLevel(githubData, userProfile) {
-  const systemPrompt = getAgentInstructions();
+async function fetchCategoryScores(githubData, userProfile) {
+  const systemPrompt = getScoringInstructions();
+  const metricsBlock = formatGitHubMetrics(githubData, userProfile);
 
-  const prompt = `Analyze this GitHub profile. Score all four categories (0-100) using the calibration anchors in your instructions.
+  const prompt = `Score all four categories (0-100) for this GitHub profile using the calibration anchors in your instructions.
 
-${formatGitHubMetrics(githubData, userProfile)}
+${metricsBlock}
 
-Return ONLY valid JSON in this format, with no extra text:
-{
-  "summary": "<1-2 sentence plain-English assessment>",
-  "recommendations": ["<specific actionable task 1>", "<task 2>", "<task 3>"],
-  "projectsInsight": "<1 sentence on how recommended projects help>",
-  "languageInsight": "<1 sentence on language stack>",
-  "activityInsight": "<1 sentence on contribution patterns>",
-  "categoryScores": {
-    "activity": { "score": <0-100>, "notes": "<1 sentence>" },
-    "skillSignals": { "score": <0-100>, "notes": "<1 sentence>" },
-    "growth": { "score": <0-100>, "notes": "<1 sentence>" },
-    "collaboration": { "score": <0-100>, "notes": "<1 sentence>" }
-  }
-}
+Return ONLY the JSON object with categoryScores. No extra text.`;
 
-All 4 categoryScores REQUIRED.`;
+  const response = await callOpenRouter(prompt, systemPrompt);
+  const jsonMatch = response.match(/\{[\s\S]*\}/);
+  let parsed = jsonMatch ? safeParseJSON(jsonMatch[0]) : null;
 
-  try {
-    const response = await callOpenRouter(prompt, systemPrompt);
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    let parsed = jsonMatch ? safeParseJSON(jsonMatch[0]) : null;
+  if (!parsed) throw new Error("Phase 1: Could not parse scoring response");
 
-    if (parsed) {
-      const missing = missingCategories(parsed.categoryScores || {});
+  // Retry for any missing categories
+  const missing = missingCategories(parsed.categoryScores || {});
+  if (missing.length > 0) {
+    console.warn("[scoring] Missing categories:", missing, "— retrying");
+    const retryPrompt = `The previous response was missing scores for: ${missing.join(", ")}.
 
-      // If some categories didn't come back, do one targeted retry for just those
-      if (missing.length > 0) {
-        console.warn(
-          "[analysis] Missing categories after first pass:",
-          missing,
-          "— retrying",
-        );
-        const retryPrompt = `The previous analysis was missing scores for: ${missing.join(", ")}.
+Using this GitHub profile data, return ONLY a JSON object with the missing categoryScores keys.
 
-Using the same GitHub profile data below, return ONLY a JSON object with just the missing categoryScores keys — nothing else.
-
-${formatGitHubMetrics(githubData, userProfile)}
+${metricsBlock}
 
 Respond with ONLY this JSON (no extra text):
 {
@@ -302,35 +281,80 @@ Respond with ONLY this JSON (no extra text):
 ${missing.map((k) => `    "${k}": { "score": <integer 0-100>, "notes": "<1 sentence>" }`).join(",\n")}
   }
 }`;
-
-        try {
-          const retryResp = await callOpenRouter(retryPrompt, systemPrompt);
-          const retryMatch = retryResp.match(/\{[\s\S]*\}/);
-          if (retryMatch) {
-            const retryParsed = safeParseJSON(retryMatch[0]);
-            if (retryParsed?.categoryScores) {
-              // Merge retry scores into the original parsed object
-              parsed = {
-                ...parsed,
-                categoryScores: {
-                  ...(parsed.categoryScores || {}),
-                  ...retryParsed.categoryScores,
-                },
-              };
-            }
-          }
-        } catch (retryErr) {
-          console.warn(
-            "[analysis] Retry failed, normalizing with fallback:",
-            retryErr,
-          );
+    try {
+      const retryResp = await callOpenRouter(retryPrompt, systemPrompt);
+      const retryMatch = retryResp.match(/\{[\s\S]*\}/);
+      if (retryMatch) {
+        const retryParsed = safeParseJSON(retryMatch[0]);
+        if (retryParsed?.categoryScores) {
+          parsed = {
+            ...parsed,
+            categoryScores: { ...(parsed.categoryScores || {}), ...retryParsed.categoryScores },
+          };
         }
       }
-
-      return normalizeAnalysis(parsed);
+    } catch (retryErr) {
+      console.warn("[scoring] Retry failed, will fall back in normalization:", retryErr);
     }
+  }
 
-    throw new Error("Could not parse AI response");
+  return parsed.categoryScores || {};
+}
+
+/**
+ * Phase 2: Given pre-computed category scores, ask the AI for the
+ * summary, recommendations, and insights.
+ */
+async function fetchSynthesis(githubData, userProfile, categoryScores) {
+  const systemPrompt = getChatInstructions() + getAnalysisModeInstructions("SYNTHESIS");
+  const metricsBlock = formatGitHubMetrics(githubData, userProfile);
+
+  // Format the pre-computed scores for the prompt
+  const scoresBlock = Object.entries(categoryScores)
+    .map(([k, v]) => `  ${k}: ${v?.score ?? "?"}  — ${v?.notes ?? ""}`)
+    .join("\n");
+
+  const prompt = `Using the pre-computed category scores below, generate the summary, recommendations, and insights for this GitHub profile.
+
+## PRE-COMPUTED CATEGORY SCORES (do NOT re-score)
+${scoresBlock}
+
+${metricsBlock}
+
+Return ONLY this JSON (no extra text):
+{
+  "summary": "<1-2 sentence honest assessment>",
+  "recommendations": ["<specific task with tech + timeline>", "<task 2>", "<task 3>"],
+  "projectsInsight": "<1 sentence on how recommended projects help>",
+  "languageInsight": "<1 sentence on their language stack>",
+  "activityInsight": "<1 sentence on contribution patterns>"
+}`;
+
+  const response = await callOpenRouter(prompt, systemPrompt);
+  const jsonMatch = response.match(/\{[\s\S]*\}/);
+  const parsed = jsonMatch ? safeParseJSON(jsonMatch[0]) : null;
+  if (!parsed) throw new Error("Phase 2: Could not parse synthesis response");
+  return parsed;
+}
+
+/**
+ * Generate "Cooked Level" and recommendations based on GitHub data.
+ * Two-phase approach: score first, then synthesize summary/recommendations/insights.
+ * @param {Object} githubData - User's GitHub metrics
+ * @param {Object} userProfile - User's profile data (age, education, interests, etc.)
+ * @returns {Promise<Object>} - { cookedLevel, levelName, summary, recommendations, categoryScores, ... }
+ */
+export async function analyzeCookedLevel(githubData, userProfile) {
+  try {
+    // Phase 1 — Scoring
+    const rawCategoryScores = await fetchCategoryScores(githubData, userProfile);
+
+    // Phase 2 — Synthesis (summary, recommendations, insights)
+    const synthesis = await fetchSynthesis(githubData, userProfile, rawCategoryScores);
+
+    // Combine and normalize
+    const combined = { ...synthesis, categoryScores: rawCategoryScores };
+    return normalizeAnalysis(combined);
   } catch (error) {
     console.error("AI analysis error:", error);
     throw error;
@@ -357,8 +381,20 @@ Return ONLY a JSON array of exactly 4 projects matching the format in your instr
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const result = safeParseJSON(jsonMatch[0]);
-      if (result && Array.isArray(result) && result.length > 0)
-        return result.slice(0, 4);
+      if (result && Array.isArray(result) && result.length > 0) {
+        // Enforce 3-6 items in suggestedStack for every project
+        const normalized = result.slice(0, 4).map((project) => {
+          const stack = Array.isArray(project.suggestedStack) ? project.suggestedStack : [];
+          // Trim to 6 max
+          const trimmed = stack.slice(0, 6);
+          // Pad to 3 min with generic fallback entries
+          while (trimmed.length < 3) {
+            trimmed.push({ name: "Documentation", description: "Project documentation and README" });
+          }
+          return { ...project, suggestedStack: trimmed };
+        });
+        return normalized;
+      }
     }
     throw new Error("Could not parse AI project recommendations");
   } catch (error) {
