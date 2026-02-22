@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { signInWithPopup } from 'firebase/auth';
+import { useNavigate, Link } from 'react-router-dom';
 import logo from '@/assets/amicooked_logo.png';
-import { auth, githubProvider } from '@/config/firebase';
 import { Button } from '@/components/ui/Button';
+import { useToast } from '@/components/ui/Toast';
+import { useGitHubSignIn } from '@/hooks/useGitHubSignIn';
 import { Github, Check, Zap, Crown, GraduationCap, ArrowRight, MessageSquare, RefreshCw } from 'lucide-react';
 
 const plans = [
@@ -11,10 +11,10 @@ const plans = [
         id: 'student',
         name: 'Student',
         icon: GraduationCap,
-        iconColor: 'text-[#58a6ff]',
-        iconBg: 'bg-[#1c2d4f]',
-        borderColor: 'border-[#30363d]',
-        badgeColor: 'bg-[#1c2d4f] text-[#58a6ff] border border-[#1f4070]',
+        iconColor: 'text-accent',
+        iconBg: 'bg-plan-student-bg',
+        borderColor: 'border-border',
+        badgeColor: 'bg-plan-student-bg text-accent border border-plan-student-border',
         monthlyPrice: 3,
         yearlyPrice: 20,
         tag: null,
@@ -23,16 +23,16 @@ const plans = [
         aiMessages: '50 / month',
         regenerations: '15 / month',
         cta: 'Get Student Plan',
-        ctaStyle: 'bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-white',
+        ctaStyle: 'bg-surface hover:bg-track border border-border text-foreground',
     },
     {
         id: 'pro',
         name: 'Pro',
         icon: Zap,
         iconColor: 'text-green-400',
-        iconBg: 'bg-[#12261e]',
-        borderColor: 'border-[#238636]',
-        badgeColor: 'bg-[#12261e] text-green-400 border border-[#238636]/40',
+        iconBg: 'bg-plan-pro-bg',
+        borderColor: 'border-primary',
+        badgeColor: 'bg-plan-pro-bg text-green-400 border border-primary/40',
         monthlyPrice: 8,
         yearlyPrice: 80,
         tag: 'Most Popular',
@@ -41,16 +41,16 @@ const plans = [
         aiMessages: '200 / month',
         regenerations: '50 / month',
         cta: 'Get Pro Plan',
-        ctaStyle: 'bg-[#238636] hover:bg-[#2ea043] text-white',
+        ctaStyle: 'bg-primary hover:bg-primary-hover text-foreground',
     },
     {
         id: 'ultimate',
         name: 'Ultimate',
         icon: Crown,
         iconColor: 'text-orange-400',
-        iconBg: 'bg-[#2d1e0f]',
-        borderColor: 'border-[#f97316]/40',
-        badgeColor: 'bg-[#2d1e0f] text-orange-400 border border-[#f97316]/30',
+        iconBg: 'bg-plan-ultimate-bg',
+        borderColor: 'border-plan-ultimate-accent/40',
+        badgeColor: 'bg-plan-ultimate-bg text-orange-400 border border-plan-ultimate-accent/30',
         monthlyPrice: 15,
         yearlyPrice: 100,
         tag: 'Best Results',
@@ -59,7 +59,7 @@ const plans = [
         aiMessages: 'Unlimited',
         regenerations: 'Unlimited',
         cta: 'Get Ultimate Plan',
-        ctaStyle: 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-white',
+        ctaStyle: 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-foreground',
     },
 ];
 
@@ -94,26 +94,14 @@ const faqs = [
 export default function Pricing() {
     const [yearly, setYearly] = useState(false);
     const [hoveredPlan, setHoveredPlan] = useState(null);
-    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
-
-    const handleGitHubSignIn = async () => {
-        setLoading(true);
-        try {
-            const result = await signInWithPopup(auth, githubProvider);
-            const credential = result._tokenResponse.oauthAccessToken;
-            localStorage.setItem('github_token', credential);
-            navigate('/dashboard');
-        } catch (error) {
-            console.error('Authentication error:', error);
-            alert('Failed to sign in with GitHub. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const toast = useToast();
+    const { handleGitHubSignIn, loading } = useGitHubSignIn({
+        onError: () => toast.error('Failed to sign in with GitHub. Please try again.'),
+    });
 
     return (
-        <div className="min-h-screen bg-[#0d1117] text-white">
+        <div className="min-h-screen bg-background text-foreground">
             {/* Background grid */}
             <div
                 className="fixed inset-0 pointer-events-none z-0"
@@ -125,23 +113,23 @@ export default function Pricing() {
             />
 
             {/* Nav */}
-            <nav className="sticky top-0 z-50 border-b border-[#30363d] bg-[#020408]">
+            <nav className="sticky top-0 z-50 border-b border-border bg-background-dark">
                 <div className="max-w-full mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
-                    <a href="/" className="flex items-center gap-2">
+                    <Link to="/" className="flex items-center gap-2">
                         <img src={logo} alt="AmICooked" className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover" />
                         <span className="text-lg sm:text-xl font-bold">AmICooked?</span>
-                    </a>
+                    </Link>
                     <div className="flex items-center gap-2 sm:gap-3">
-                        <a
-                            href="/"
-                            className="text-gray-400 hover:text-white hover:bg-[#161b22] border border-transparent hover:border-[#30363d] text-xs sm:text-sm transition-colors px-3 py-1.5 rounded-md"
+                        <Link
+                            to="/"
+                            className="text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border text-xs sm:text-sm transition-colors px-3 py-1.5 rounded-md"
                         >
                             ← Back to home
-                        </a>
+                        </Link>
                         <Button
                             onClick={handleGitHubSignIn}
                             disabled={loading}
-                            className="bg-[#238636] hover:bg-[#2ea043] text-white text-xs sm:text-sm"
+                            className="bg-primary hover:bg-primary-hover text-foreground text-xs sm:text-sm"
                         >
                             <Github className="mr-1 sm:mr-2 h-4 w-4" />
                             {loading ? 'Signing in...' : 'Sign in with GitHub'}
@@ -152,7 +140,7 @@ export default function Pricing() {
 
             {/* Hero */}
             <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-14 sm:pt-20 pb-8 text-center">
-                <div className="inline-block mb-4 px-3 py-1.5 rounded-md border border-[#30363d] bg-[#161b22] text-xs sm:text-sm text-gray-400">
+                <div className="inline-block mb-4 px-3 py-1.5 rounded-md border border-border bg-card text-xs sm:text-sm text-muted-foreground">
                     🔥 Stop being cooked. Start getting hired.
                 </div>
                 <h1 className="text-3xl sm:text-5xl font-bold leading-tight mb-4">
@@ -162,18 +150,18 @@ export default function Pricing() {
                         No hidden nonsense.
                     </span>
                 </h1>
-                <p className="text-base sm:text-lg text-gray-400 max-w-xl mx-auto leading-relaxed mb-8">
+                <p className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed mb-8">
                     Whether you're just starting out or grinding hard for your next offer — there's a plan for where you are right now.
                 </p>
 
                 {/* Billing toggle */}
-                <div className="inline-flex items-center gap-3 bg-[#161b22] border border-[#30363d] rounded-lg p-1">
+                <div className="inline-flex items-center gap-3 bg-card border border-border rounded-lg p-1">
                     <button
                         onClick={() => setYearly(false)}
                         className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
                             !yearly
-                                ? 'bg-[#0d1117] text-white shadow border border-[#30363d]'
-                                : 'text-gray-400 hover:text-white'
+                                ? 'bg-background text-foreground shadow border border-border'
+                                : 'text-muted-foreground hover:text-foreground'
                         }`}
                     >
                         Monthly
@@ -182,8 +170,8 @@ export default function Pricing() {
                         onClick={() => setYearly(true)}
                         className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
                             yearly
-                                ? 'bg-[#0d1117] text-white shadow border border-[#30363d]'
-                                : 'text-gray-400 hover:text-white'
+                                ? 'bg-background text-foreground shadow border border-border'
+                                : 'text-muted-foreground hover:text-foreground'
                         }`}
                     >
                         Yearly
@@ -212,8 +200,8 @@ export default function Pricing() {
                                     relative rounded-xl border p-6 flex flex-col transition-all duration-300
                                     ${plan.borderColor}
                                     ${plan.highlight
-                                    ? 'bg-gradient-to-b from-[#1a2e1a] to-[#161b22]'
-                                    : 'bg-[#161b22]'}
+                                    ? 'bg-gradient-to-b from-plan-pro-bg to-card'
+                                    : 'bg-card'}
                                     ${isHovered ? 'scale-[1.02]' : ''}
                                 `}
                                 style={{
@@ -242,52 +230,52 @@ export default function Pricing() {
                                 <div className="mb-1">
                                     <div className="flex items-end gap-1">
                                         <span className="text-4xl font-extrabold">${price}</span>
-                                        <span className="text-gray-500 text-sm mb-1.5">/ {period}</span>
+                                        <span className="text-muted-foreground text-sm mb-1.5">/ {period}</span>
                                     </div>
 
                                 </div>
 
-                                <p className="text-sm text-gray-400 mb-6 leading-relaxed mt-2">{plan.description}</p>
+                                <p className="text-sm text-muted-foreground mb-6 leading-relaxed mt-2">{plan.description}</p>
 
-                                <div className={`border-t ${plan.highlight ? 'border-[#238636]/30' : 'border-[#30363d]'} mb-5`} />
+                                <div className={`border-t ${plan.highlight ? 'border-primary/30' : 'border-border'} mb-5`} />
 
                                 {/* Usage limits */}
                                 <div className="space-y-2.5 mb-5">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm text-gray-300">
-                                            <MessageSquare className="w-3.5 h-3.5 text-[#58a6ff] flex-shrink-0" />
+                                        <div className="flex items-center gap-2 text-sm text-foreground">
+                                            <MessageSquare className="w-3.5 h-3.5 text-accent flex-shrink-0" />
                                             AI Messages
                                         </div>
                                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                                             plan.aiMessages === 'Unlimited'
                                                 ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-300 border border-orange-500/20'
-                                                : 'bg-[#1c2d4f] text-[#58a6ff]'
+                                                : 'bg-plan-student-bg text-accent'
                                         }`}>
                                             {plan.aiMessages}
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm text-gray-300">
-                                            <RefreshCw className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                                        <div className="flex items-center gap-2 text-sm text-foreground">
+                                            <RefreshCw className="w-3.5 h-3.5 text-accent flex-shrink-0" />
                                             Regenerations
                                         </div>
                                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                                             plan.regenerations === 'Unlimited'
                                                 ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-300 border border-orange-500/20'
-                                                : 'bg-purple-500/10 text-purple-300 border border-purple-500/20'
+                                                : 'bg-accent/10 text-accent border border-accent/20'
                                         }`}>
                                             {plan.regenerations}
                                         </span>
                                     </div>
                                 </div>
 
-                                <div className={`border-t ${plan.highlight ? 'border-[#238636]/30' : 'border-[#30363d]'} mb-5`} />
+                                <div className={`border-t ${plan.highlight ? 'border-primary/30' : 'border-border'} mb-5`} />
 
                                 {/* Shared features — single checkmark list */}
                                 <ul className="space-y-2.5 flex-1 mb-7">
                                     {sharedFeatures.map((feature, i) => (
-                                        <li key={i} className="flex items-center gap-2 text-sm text-gray-300">
-                                            <Check className={`w-3.5 h-3.5 flex-shrink-0 ${plan.highlight ? 'text-green-400' : 'text-gray-500'}`} />
+                                        <li key={i} className="flex items-center gap-2 text-sm text-foreground">
+                                            <Check className={`w-3.5 h-3.5 flex-shrink-0 ${plan.highlight ? 'text-green-400' : 'text-muted-foreground'}`} />
                                             {feature}
                                         </li>
                                     ))}
@@ -295,6 +283,7 @@ export default function Pricing() {
 
                                 {/* CTA */}
                                 <button
+                                    onClick={handleGitHubSignIn}
                                     className={`
                                         w-full h-11 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2
                                         ${plan.ctaStyle}
@@ -315,23 +304,23 @@ export default function Pricing() {
                 <h3 className="text-xl font-bold text-center mb-6">Quick answers</h3>
                 <div className="grid sm:grid-cols-2 gap-4">
                     {faqs.map((faq, i) => (
-                        <div key={i} className="border border-[#30363d] rounded-lg p-4 bg-[#161b22]">
-                            <p className="text-sm font-semibold text-white mb-1">{faq.q}</p>
-                            <p className="text-sm text-gray-400 leading-relaxed">{faq.a}</p>
+                        <div key={i} className="border border-border rounded-lg p-4 bg-card">
+                            <p className="text-sm font-semibold text-foreground mb-1">{faq.q}</p>
+                            <p className="text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
                         </div>
                     ))}
                 </div>
             </section>
 
             {/* Footer */}
-            <footer className="relative z-10 border-t border-[#30363d] bg-[#020408]">
+            <footer className="relative z-10 border-t border-border bg-background-dark">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                             <img src={logo} alt="AmICooked" className="w-6 h-6 rounded-full object-cover" />
                             <span className="text-sm font-semibold">AmICooked?</span>
                         </div>
-                        <span className="text-gray-500 text-xs">
+                        <span className="text-muted-foreground text-xs">
                             © 2026 AmICooked. Built with ❤️ for WinHacks 2026 · Katarina Mantay, Aditya Patel, Norika Upadhyay
                         </span>
                     </div>

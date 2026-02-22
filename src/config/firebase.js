@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GithubAuthProvider, SignInMethod } from 'firebase/auth';
+import { getAuth, GithubAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -25,8 +25,7 @@ githubProvider.addScope('repo');
 githubProvider.addScope('read:user');
 githubProvider.addScope('user:email');
 githubProvider.setCustomParameters({
-  allow_signup: 'true',
-  SignInMethod: SignInMethod.POPUP
+  allow_signup: 'true'
 });
 
 export default app;

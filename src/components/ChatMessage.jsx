@@ -27,7 +27,7 @@ function CopyButton({ text }) {
   return (
     <button
       onClick={handleCopy}
-      className="absolute top-2 right-2 p-1.5 rounded-md bg-[#1c2128] hover:bg-[#30363d] text-gray-400 hover:text-gray-200 transition-colors opacity-0 group-hover/code:opacity-100"
+      className="absolute top-2 right-2 p-1.5 rounded-md bg-surface hover:bg-border text-muted-foreground hover:text-gray-200 transition-colors opacity-0 group-hover/code:opacity-100"
       title="Copy code"
     >
       {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -46,14 +46,14 @@ const markdownComponents = {
       return (
         <div className="group/code relative my-3 max-w-full overflow-hidden">
           {match && (
-            <div className="flex items-center justify-between px-4 py-1.5 bg-[#1c2128] border border-[#30363d] border-b-0 rounded-t-lg">
-              <span className="text-[11px] font-mono text-gray-400 uppercase tracking-wider">{match[1]}</span>
+            <div className="flex items-center justify-between px-4 py-1.5 bg-surface border border-border border-b-0 rounded-t-lg">
+              <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">{match[1]}</span>
             </div>
           )}
           <div className={`relative ${match ? '' : 'rounded-t-lg'}`}>
             <CopyButton text={codeString} />
-            <pre className={`bg-[#0d1117] border border-[#30363d] ${match ? 'rounded-b-lg' : 'rounded-lg'} p-4 overflow-x-auto`}>
-              <code className="text-sm leading-relaxed font-mono text-[#e6edf3] break-normal whitespace-pre" {...props}>
+            <pre className={`bg-background border border-border ${match ? 'rounded-b-lg' : 'rounded-lg'} p-4 overflow-x-auto`}>
+              <code className="text-sm leading-relaxed font-mono text-foreground break-normal whitespace-pre" {...props}>
                 {children}
               </code>
             </pre>
@@ -65,7 +65,7 @@ const markdownComponents = {
     // Inline code (or single-line code blocks)
     return (
       <code
-        className="bg-[#1c2128] border border-[#30363d] px-1.5 py-0.5 rounded text-sm text-[#f0883e] font-mono break-all"
+        className="bg-surface border border-border px-1.5 py-0.5 rounded text-sm text-code-inline font-mono break-all"
         {...props}
       >
         {children}
@@ -79,7 +79,7 @@ const markdownComponents = {
   // ---------- Links ----------
   a: ({ node, children, ...props }) => (
     <a
-      className="text-[#58a6ff] hover:underline break-all"
+      className="text-accent hover:underline break-all"
       target="_blank"
       rel="noopener noreferrer"
       {...props}
@@ -107,13 +107,13 @@ const markdownComponents = {
 
   // ---------- Headings ----------
   h1: ({ node, children, ...props }) => (
-    <h1 className="text-lg font-bold text-white mt-5 mb-2 first:mt-0" {...props}>{children}</h1>
+    <h1 className="text-lg font-bold text-foreground mt-5 mb-2 first:mt-0" {...props}>{children}</h1>
   ),
   h2: ({ node, children, ...props }) => (
-    <h2 className="text-base font-bold text-white mt-4 mb-2 first:mt-0" {...props}>{children}</h2>
+    <h2 className="text-base font-bold text-foreground mt-4 mb-2 first:mt-0" {...props}>{children}</h2>
   ),
   h3: ({ node, children, ...props }) => (
-    <h3 className="text-sm font-semibold text-white mt-3 mb-1.5 first:mt-0" {...props}>{children}</h3>
+    <h3 className="text-sm font-semibold text-foreground mt-3 mb-1.5 first:mt-0" {...props}>{children}</h3>
   ),
 
   // ---------- Paragraphs ----------
@@ -124,7 +124,7 @@ const markdownComponents = {
   // ---------- Blockquotes ----------
   blockquote: ({ node, children, ...props }) => (
     <blockquote
-      className="border-l-3 border-[#58a6ff]/40 pl-4 my-3 text-gray-400 italic"
+      className="border-l-3 border-accent/40 pl-4 my-3 text-muted-foreground italic"
       {...props}
     >
       {children}
@@ -132,33 +132,33 @@ const markdownComponents = {
   ),
 
   // ---------- Horizontal Rule ----------
-  hr: () => <hr className="border-[#30363d] my-4" />,
+  hr: () => <hr className="border-border my-4" />,
 
   // ---------- Tables ----------
   table: ({ node, children, ...props }) => (
-    <div className="overflow-x-auto my-3 rounded-lg border border-[#30363d]">
+    <div className="overflow-x-auto my-3 rounded-lg border border-border">
       <table className="min-w-full text-sm" {...props}>
         {children}
       </table>
     </div>
   ),
   thead: ({ node, children, ...props }) => (
-    <thead className="bg-[#161b22]" {...props}>{children}</thead>
+    <thead className="bg-card" {...props}>{children}</thead>
   ),
   th: ({ node, children, ...props }) => (
-    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-300 border-b border-[#30363d]" {...props}>
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-300 border-b border-border" {...props}>
       {children}
     </th>
   ),
   td: ({ node, children, ...props }) => (
-    <td className="px-3 py-2 text-gray-400 border-b border-[#30363d]" {...props}>
+    <td className="px-3 py-2 text-muted-foreground border-b border-border" {...props}>
       {children}
     </td>
   ),
 
   // ---------- Strong / Em ----------
   strong: ({ node, children, ...props }) => (
-    <strong className="font-semibold text-white" {...props}>{children}</strong>
+    <strong className="font-semibold text-foreground" {...props}>{children}</strong>
   ),
   em: ({ node, children, ...props }) => (
     <em className="italic text-gray-300" {...props}>{children}</em>
@@ -180,10 +180,10 @@ export default function ChatMessage({ role, content, timestamp, formatTime }) {
     return (
       <div className="max-w-4xl w-full mx-auto">
         <div className="flex justify-end">
-          <div className="max-w-[85%] sm:max-w-xl rounded-2xl rounded-br-sm px-3 sm:px-4 py-2.5 bg-[#238636] text-white min-w-0">
+            <div className="max-w-[85%] sm:max-w-xl rounded-2xl rounded-br-sm px-3 sm:px-4 py-2.5 bg-primary text-foreground min-w-0">
             <p className="text-[15px] whitespace-pre-wrap break-words leading-relaxed" style={{ overflowWrap: 'anywhere' }}>{content}</p>
             {timeLabel && (
-              <p className="text-[10px] mt-1.5 text-white/40 text-right">{timeLabel}</p>
+              <p className="text-[10px] mt-1.5 text-foreground/40 text-right">{timeLabel}</p>
             )}
           </div>
         </div>
@@ -204,7 +204,7 @@ export default function ChatMessage({ role, content, timestamp, formatTime }) {
           </ReactMarkdown>
         </div>
         {timeLabel && (
-          <p className="text-[10px] mt-1 text-gray-600">{timeLabel}</p>
+          <p className="text-[10px] mt-1 text-muted-foreground">{timeLabel}</p>
         )}
       </div>
     </div>

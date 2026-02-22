@@ -7,9 +7,9 @@ import {
   getSavedProject,
   saveProject,
   isProjectSaved,
+  slugify,
 } from "@/services/savedProjects";
-import { callOpenRouter } from "@/services/openrouter";
-import { formatEducation } from "@/utils/formatEducation";
+import { createAgent } from "@/services/agent";
 import {
   X,
   Bookmark,
@@ -40,6 +40,7 @@ export default function SavedProjectsOverlay({
   onClose,
   githubData,
   userProfile,
+  analysis,
   recommendedProjects = [],
   initialProjectId = null,
 }) {
@@ -60,6 +61,7 @@ export default function SavedProjectsOverlay({
   const [savingBookmark, setSavingBookmark] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const agentRef = useRef(null);
   const userId = auth.currentUser?.uid;
 
   // Load projects when overlay opens
@@ -190,6 +192,17 @@ export default function SavedProjectsOverlay({
     setRecommendedProjectsData(enrichedProjects);
   };
 
+  const initAgentForProject = (projectMessages) => {
+    agentRef.current = createAgent();
+    agentRef.current.initialize(githubData, userProfile, analysis);
+    // Seed agent memory with existing conversation history
+    if (projectMessages?.length) {
+      projectMessages.slice(-10).forEach(m => {
+        agentRef.current.memory.addMessage(m.role, m.content);
+      });
+    }
+  };
+
   const handleSelectRecommendedProject = async (proj) => {
     if (!proj) return;
     
@@ -201,9 +214,11 @@ export default function SavedProjectsOverlay({
       // Load saved project with chat history
       const savedProj = await getSavedProject(userId, slugId);
       setActiveProject(savedProj || { ...proj, id: slugId, messages: [] });
+      initAgentForProject(savedProj?.messages);
     } else {
       // Show project info but no persisted chat yet
       setActiveProject({ ...proj, id: slugId, messages: [] });
+      initAgentForProject([]);
     }
     
     if (window.innerWidth < 640) setShowSidebar(false);
@@ -248,6 +263,7 @@ export default function SavedProjectsOverlay({
     // Fetch fresh data to get latest messages
     const fresh = await getSavedProject(userId, proj.id);
     setActiveProject(fresh || proj);
+    initAgentForProject(fresh?.messages || proj.messages);
     if (window.innerWidth < 640) setShowSidebar(false);
     setInfoExpanded(true);
   };
@@ -329,46 +345,6 @@ export default function SavedProjectsOverlay({
   };
 
   // ── Chat ──
-  const buildSystemPrompt = () => {
-    if (!activeProject) return "";
-    const parts = [
-      "You are a helpful AI mentor for the AmICooked platform. The user is working on a saved project and has questions about it.",
-      "Be concise, encouraging, and practical. Provide specific, actionable answers.",
-      `\nProject:`,
-      `- Name: ${activeProject.name}`,
-      `- Overview: ${activeProject.overview || "N/A"}`,
-      `- Skills: ${activeProject.skill1}, ${activeProject.skill2}, ${activeProject.skill3}`,
-      `- Alignment: ${activeProject.alignment || "N/A"}`,
-    ];
-    if (activeProject.suggestedStack?.length) {
-      parts.push(
-        `- Stack: ${activeProject.suggestedStack.map((s) => `${s.name} (${s.description})`).join(", ")}`,
-      );
-    }
-    if (userProfile) {
-      parts.push("\nUser Profile:");
-      if (userProfile.age) parts.push(`- Age: ${userProfile.age}`);
-      if (userProfile.education)
-        parts.push(`- Education: ${formatEducation(userProfile.education)}`);
-      if (userProfile.experienceYears)
-        parts.push(
-          `- Experience: ${userProfile.experienceYears.replace(/_/g, " ")}`,
-        );
-      if (userProfile.careerGoal)
-        parts.push(`- Career Goal: ${userProfile.careerGoal}`);
-    }
-    if (githubData) {
-      parts.push("\nGitHub Stats:");
-      parts.push(
-        `- Repos: ${githubData.totalRepos}, Commits: ${githubData.totalCommits}`,
-      );
-      parts.push(
-        `- Top Languages: ${githubData.languages?.join(", ") || "Unknown"}`,
-      );
-    }
-    return parts.join("\n");
-  };
-
   const handleSendMessage = async () => {
     if (!input.trim() || chatLoading || !activeProject) return;
     const userMsg = input.trim();
@@ -398,21 +374,11 @@ export default function SavedProjectsOverlay({
       await addProjectMessage(userId, activeProject.id, "user", userMsg);
 
       // Build contextual prompt
-      let contextualPrompt = userMsg;
-      if (newMessages.length > 1) {
-        const recent = newMessages
-          .slice(-6, -1)
-          .map(
-            (m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`,
-          )
-          .join("\n");
-        contextualPrompt = `Previous conversation:\n${recent}\n\nUser's latest message: ${userMsg}`;
+      if (!agentRef.current) {
+        initAgentForProject(newMessages.slice(0, -1));
       }
-
-      const response = await callOpenRouter(
-        contextualPrompt,
-        buildSystemPrompt(),
-      );
+      const result = await agentRef.current.processProjectMessage(userMsg, activeProject);
+      const response = result.response;
 
       // Persist AI response
       await addProjectMessage(userId, activeProject.id, "assistant", response);
@@ -457,14 +423,14 @@ export default function SavedProjectsOverlay({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-[#0d1117] flex flex-col">
+      <div className="fixed inset-0 z-50 bg-background flex flex-col">
         {/* Header */}
-        <header className="border-b border-[#30363d] bg-[#161b22] px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
+        <header className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {!showSidebar && (
               <button
                 onClick={handleBack}
-                className="text-gray-400 hover:text-white mr-1 sm:mr-2"
+                className="text-muted-foreground hover:text-foreground mr-1 sm:mr-2"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -473,10 +439,10 @@ export default function SavedProjectsOverlay({
               <Bookmark className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400 fill-current" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-xl font-bold text-white truncate">
+              <h1 className="text-base sm:text-xl font-bold text-foreground truncate">
                 {activeProject ? activeProject.name : "My Projects"}
               </h1>
-              <p className="text-xs text-gray-400 hidden sm:block">
+              <p className="text-xs text-muted-foreground hidden sm:block">
                 {activeProject
                   ? `${activeProject.skill1} · ${activeProject.skill2} · ${activeProject.skill3}`
                   : `${projects.length} project${projects.length !== 1 ? "s" : ""} saved`}
@@ -488,7 +454,7 @@ export default function SavedProjectsOverlay({
               <>
                 <button
                   onClick={() => setInfoExpanded((v) => !v)}
-                  className="p-2 rounded-md text-gray-400 hover:text-white hover:bg-[#1c2128] transition-colors"
+                  className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
                   title={
                     infoExpanded ? "Hide project info" : "Show project info"
                   }
@@ -503,7 +469,7 @@ export default function SavedProjectsOverlay({
                 {!recommendedProjects.some(rec => rec.name === activeProject.name) && (
                   <button
                     onClick={() => setDeleteTarget(activeProject)}
-                    className="p-2 rounded-md text-gray-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                    className="p-2 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors"
                     title="Delete project"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -513,7 +479,7 @@ export default function SavedProjectsOverlay({
             )}
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white p-2 rounded-md hover:bg-[#1c2128]"
+              className="text-muted-foreground hover:text-foreground p-2 rounded-md hover:bg-surface"
             >
               <X className="w-5 h-5" />
             </button>
@@ -524,21 +490,21 @@ export default function SavedProjectsOverlay({
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar — Projects List */}
           {showSidebar && (
-            <div className="absolute inset-0 sm:relative sm:inset-auto w-full sm:w-80 border-r border-[#30363d] bg-[#161b22] flex flex-col shrink-0 z-10">
+            <div className="absolute inset-0 sm:relative sm:inset-auto w-full sm:w-80 border-r border-border bg-card flex flex-col shrink-0 z-10">
               <div className="flex-1 overflow-y-auto">
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-6 h-6 animate-spin text-[#58a6ff]" />
+                    <Loader2 className="w-6 h-6 animate-spin text-accent" />
                   </div>
                 ) : (
                   <>
                     {/* Recommended Projects Section */}
                     {recommendedProjects && recommendedProjects.length > 0 && (
-                      <div className="border-b border-[#30363d]">
+                      <div className="border-b border-border">
                         <div className="p-4 pb-3">
                           <div className="flex items-center gap-2 mb-3">
                             <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+                            <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">
                               Recommended Projects
                             </h2>
                           </div>
@@ -549,24 +515,24 @@ export default function SavedProjectsOverlay({
                                   onClick={() => handleSelectRecommendedProject(rec)}
                                   className={`w-full text-left px-3 py-3 pr-9 rounded-md transition-colors ${
                                     activeProject?.name === rec.name
-                                      ? "bg-[#1c2128] border border-[#58a6ff]/30"
-                                      : "hover:bg-[#1c2128] border border-transparent"
+                                      ? "bg-surface border border-accent/30"
+                                      : "hover:bg-surface border border-transparent"
                                   }`}
                                 >
                                   <div className="flex items-center gap-2">
                                     <Lightbulb className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
-                                    <p className="text-sm text-white truncate">
+                                    <p className="text-sm text-foreground truncate">
                                       {rec.name}
                                     </p>
                                   </div>
                                   <div className="flex flex-wrap gap-1 mt-1.5 ml-5.5">
-                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#0d1117] border border-[#30363d] text-green-400">
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-background border border-border text-green-400">
                                       {rec.skill1}
                                     </span>
-                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#0d1117] border border-[#30363d] text-blue-400">
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-background border border-border text-blue-400">
                                       {rec.skill2}
                                     </span>
-                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#0d1117] border border-[#30363d] text-yellow-400">
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-background border border-border text-yellow-400">
                                       {rec.skill3}
                                     </span>
                                   </div>
@@ -580,7 +546,7 @@ export default function SavedProjectsOverlay({
                                   className={`absolute right-2 top-3 p-1 rounded transition-colors ${
                                     recommendedSaveStatus[rec.name]
                                       ? 'text-yellow-400 hover:text-yellow-500'
-                                      : 'text-gray-600 hover:text-yellow-400 opacity-0 group-hover:opacity-100'
+                                      : 'text-muted-foreground hover:text-yellow-400 opacity-0 group-hover:opacity-100'
                                   }`}
                                   title={recommendedSaveStatus[rec.name] ? 'Saved' : 'Save project'}
                                 >
@@ -597,7 +563,7 @@ export default function SavedProjectsOverlay({
                     <div>
                       <div className="p-4 pb-3">
                         <div className="flex items-center justify-between mb-3">
-                          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+                          <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">
                             Saved
                           </h2>
                           
@@ -606,12 +572,12 @@ export default function SavedProjectsOverlay({
                             <div className="relative">
                               {bulkDeleteMode ? (
                                 <div className="flex items-center gap-2">
-                                  <span className="text-xs text-gray-400">
+                                  <span className="text-xs text-muted-foreground">
                                     {selectedProjects.size} selected
                                   </span>
                                   <button
                                     onClick={handleCancelBulkMode}
-                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-[#1c2128] transition-colors"
+                                    className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-surface transition-colors"
                                   >
                                     Cancel
                                   </button>
@@ -627,7 +593,7 @@ export default function SavedProjectsOverlay({
                                 <>
                                   <button
                                     onClick={() => setShowDeleteMenu(!showDeleteMenu)}
-                                    className="p-1 rounded text-gray-400 hover:text-white hover:bg-[#1c2128] transition-colors"
+                                    className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
                                     title="Delete options"
                                   >
                                     <MoreVertical className="w-4 h-4" />
@@ -639,13 +605,13 @@ export default function SavedProjectsOverlay({
                                         className="fixed inset-0 z-10" 
                                         onClick={() => setShowDeleteMenu(false)}
                                       />
-                                      <div className="absolute right-0 top-8 z-20 w-48 bg-[#0d1117] border border-[#303d] rounded-lg shadow-xl py-1">
+                                      <div className="absolute right-0 top-8 z-20 w-48 bg-background border border-border rounded-lg shadow-xl py-1">
                                         <button
                                           onClick={() => {
                                             setBulkDeleteMode(true);
                                             setShowDeleteMenu(false);
                                           }}
-                                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-[#1c2128] hover:text-white transition-colors text-left"
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-surface hover:text-foreground transition-colors text-left"
                                         >
                                           <CheckSquare className="w-4 h-4" />
                                           Select Projects
@@ -668,11 +634,11 @@ export default function SavedProjectsOverlay({
                         
                         {projects.length === 0 ? (
                           <div className="text-center py-8 px-4">
-                            <FolderOpen className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-                            <p className="text-gray-500 text-xs">
+                            <FolderOpen className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                            <p className="text-muted-foreground text-xs">
                               No saved projects
                             </p>
-                            <p className="text-gray-600 text-[10px] mt-1">
+                            <p className="text-muted-foreground text-[10px] mt-1">
                               Bookmark projects to save them
                             </p>
                           </div>
@@ -684,30 +650,30 @@ export default function SavedProjectsOverlay({
                                   onClick={() => bulkDeleteMode ? handleToggleSelectProject(proj.id) : handleSelectProject(proj)}
                                   className={`w-full text-left px-3 py-3 ${bulkDeleteMode ? 'pr-3' : 'pr-8'} rounded-md transition-colors ${
                                     activeProject?.id === proj.id && !bulkDeleteMode
-                                      ? "bg-[#1c2128] border border-[#58a6ff]/30"
-                                      : "hover:bg-[#1c2128] border border-transparent"
+                                      ? "bg-surface border border-accent/30"
+                                      : "hover:bg-surface border border-transparent"
                                   }`}
                                 >
                                   <div className="flex items-center gap-2">
                                     {bulkDeleteMode ? (
                                       selectedProjects.has(proj.id) ? (
-                                        <CheckSquare className="w-4 h-4 text-[#58a6ff] shrink-0" />
+                                        <CheckSquare className="w-4 h-4 text-accent shrink-0" />
                                       ) : (
-                                        <Square className="w-4 h-4 text-gray-500 shrink-0" />
+                                        <Square className="w-4 h-4 text-muted-foreground shrink-0" />
                                       )
                                     ) : (
-                                      <Lightbulb className="w-3.5 h-3.5 text-[#238636] shrink-0" />
+                                      <Lightbulb className="w-3.5 h-3.5 text-primary shrink-0" />
                                     )}
-                                    <p className="text-sm text-white truncate">
+                                    <p className="text-sm text-foreground truncate">
                                       {proj.name}
                                     </p>
                                   </div>
                                   <div className="flex items-center gap-2 mt-1 ml-5.5">
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-muted-foreground">
                                       {proj.messages?.length || 0} messages
                                     </p>
                                     {proj.savedAt && (
-                                      <span className="text-xs text-gray-600">
+                                      <span className="text-xs text-muted-foreground">
                                         · {formatTime(proj.savedAt)}
                                       </span>
                                     )}
@@ -719,7 +685,7 @@ export default function SavedProjectsOverlay({
                                       e.stopPropagation();
                                       setDeleteTarget(proj);
                                     }}
-                                    className="absolute right-2 top-3 p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100"
+                                    className="absolute right-2 top-3 p-1 rounded text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100"
                                     title="Delete project"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -743,29 +709,29 @@ export default function SavedProjectsOverlay({
               <>
                 {/* Collapsible project info */}
                 {infoExpanded && (
-                  <div className="px-4 sm:px-5 py-4 space-y-4 border-b border-[#30363d] overflow-y-auto max-h-[50vh] shrink-0 bg-[#0d1117]">
+                  <div className="px-4 sm:px-5 py-4 space-y-4 border-b border-border overflow-y-auto max-h-[50vh] shrink-0 bg-background">
                     <div>
                       <div className="flex items-center gap-2 mb-1.5">
-                        <BookOpen className="w-3.5 h-3.5 text-[#58a6ff]" />
-                        <h3 className="text-xs font-semibold text-[#58a6ff] uppercase tracking-wide">
+                        <BookOpen className="w-3.5 h-3.5 text-accent" />
+                        <h3 className="text-xs font-semibold text-accent uppercase tracking-wide">
                           Overview
                         </h3>
                       </div>
-                      <p className="text-gray-300 text-sm leading-relaxed">
+                      <p className="text-foreground text-sm leading-relaxed">
                         {activeProject.overview ||
                           "Build practical skills and expand your portfolio."}
                       </p>
                     </div>
 
                     {activeProject.alignment && (
-                      <div className="bg-[#161b22] rounded-lg p-3 border border-[#30363d]">
+                      <div className="bg-card rounded-lg p-3 border border-border">
                         <div className="flex items-center gap-2 mb-1">
                           <Lightbulb className="w-3.5 h-3.5 text-yellow-400" />
                           <h3 className="text-xs font-semibold text-yellow-400">
                             Why This Fits You
                           </h3>
                         </div>
-                        <p className="text-gray-400 text-sm leading-relaxed">
+                        <p className="text-muted-foreground text-sm leading-relaxed">
                           {activeProject.alignment}
                         </p>
                       </div>
@@ -774,8 +740,8 @@ export default function SavedProjectsOverlay({
                     {stack.length > 0 && (
                       <div>
                         <div className="flex items-center gap-2 mb-2">
-                          <Wrench className="w-3.5 h-3.5 text-[#58a6ff]" />
-                          <h3 className="text-xs font-semibold text-[#58a6ff] uppercase tracking-wide">
+                          <Wrench className="w-3.5 h-3.5 text-accent" />
+                          <h3 className="text-xs font-semibold text-accent uppercase tracking-wide">
                             Suggested Stack
                           </h3>
                         </div>
@@ -783,15 +749,15 @@ export default function SavedProjectsOverlay({
                           {stack.map((tech, i) => (
                             <div
                               key={i}
-                              className="flex items-start gap-2 bg-[#161b22] rounded-lg px-3 py-2 border border-[#30363d]"
+                              className="flex items-start gap-2 bg-card rounded-lg px-3 py-2 border border-border"
                             >
-                              <div className="w-1.5 h-1.5 rounded-full bg-[#58a6ff] mt-1.5 shrink-0" />
+                              <div className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
                               <div className="text-sm">
-                                <span className="font-medium text-white">
+                                <span className="font-medium text-foreground">
                                   {tech.name}
                                 </span>
-                                <span className="text-gray-500 mx-1">—</span>
-                                <span className="text-gray-400">
+                                <span className="text-muted-foreground mx-1">—</span>
+                                <span className="text-muted-foreground">
                                   {tech.description}
                                 </span>
                               </div>
@@ -803,13 +769,13 @@ export default function SavedProjectsOverlay({
 
                     {/* Skills pills */}
                     <div className="flex flex-wrap gap-1.5">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#161b22] border border-[#30363d] text-green-400">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-card border border-border text-green-400">
                         {activeProject.skill1}
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#161b22] border border-[#30363d] text-blue-400">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-card border border-border text-blue-400">
                         {activeProject.skill2}
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#161b22] border border-[#30363d] text-yellow-400">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-card border border-border text-yellow-400">
                         {activeProject.skill3}
                       </span>
                     </div>
@@ -821,13 +787,13 @@ export default function SavedProjectsOverlay({
                   {messages.length === 0 ? (
                     <div className="flex-1 flex items-center justify-center h-full">
                       <div className="text-center">
-                        <div className="w-16 h-16 rounded-full bg-[#161b22] border border-[#30363d] flex items-center justify-center mx-auto mb-4">
-                          <MessageSquare className="w-8 h-8 text-gray-600" />
+                        <div className="w-16 h-16 rounded-full bg-card border border-border flex items-center justify-center mx-auto mb-4">
+                          <MessageSquare className="w-8 h-8 text-muted-foreground" />
                         </div>
-                        <h2 className="text-lg font-semibold text-white mb-1">
+                        <h2 className="text-lg font-semibold text-foreground mb-1">
                           Chat about {activeProject.name}
                         </h2>
-                        <p className="text-gray-400 text-sm max-w-md mb-6">
+                        <p className="text-muted-foreground text-sm max-w-md mb-6">
                           Get help planning, building, or learning the
                           technologies for this project.
                         </p>
@@ -848,7 +814,7 @@ export default function SavedProjectsOverlay({
                       {chatLoading && (
                         <div className="flex justify-center">
                           <div className="px-4 py-3">
-                            <div className="flex items-center gap-2 text-gray-400">
+                            <div className="flex items-center gap-2 text-muted-foreground">
                               <Loader2 className="w-4 h-4 animate-spin" />
                               <span className="text-sm">Thinking...</span>
                             </div>
@@ -861,13 +827,13 @@ export default function SavedProjectsOverlay({
                 </div>
 
                 {/* Input */}
-                <div className="border-t border-[#30363d] bg-[#161b22] p-3 sm:p-4 shrink-0">
+                <div className="border-t border-border bg-card p-3 sm:p-4 shrink-0">
                   <div className="max-w-4xl mx-auto relative">
                     <input
                       ref={inputRef}
                       type="text"
                       placeholder={`Ask about ${activeProject.name}...`}
-                      className="w-full pl-4 pr-12 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                      className="w-full pl-4 pr-12 py-3 rounded-md bg-background border border-border text-foreground text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -881,7 +847,7 @@ export default function SavedProjectsOverlay({
                     <button
                       onClick={handleSendMessage}
                       disabled={!input.trim() || chatLoading}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/60 hover:text-white disabled:text-white/20 transition-colors"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-foreground/60 hover:text-foreground disabled:text-foreground/20 transition-colors"
                     >
                       {chatLoading ? (
                         <Loader2 className="w-5 h-5 animate-spin" />
@@ -897,13 +863,13 @@ export default function SavedProjectsOverlay({
               !showSidebar && (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
-                    <div className="w-20 h-20 rounded-full bg-[#161b22] border border-[#30363d] flex items-center justify-center mx-auto mb-4">
-                      <FolderOpen className="w-10 h-10 text-gray-600" />
+                    <div className="w-20 h-20 rounded-full bg-card border border-border flex items-center justify-center mx-auto mb-4">
+                      <FolderOpen className="w-10 h-10 text-muted-foreground" />
                     </div>
-                    <h2 className="text-xl font-semibold text-white mb-2">
+                    <h2 className="text-xl font-semibold text-foreground mb-2">
                       Select a Project
                     </h2>
-                    <p className="text-gray-400 text-sm max-w-md">
+                    <p className="text-muted-foreground text-sm max-w-md">
                       Choose a saved project from the sidebar to view its
                       details and continue chatting.
                     </p>
@@ -922,13 +888,13 @@ export default function SavedProjectsOverlay({
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             onClick={() => setDeleteTarget(null)}
           />
-          <div className="relative bg-[#161b22] border border-[#30363d] rounded-xl p-6 max-w-sm mx-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-2">
+          <div className="relative bg-card border border-border rounded-xl p-6 max-w-sm mx-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-foreground mb-2">
               Delete Project?
             </h3>
-            <p className="text-sm text-gray-400 mb-6">
+            <p className="text-sm text-muted-foreground mb-6">
               This will permanently delete{" "}
-              <span className="text-white font-medium">
+              <span className="text-foreground font-medium">
                 "{deleteTarget.name}"
               </span>{" "}
               and its entire chat history. This action cannot be undone.
@@ -936,13 +902,13 @@ export default function SavedProjectsOverlay({
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="flex-1 px-4 py-2 rounded-md border border-[#30363d] text-gray-300 hover:bg-[#1c2128] text-sm transition-colors"
+                className="flex-1 px-4 py-2 rounded-md border border-border text-foreground hover:bg-surface text-sm transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="flex-1 px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm transition-colors"
+                className="flex-1 px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 text-foreground text-sm transition-colors"
               >
                 Delete Permanently
               </button>
@@ -958,16 +924,16 @@ export default function SavedProjectsOverlay({
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             onClick={() => setBulkDeleteTarget(null)}
           />
-          <div className="relative bg-[#161b22] border border-[#30363d] rounded-xl p-6 max-w-md mx-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-2">
+          <div className="relative bg-card border border-border rounded-xl p-6 max-w-md mx-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-foreground mb-2">
               {bulkDeleteTarget === 'all' 
                 ? `Delete All ${projects.length} Projects?` 
                 : `Delete ${selectedProjects.size} Project${selectedProjects.size !== 1 ? 's' : ''}?`}
             </h3>
-            <p className="text-sm text-gray-400 mb-3">
+            <p className="text-sm text-muted-foreground mb-3">
               This will permanently delete the following projects and their entire chat histories:
             </p>
-            <div className="max-h-48 overflow-y-auto mb-4 bg-[#0d1117] rounded-lg border border-[#30363d] p-3">
+            <div className="max-h-48 overflow-y-auto mb-4 bg-background rounded-lg border border-border p-3">
               <ul className="space-y-1.5">
                 {(bulkDeleteTarget === 'all'
                   ? projects 
@@ -975,24 +941,24 @@ export default function SavedProjectsOverlay({
                 ).map((proj) => (
                   <li key={proj.id} className="flex items-start gap-2 text-sm">
                     <span className="text-red-400 mt-0.5">•</span>
-                    <span className="text-white font-medium">{proj.name}</span>
+                    <span className="text-foreground font-medium">{proj.name}</span>
                   </li>
                 ))}
               </ul>
             </div>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-muted-foreground mb-6">
               This action cannot be undone.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setBulkDeleteTarget(null)}
-                className="flex-1 px-4 py-2 rounded-md border border-[#30363d] text-gray-300 hover:bg-[#1c2128] text-sm transition-colors"
+                className="flex-1 px-4 py-2 rounded-md border border-border text-foreground hover:bg-surface text-sm transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmBulkDelete}
-                className="flex-1 px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm transition-colors"
+                className="flex-1 px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 text-foreground text-sm transition-colors"
               >
                 Delete Permanently
               </button>
@@ -1004,9 +970,3 @@ export default function SavedProjectsOverlay({
   );
 }
 
-function slugify(name) {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}

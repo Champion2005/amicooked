@@ -129,6 +129,13 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       await loadChats();
     } catch (error) {
       console.error('Error starting chat:', error);
+      if (activeChat || newMessages) {
+        const errorMessages = [
+          ...(newMessages || []),
+          { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.', timestamp: new Date().toISOString() }
+        ];
+        setActiveChat(prev => prev ? { ...prev, messages: errorMessages } : null);
+      }
     } finally {
       setLoading(false);
     }
@@ -219,22 +226,22 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0d1117] flex flex-col">
+    <div className="fixed inset-0 z-50 bg-background flex flex-col">
       {/* Chat Header */}
-      <header className="border-b border-[#30363d] bg-[#161b22] px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
+      <header className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {!showSidebar && (
             <button 
               onClick={() => setShowSidebar(true)}
-              className="text-gray-400 hover:text-white mr-1 sm:mr-2"
+              className="text-muted-foreground hover:text-foreground mr-1 sm:mr-2"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
           )}
           <img src={logo} alt="AmICooked" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover shrink-0" />
           <div className="min-w-0">
-            <h1 className="text-base sm:text-xl font-bold text-white truncate">AmICooked Bot</h1>
-            <p className="text-xs text-gray-400 hidden sm:block">Ask anything about your profile</p>
+            <h1 className="text-base sm:text-xl font-bold text-foreground truncate">AmICooked Bot</h1>
+            <p className="text-xs text-muted-foreground hidden sm:block">Ask anything about your profile</p>
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -242,14 +249,14 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
             onClick={handleNewChat}
             variant="outline"
             size="sm"
-            className="border-[#30363d] text-gray-300 hover:text-white hover:bg-[#1c2128]"
+            className="border-border text-gray-300 hover:text-foreground hover:bg-surface"
           >
             <Plus className="w-4 h-4 sm:mr-1" />
             <span className="hidden sm:inline">New Chat</span>
           </Button>
           <button 
             onClick={handleClose}
-            className="text-gray-400 hover:text-white p-2 rounded-md hover:bg-[#1c2128]"
+            className="text-muted-foreground hover:text-foreground p-2 rounded-md hover:bg-surface"
           >
             <X className="w-5 h-5" />
           </button>
@@ -260,20 +267,20 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar - Chat History */}
         {showSidebar && (
-          <div className="absolute inset-0 sm:relative sm:inset-auto w-full sm:w-80 border-r border-[#30363d] bg-[#161b22] flex flex-col shrink-0 z-10">
-            <div className="p-4 border-b border-[#30363d]">
+          <div className="absolute inset-0 sm:relative sm:inset-auto w-full sm:w-80 border-r border-border bg-card flex flex-col shrink-0 z-10">
+            <div className="p-4 border-b border-border">
               <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Chat History</h2>
             </div>
             <div className="flex-1 overflow-y-auto">
               {chatsLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#58a6ff]" />
+                  <Loader2 className="w-6 h-6 animate-spin text-accent" />
                 </div>
               ) : chats.length === 0 ? (
                 <div className="text-center py-12 px-4">
-                  <MessageSquare className="w-10 h-10 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-500 text-sm">No chats yet</p>
-                  <p className="text-gray-600 text-xs mt-1">Start a conversation below</p>
+                  <MessageSquare className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground text-sm">No chats yet</p>
+                  <p className="text-muted-foreground text-xs mt-1">Start a conversation below</p>
                 </div>
               ) : (
                 <div className="space-y-1 p-2">
@@ -283,12 +290,12 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                       onClick={() => handleSelectChat(chat)}
                       className={`w-full text-left px-3 py-3 rounded-md transition-colors ${
                         activeChat?.id === chat.id
-                          ? 'bg-[#1c2128] border border-[#58a6ff]/30'
-                          : 'hover:bg-[#1c2128] border border-transparent'
+                          ? 'bg-surface border border-accent/30'
+                          : 'hover:bg-surface border border-transparent'
                       }`}
                     >
-                      <p className="text-sm text-white truncate">{chat.title}</p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-sm text-foreground truncate">{chat.title}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
                         {formatTime(chat.updatedAt)} · {chat.messages?.length || 0} messages
                       </p>
                     </button>
@@ -332,7 +339,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                 {loading && (
                   <div className="flex justify-center">
                     <div className="px-4 py-3">
-                      <div className="flex items-center gap-2 text-gray-400">
+                        <div className="flex items-center gap-2 text-muted-foreground">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span className="text-sm">Thinking...</span>
                       </div>
@@ -343,13 +350,13 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
               </div>
 
               {/* Input */}
-              <div className="border-t border-[#30363d] bg-[#161b22] p-3 sm:p-4">
+              <div className="border-t border-border bg-card p-3 sm:p-4">
                 <div className="max-w-4xl mx-auto relative">
                   <input
                     ref={inputRef}
                     type="text"
                     placeholder="Type your message..."
-                    className="w-full pl-4 pr-12 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                    className="w-full pl-4 pr-12 py-3 rounded-md bg-background border border-border text-foreground text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -370,11 +377,11 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
             <div className="flex-1 flex flex-col min-w-0">
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="w-20 h-20 rounded-full bg-[#161b22] border border-[#30363d] flex items-center justify-center mx-auto mb-4">
-                    <MessageSquare className="w-10 h-10 text-gray-600" />
+                  <div className="w-20 h-20 rounded-full bg-card border border-border flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare className="w-10 h-10 text-muted-foreground" />
                   </div>
-                  <h2 className="text-xl font-semibold text-white mb-2">Ask your Agent anything</h2>
-                  <p className="text-gray-400 text-sm max-w-md">
+                  <h2 className="text-xl font-semibold text-foreground mb-2">Ask your Agent anything</h2>
+                  <p className="text-muted-foreground text-sm max-w-md">
                     Ask about your GitHub profile, get career advice, project ideas, or help understanding your Cooked Level.
                   </p>
                   <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto px-4 sm:px-0">
@@ -388,7 +395,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                         key={idx}
                         onClick={() => handleNewChatWithQuery(suggestion)}
                         disabled={loading}
-                        className="text-left px-4 py-3 rounded-lg border border-[#30363d] bg-[#161b22] hover:bg-[#1c2128] text-sm text-gray-300 hover:text-white transition-colors disabled:opacity-50"
+                        className="text-left px-4 py-3 rounded-lg border border-border bg-card hover:bg-surface text-sm text-gray-300 hover:text-foreground transition-colors disabled:opacity-50"
                       >
                         {suggestion}
                       </button>
@@ -397,13 +404,13 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                 </div>
               </div>
               {/* New chat input */}
-              <div className="border-t border-[#30363d] bg-[#161b22] p-3 sm:p-4">
+              <div className="border-t border-border bg-card p-3 sm:p-4">
                 <div className="max-w-4xl mx-auto relative">
                   <input
                     ref={inputRef}
                     type="text"
                     placeholder="Ask something..."
-                    className="w-full pl-4 pr-12 py-3 rounded-md bg-[#0d1117] border border-[#30363d] text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#58a6ff]"
+                    className="w-full pl-4 pr-12 py-3 rounded-md bg-background border border-border text-foreground text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => {
