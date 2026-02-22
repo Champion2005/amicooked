@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import logo from '@/assets/amicooked_logo.png';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { useGitHubSignIn } from '@/hooks/useGitHubSignIn';
+import { auth } from '@/config/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { Github, Check, Zap, Crown, GraduationCap, ArrowRight, MessageSquare, RefreshCw, Sparkles } from 'lucide-react';
 
 const plans = [
@@ -102,6 +104,12 @@ export default function Pricing() {
     const { handleGitHubSignIn, loading } = useGitHubSignIn({
         onError: () => toast.error('Failed to sign in with GitHub. Please try again.'),
     });
+    const [currentUser, setCurrentUser] = useState(auth.currentUser);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => setCurrentUser(user));
+        return unsubscribe;
+    }, []);
 
     return (
         <div className="min-h-screen bg-background text-foreground">
@@ -129,14 +137,24 @@ export default function Pricing() {
                         >
                             ← Back to home
                         </Link>
-                        <Button
-                            onClick={handleGitHubSignIn}
-                            disabled={loading}
-                            className="bg-primary hover:bg-primary-hover text-foreground text-xs sm:text-sm"
-                        >
-                            <Github className="mr-1 sm:mr-2 h-4 w-4" />
-                            {loading ? 'Signing in...' : 'Sign in with GitHub'}
-                        </Button>
+                        {currentUser ? (
+                            <Button
+                                onClick={() => navigate('/results')}
+                                className="bg-primary hover:bg-primary-hover text-foreground text-xs sm:text-sm"
+                            >
+                                <ArrowRight className="mr-1 sm:mr-2 h-4 w-4" />
+                                Return to Results
+                            </Button>
+                        ) : (
+                            <Button
+                                onClick={handleGitHubSignIn}
+                                disabled={loading}
+                                className="bg-primary hover:bg-primary-hover text-foreground text-xs sm:text-sm"
+                            >
+                                <Github className="mr-1 sm:mr-2 h-4 w-4" />
+                                {loading ? 'Signing in...' : 'Sign in with GitHub'}
+                            </Button>
+                        )}
                     </div>
                 </div>
             </nav>

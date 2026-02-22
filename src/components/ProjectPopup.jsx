@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   X, Send, Loader2, Lightbulb, BookOpen, MessageSquare, Wrench,
-  Bookmark, ChevronDown, ChevronUp
+  Bookmark, ChevronDown, ChevronUp, AlertCircle
 } from 'lucide-react';
 import { createAgent } from '@/services/agent';
 import { auth } from '@/config/firebase';
@@ -9,7 +9,10 @@ import {
   saveProject, unsaveProject, isProjectSaved,
   addProjectMessage, getSavedProject, slugify
 } from '@/services/savedProjects';
+import { checkLimit, incrementUsage } from '@/services/usage';
+import { USAGE_TYPES, formatLimit } from '@/config/plans';
 import ChatMessage from '@/components/ChatMessage';
+import { useToast } from '@/components/ui/Toast';
 
 /**
  * ProjectPopup — modal for a project with collapsible info header,
@@ -28,10 +31,12 @@ export default function ProjectPopup({
   const [savingBookmark, setSavingBookmark] = useState(false);
   const [infoExpanded, setInfoExpanded] = useState(initiallyExpanded);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [usingFallback, setUsingFallback] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const agentRef = useRef(null);
   const userId = auth.currentUser?.uid;
+  const toast = useToast();
 
   // Sync state & create fresh agent when project changes
   useEffect(() => {
@@ -135,6 +140,15 @@ export default function ProjectPopup({
 
   const handleAsk = async () => {
     if (!question.trim() || loading) return;
+
+    // Check project chat usage limit
+    const limitCheck = await checkLimit(userId, USAGE_TYPES.PROJECT_CHAT);
+    if (!limitCheck.allowed) {
+      toast.error(`You've used all ${formatLimit(limitCheck.limit)} project chat messages for this period. Upgrade your plan to continue.`);
+      return;
+    }
+    setUsingFallback(limitCheck.usingFallback);
+
     const userMsg = question.trim();
     setQuestion('');
     const userTimestamp = new Date().toISOString();
@@ -155,7 +169,7 @@ export default function ProjectPopup({
       const assistantMessage = { role: 'assistant', content: '' };
       setMessages(prev => [...prev, assistantMessage]);
 
-      // Stream the response
+      // Stream the response using the resolved model
       let fullResponse = '';
       await agentRef.current.processProjectMessage(userMsg, project, (chunk) => {
         fullResponse += chunk;
@@ -168,7 +182,7 @@ export default function ProjectPopup({
           };
           return updated;
         });
-      });
+      }, limitCheck.model);
 
       // Set timestamp after streaming completes
       setMessages(prev => {
@@ -183,6 +197,9 @@ export default function ProjectPopup({
         await addProjectMessage(userId, projectId, 'user', userMsg).catch(() => {});
         await addProjectMessage(userId, projectId, 'assistant', fullResponse).catch(() => {});
       }
+
+      // Increment project chat usage counter
+      await incrementUsage(userId, USAGE_TYPES.PROJECT_CHAT);
     } catch (error) {
       console.error('Project chat error:', error);
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong. Please try again.', timestamp: new Date().toISOString() }]);
@@ -319,6 +336,13 @@ export default function ProjectPopup({
 
           {/* Input */}
           <div className="px-4 sm:px-5 py-3 border-t border-border bg-card shrink-0">
+            {/* Fallback model notice */}
+            {usingFallback && (
+              <div className="flex items-center gap-2 text-xs text-amber-400/80 bg-amber-400/5 border border-amber-400/20 rounded-md px-3 py-1.5 mb-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>Free model active — <a href="/pricing" className="underline hover:text-amber-400">upgrade</a> for better responses.</span>
+              </div>
+            )}
             <div className="relative">
               <input
                 ref={inputRef}

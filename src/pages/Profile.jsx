@@ -1,12 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { auth } from '@/config/firebase';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { useToast } from '@/components/ui/Toast';
+import TagInput from '@/components/ui/TagInput';
 import { getUserProfile, saveUserProfile } from '@/services/userProfile';
 import logo from '@/assets/amicooked_logo.png';
-import { Loader2, User, ArrowLeft } from 'lucide-react';
+import { Loader2, User, ArrowLeft, CreditCard } from 'lucide-react';
+import { getUsageSummary } from '@/services/usage';
+import { USAGE_TYPES, formatLimit, PERIOD_DAYS } from '@/config/plans';
+import { SKILL_SUGGESTIONS, INTEREST_SUGGESTIONS } from '@/config/tagSuggestions';
+
+// Character limits for free-text fields
+const CHAR_LIMITS = {
+  currentRole: 60,
+  careerGoal: 120,
+  hobbies: 150,
+};
+
+/**
+ * Normalise a tag field that may arrive from Firestore as a legacy
+ * comma-separated string into a proper string[].
+ */
+function normaliseTags(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    return value.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  return [];
+}
 
 export default function Profile() {
   const [loading, setLoading] = useState(false);
@@ -21,11 +44,13 @@ export default function Profile() {
   const resultsData = location.state?.resultsData; // Preserve results data if coming from Results
 
   // Form state
+  const [usageSummary, setUsageSummary] = useState(null);
+
   const [formData, setFormData] = useState({
     age: '',
     education: '',
-    technicalSkills: '',
-    technicalInterests: '',
+    technicalSkills: [],
+    technicalInterests: [],
     hobbies: '',
     careerGoal: '',
     experienceYears: '',
@@ -34,6 +59,10 @@ export default function Profile() {
     collaborationPreference: '',
     jobUrgency: '',
   });
+
+  // Snapshot of last-saved form data to detect unsaved changes
+  const savedSnapshot = useRef(null);
+  const unsavedToastShown = useRef(false);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -44,14 +73,37 @@ export default function Profile() {
 
     // Load existing profile if available
     loadUserProfile(user.uid);
+
+    // Load usage summary for plan badge & stats
+    getUsageSummary(user.uid).then(setUsageSummary).catch(() => {});
   }, [navigate]);
+
+  // Show a one-time toast when the user first makes an unsaved change
+  useEffect(() => {
+    if (!savedSnapshot.current) return;
+    const dirty = JSON.stringify(formData) !== JSON.stringify(savedSnapshot.current);
+    if (dirty && !unsavedToastShown.current) {
+      toast.warning('You have unsaved changes');
+      unsavedToastShown.current = true;
+    }
+    // Reset the flag when form matches saved state again (e.g. after undo)
+    if (!dirty) {
+      unsavedToastShown.current = false;
+    }
+  }, [formData, toast]);
 
   const loadUserProfile = async (userId) => {
     try {
       setProfileLoading(true);
       const profile = await getUserProfile(userId);
       if (profile) {
-        setFormData(profile);
+        const normalised = {
+          ...profile,
+          technicalSkills: normaliseTags(profile.technicalSkills),
+          technicalInterests: normaliseTags(profile.technicalInterests),
+        };
+        setFormData(normalised);
+        savedSnapshot.current = normalised;
         setIsEditing(true);
       }
     } catch (error) {
@@ -63,10 +115,17 @@ export default function Profile() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    // Enforce character limits on free-text fields
+    const limit = CHAR_LIMITS[name];
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: limit ? value.slice(0, limit) : value
     }));
+  };
+
+  // Handler for TagInput fields (technicalSkills / technicalInterests)
+  const handleTagChange = (name) => (tags) => {
+    setFormData(prev => ({ ...prev, [name]: tags }));
   };
 
   const handleSaveProfile = async () => {
@@ -74,7 +133,7 @@ export default function Profile() {
     if (!user) return;
 
     // Validate required fields
-    if (!formData.age || !formData.education || !formData.technicalSkills || 
+    if (!formData.age || !formData.education || !formData.technicalSkills?.length || 
         !formData.experienceYears || !formData.careerGoal || !formData.currentRole) {
       toast.error('Please fill in all required fields');
       return;
@@ -84,6 +143,8 @@ export default function Profile() {
       setLoading(true);
       // Save raw form data (keep education as the select value e.g. "high_school")
       await saveUserProfile(user.uid, formData);
+      savedSnapshot.current = { ...formData };
+      unsavedToastShown.current = false;
       toast.success(isEditing ? 'Profile updated!' : 'Profile saved!');
       
       // If we have results data, pass it back when navigating to results
@@ -141,8 +202,60 @@ export default function Profile() {
               : "Tell us about yourself so we can provide personalized recommendations"
             }
           </CardDescription>
+          {usageSummary && (
+            <div className="flex justify-center mt-3">
+              <span className={`text-xs font-semibold px-3 py-1 rounded-full ${usageSummary.planConfig.badge.className}`}>
+                {usageSummary.planConfig.badge.label} Plan
+              </span>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-6 px-4 sm:px-6">
+          {/* ─── Plan Usage Card ─── */}
+          {usageSummary && (
+            <div className="bg-surface border border-border rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-accent" />
+                  AI Usage — {usageSummary.planConfig.name} Plan
+                </h3>
+                {usageSummary.plan === 'free' && (
+                  <a href="/pricing" className="text-xs text-accent hover:underline">Upgrade →</a>
+                )}
+              </div>
+              {[
+                [USAGE_TYPES.MESSAGE, 'Messages'],
+                [USAGE_TYPES.REANALYZE, 'Reanalyzes'],
+                [USAGE_TYPES.PROJECT_CHAT, 'Project Chats'],
+              ].map(([type, label]) => {
+                const limit = usageSummary.planConfig.limits[type] ?? null;
+                const current = usageSummary.usage[type] ?? 0;
+                const pct = limit === null ? 0 : Math.min(100, (current / limit) * 100);
+                return (
+                  <div key={type} className="space-y-1">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{label}</span>
+                      <span>{current} / {formatLimit(limit)}</span>
+                    </div>
+                    {limit !== null && (
+                      <div className="h-1.5 rounded-full bg-background overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            pct >= 100 ? 'bg-red-500' : 'bg-accent'
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              <p className="text-xs text-muted-foreground">
+                Resets every {PERIOD_DAYS} days from your first use.
+              </p>
+            </div>
+          )}
+
           {/* ─── Required Fields ─── */}
           <div className="space-y-4">
             {/* Row: Age + Experience */}
@@ -171,7 +284,7 @@ export default function Profile() {
                 <select
                   id="experienceYears"
                   name="experienceYears"
-                  className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full px-4 py-3 pr-10 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%239ca3af%22%20d%3D%22M2%204l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_16px_center] bg-no-repeat"
                   value={formData.experienceYears}
                   onChange={handleInputChange}
                   disabled={loading}
@@ -195,7 +308,7 @@ export default function Profile() {
                 <select
                   id="education"
                   name="education"
-                  className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full px-4 py-3 pr-10 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%239ca3af%22%20d%3D%22M2%204l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_16px_center] bg-no-repeat"
                   value={formData.education}
                   onChange={handleInputChange}
                   disabled={loading}
@@ -220,12 +333,14 @@ export default function Profile() {
                   id="currentRole"
                   name="currentRole"
                   type="text"
+                  maxLength={CHAR_LIMITS.currentRole}
                   placeholder="e.g., CS Student, Junior Dev, Career Switcher"
                   className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
                   value={formData.currentRole}
                   onChange={handleInputChange}
                   disabled={loading}
                 />
+                <p className="text-xs text-muted-foreground text-right">{formData.currentRole.length}/{CHAR_LIMITS.currentRole}</p>
               </div>
             </div>
 
@@ -238,13 +353,17 @@ export default function Profile() {
                 id="careerGoal"
                 name="careerGoal"
                 type="text"
+                maxLength={CHAR_LIMITS.careerGoal}
                 placeholder="e.g., Full-Stack Developer at FAANG, Startup Founder, Freelance Consultant"
                 className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
                 value={formData.careerGoal}
                 onChange={handleInputChange}
                 disabled={loading}
               />
-              <p className="text-xs text-muted-foreground">What's your dream role or career path?</p>
+              <div className="flex justify-between">
+                <p className="text-xs text-muted-foreground">What's your dream role or career path?</p>
+                <p className="text-xs text-muted-foreground">{formData.careerGoal.length}/{CHAR_LIMITS.careerGoal}</p>
+              </div>
             </div>
 
             {/* Technical Skills */}
@@ -252,14 +371,12 @@ export default function Profile() {
               <label htmlFor="technicalSkills" className="text-sm font-medium text-foreground">
                 Technical Skills <span className="text-red-500">*</span>
               </label>
-              <textarea
+              <TagInput
                 id="technicalSkills"
-                name="technicalSkills"
-                rows="2"
-                placeholder="e.g., JavaScript, React, Python, SQL, Docker, Git"
-                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                value={formData.technicalSkills}
-                onChange={handleInputChange}
+                tags={formData.technicalSkills}
+                onChange={handleTagChange('technicalSkills')}
+                suggestions={SKILL_SUGGESTIONS}
+                placeholder="e.g., JavaScript, React, Python…"
                 disabled={loading}
               />
               <p className="text-xs text-muted-foreground">Languages, frameworks, and tools you have experience with</p>
@@ -279,14 +396,12 @@ export default function Profile() {
               <label htmlFor="technicalInterests" className="text-sm font-medium text-foreground">
                 Technical Interests
               </label>
-              <textarea
+              <TagInput
                 id="technicalInterests"
-                name="technicalInterests"
-                rows="2"
-                placeholder="e.g., Web Dev, Machine Learning, Cloud, Mobile Apps"
-                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                value={formData.technicalInterests}
-                onChange={handleInputChange}
+                tags={formData.technicalInterests}
+                onChange={handleTagChange('technicalInterests')}
+                suggestions={INTEREST_SUGGESTIONS}
+                placeholder="e.g., Web Dev, Machine Learning, Cloud…"
                 disabled={loading}
               />
               <p className="text-xs text-muted-foreground">Areas of tech you're passionate about or want to explore</p>
@@ -301,7 +416,7 @@ export default function Profile() {
                 <select
                   id="learningStyle"
                   name="learningStyle"
-                  className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full px-4 py-3 pr-10 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%239ca3af%22%20d%3D%22M2%204l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_16px_center] bg-no-repeat"
                   value={formData.learningStyle}
                   onChange={handleInputChange}
                   disabled={loading}
@@ -321,7 +436,7 @@ export default function Profile() {
                 <select
                   id="collaborationPreference"
                   name="collaborationPreference"
-                  className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full px-4 py-3 pr-10 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%239ca3af%22%20d%3D%22M2%204l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_16px_center] bg-no-repeat"
                   value={formData.collaborationPreference}
                   onChange={handleInputChange}
                   disabled={loading}
@@ -343,7 +458,7 @@ export default function Profile() {
               <select
                 id="jobUrgency"
                 name="jobUrgency"
-                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="w-full px-4 py-3 pr-10 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%239ca3af%22%20d%3D%22M2%204l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_16px_center] bg-no-repeat"
                 value={formData.jobUrgency}
                 onChange={handleInputChange}
                 disabled={loading}
@@ -366,13 +481,17 @@ export default function Profile() {
                 id="hobbies"
                 name="hobbies"
                 rows="2"
+                maxLength={CHAR_LIMITS.hobbies}
                 placeholder="e.g., Gaming, Photography, Writing, Sports"
                 className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 value={formData.hobbies}
                 onChange={handleInputChange}
                 disabled={loading}
               />
-              <p className="text-xs text-muted-foreground">Helps us suggest projects that align with your passions</p>
+              <div className="flex justify-between">
+                <p className="text-xs text-muted-foreground">Helps us suggest projects that align with your passions</p>
+                <p className="text-xs text-muted-foreground">{formData.hobbies.length}/{CHAR_LIMITS.hobbies}</p>
+              </div>
             </div>
           </div>
 
@@ -392,7 +511,7 @@ export default function Profile() {
             )}
             <Button 
               onClick={handleSaveProfile}
-              disabled={loading || !formData.age || !formData.education || !formData.technicalSkills || !formData.experienceYears || !formData.careerGoal || !formData.currentRole}
+              disabled={loading || !formData.age || !formData.education || !formData.technicalSkills?.length || !formData.experienceYears || !formData.careerGoal || !formData.currentRole}
               className={`h-11 sm:h-12 text-base sm:text-lg bg-primary hover:bg-primary-hover text-foreground ${!isEditing ? 'w-full' : 'flex-1'}`}
               size="lg"
             >

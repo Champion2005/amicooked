@@ -39,6 +39,7 @@ export function ToastProvider({ children }) {
     Object.assign((msg) => addToast(msg, 'info'), {
       success: (msg) => addToast(msg, 'success'),
       error: (msg) => addToast(msg, 'error'),
+      warning: (msg) => addToast(msg, 'warning'),
       info: (msg) => addToast(msg, 'info'),
     }),
     [addToast],
@@ -47,6 +48,7 @@ export function ToastProvider({ children }) {
   const variantStyles = {
     success: 'border-l-4 border-l-primary text-primary',
     error: 'border-l-4 border-l-red-400 text-red-400',
+    warning: 'border-l-4 border-l-yellow-400 text-yellow-400',
     info: 'border-l-4 border-l-accent text-accent',
   };
 
@@ -59,6 +61,11 @@ export function ToastProvider({ children }) {
     error: (
       <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    ),
+    warning: (
+      <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86l-8.58 14.86A1 1 0 002.59 20h18.82a1 1 0 00.88-1.28L13.71 3.86a1 1 0 00-1.42 0z" />
       </svg>
     ),
     info: (

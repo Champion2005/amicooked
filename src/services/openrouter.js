@@ -105,6 +105,9 @@ function normalizeAnalysis(raw) {
 }
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
+/** Default model used when no override is provided. */
+export const DEFAULT_MODEL = "openrouter/free";
+
 if (!OPENROUTER_API_KEY) {
   console.error("Missing VITE_OPENROUTER_API_KEY environment variable");
 }
@@ -118,6 +121,14 @@ export function formatGitHubMetrics(githubData, userProfile) {
   const ed = formatEducation(userProfile.education);
   const exp = userProfile.experienceYears?.replace(/_/g, " ") || "Unknown";
 
+  // Normalise tag fields: accept both string[] (new) and legacy comma-separated string
+  const skills = Array.isArray(userProfile.technicalSkills)
+    ? userProfile.technicalSkills.join(', ')
+    : (userProfile.technicalSkills || 'Not specified');
+  const interests = Array.isArray(userProfile.technicalInterests)
+    ? userProfile.technicalInterests.join(', ')
+    : (userProfile.technicalInterests || '');
+
   return `
 ## USER PROFILE
 - Age: ${userProfile.age}
@@ -125,7 +136,7 @@ export function formatGitHubMetrics(githubData, userProfile) {
 - Experience: ${exp}
 - Current Status: ${userProfile.currentRole || "Unknown"}
 - Career Goal: ${userProfile.careerGoal || "Not specified"}
-- Technical Skills: ${userProfile.technicalSkills || "Not specified"}${userProfile.technicalInterests ? `\n- Technical Interests: ${userProfile.technicalInterests}` : ""}${userProfile.learningStyle ? `\n- Learning Style: ${userProfile.learningStyle.replace(/_/g, ' ')}` : ""}${userProfile.collaborationPreference ? `\n- Work Approach: ${userProfile.collaborationPreference.replace(/_/g, ' ')}` : ""}${userProfile.jobUrgency ? `\n- Job Search Timeline: ${userProfile.jobUrgency.replace(/_/g, ' ')}` : ""}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ""}
+- Technical Skills: ${skills}${interests ? `\n- Technical Interests: ${interests}` : ""}${userProfile.learningStyle ? `\n- Learning Style: ${userProfile.learningStyle.replace(/_/g, ' ')}` : ""}${userProfile.collaborationPreference ? `\n- Work Approach: ${userProfile.collaborationPreference.replace(/_/g, ' ')}` : ""}${userProfile.jobUrgency ? `\n- Job Search Timeline: ${userProfile.jobUrgency.replace(/_/g, ' ')}` : ""}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ""}
 
 ## GITHUB METRICS
 
@@ -209,13 +220,14 @@ function safeParseJSON(raw) {
 }
 
 /**
- * Call OpenRouter API with auto model selection
+ * Call OpenRouter API with optional model override.
  * @param {string} prompt - The prompt to send to the AI
  * @param {string} systemPrompt - Optional system prompt for context
  * @param {Function} onChunk - Optional callback for streaming chunks: (text) => void
+ * @param {string} model - Optional model override (defaults to DEFAULT_MODEL)
  * @returns {Promise<string>} - AI response text
  */
-export async function callOpenRouter(prompt, systemPrompt = "", onChunk = null) {
+export async function callOpenRouter(prompt, systemPrompt = "", onChunk = null, model = DEFAULT_MODEL) {
   try {
     const response = await fetch(OPENROUTER_API_URL, {
       method: "POST",
@@ -226,7 +238,7 @@ export async function callOpenRouter(prompt, systemPrompt = "", onChunk = null) 
         "X-Title": "amicooked",
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-4-scout", // Auto-select model based on prompt
+        model, // injected from plan config or DEFAULT_MODEL
         stream: !!onChunk, // Enable streaming if callback provided
         messages: [
           ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
@@ -291,7 +303,7 @@ export async function callOpenRouter(prompt, systemPrompt = "", onChunk = null) 
  * Phase 1: Ask the AI for category scores only.
  * Returns a normalized categoryScores object.
  */
-async function fetchCategoryScores(githubData, userProfile) {
+async function fetchCategoryScores(githubData, userProfile, model = DEFAULT_MODEL) {
   const systemPrompt = getScoringInstructions();
   const metricsBlock = formatGitHubMetrics(githubData, userProfile);
 
@@ -301,7 +313,7 @@ ${metricsBlock}
 
 Return ONLY the JSON object with categoryScores. No extra text.`;
 
-  const response = await callOpenRouter(prompt, systemPrompt);
+  const response = await callOpenRouter(prompt, systemPrompt, null, model);
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   let parsed = jsonMatch ? safeParseJSON(jsonMatch[0]) : null;
 
@@ -324,7 +336,7 @@ ${missing.map((k) => `    "${k}": { "score": <integer 0-100>, "notes": "<1 sente
   }
 }`;
     try {
-      const retryResp = await callOpenRouter(retryPrompt, systemPrompt);
+      const retryResp = await callOpenRouter(retryPrompt, systemPrompt, null, model);
       const retryMatch = retryResp.match(/\{[\s\S]*\}/);
       if (retryMatch) {
         const retryParsed = safeParseJSON(retryMatch[0]);
@@ -347,7 +359,7 @@ ${missing.map((k) => `    "${k}": { "score": <integer 0-100>, "notes": "<1 sente
  * Phase 2: Given pre-computed category scores, ask the AI for the
  * summary, recommendations, and insights.
  */
-async function fetchSynthesis(githubData, userProfile, categoryScores, onChunk = null) {
+async function fetchSynthesis(githubData, userProfile, categoryScores, onChunk = null, model = DEFAULT_MODEL) {
   const systemPrompt = getChatInstructions() + getAnalysisModeInstructions("SYNTHESIS");
   const metricsBlock = formatGitHubMetrics(githubData, userProfile);
 
@@ -376,7 +388,7 @@ Return ONLY this JSON (no extra text):
   const response = await callOpenRouter(prompt, systemPrompt, (chunk) => {
     fullResponse += chunk;
     if (onChunk) onChunk(chunk);
-  });
+  }, model);
 
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   const parsed = jsonMatch ? safeParseJSON(jsonMatch[0]) : null;
@@ -390,15 +402,16 @@ Return ONLY this JSON (no extra text):
  * @param {Object} githubData - User's GitHub metrics
  * @param {Object} userProfile - User's profile data (age, education, interests, etc.)
  * @param {Function} onSynthesisChunk - Optional callback for streaming synthesis chunks
+ * @param {string} model - Optional model override
  * @returns {Promise<Object>} - { cookedLevel, levelName, summary, recommendations, categoryScores, ... }
  */
-export async function analyzeCookedLevel(githubData, userProfile, onSynthesisChunk = null) {
+export async function analyzeCookedLevel(githubData, userProfile, onSynthesisChunk = null, model = DEFAULT_MODEL) {
   try {
     // Phase 1 — Scoring
-    const rawCategoryScores = await fetchCategoryScores(githubData, userProfile);
+    const rawCategoryScores = await fetchCategoryScores(githubData, userProfile, model);
 
     // Phase 2 — Synthesis (summary, recommendations, insights) with optional streaming
-    const synthesis = await fetchSynthesis(githubData, userProfile, rawCategoryScores, onSynthesisChunk);
+    const synthesis = await fetchSynthesis(githubData, userProfile, rawCategoryScores, onSynthesisChunk, model);
 
     // Combine and normalize
     const combined = { ...synthesis, categoryScores: rawCategoryScores };
@@ -414,9 +427,10 @@ export async function analyzeCookedLevel(githubData, userProfile, onSynthesisChu
  * @param {Object} githubData - User's GitHub metrics
  * @param {Object} userProfile - User's profile data
  * @param {Function} onChunk - Optional callback for streaming chunks
+ * @param {string} model - Optional model override
  * @returns {Promise<Array>} - Array of project objects with detailed info
  */
-export async function getRecommendedProjects(githubData, userProfile, onChunk = null) {
+export async function getRecommendedProjects(githubData, userProfile, onChunk = null, model = DEFAULT_MODEL) {
   const systemPrompt = getChatInstructions() + getAnalysisModeInstructions("PROJECT_RECOMMENDATION");
 
   const prompt = `Suggest exactly 4 projects targeting this user's skill gaps.
@@ -426,7 +440,7 @@ ${formatGitHubMetrics(githubData, userProfile)}
 Return ONLY a JSON array of exactly 4 projects matching the format in your instructions. No trailing commas. Double quotes only.`;
 
   try {
-    const response = await callOpenRouter(prompt, systemPrompt, onChunk);
+    const response = await callOpenRouter(prompt, systemPrompt, onChunk, model);
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const result = safeParseJSON(jsonMatch[0]);

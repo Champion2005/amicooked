@@ -3,10 +3,13 @@ import { auth } from '@/config/firebase';
 import logo from '@/assets/amicooked_logo.png';
 import { createAgent } from '@/services/agent';
 import { createChat, addMessage, getUserChats } from '@/services/chat';
+import { checkLimit, incrementUsage, getUsageSummary } from '@/services/usage';
+import { USAGE_TYPES, formatLimit } from '@/config/plans';
 import { 
-  X, Send, MessageSquare, Plus, Loader2, ChevronLeft, Flame, Bookmark 
+  X, Send, MessageSquare, Plus, Loader2, ChevronLeft, Flame, Bookmark, AlertCircle, Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useToast } from '@/components/ui/Toast';
 import ChatMessage from '@/components/ChatMessage';
 
 /**
@@ -26,14 +29,17 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
   const [loading, setLoading] = useState(false);
   const [chatsLoading, setChatsLoading] = useState(true);
   const [showSidebar, setShowSidebar] = useState(true);
+  const [usageSummary, setUsageSummary] = useState(null);
+  const [usingFallback, setUsingFallback] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const agentRef = useRef(null);
   const hasHandledInitialQuery = useRef(false);
 
   const userId = auth.currentUser?.uid;
+  const toast = useToast();
 
-  // Load chat history and initialise agent on open
+  // Load chat history, usage summary, and initialise agent on open
   useEffect(() => {
     if (isOpen && userId) {
       loadChats();
@@ -41,6 +47,8 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       // Create a fresh agent with full context (including pre-computed analysis)
       agentRef.current = createAgent();
       agentRef.current.initialize(githubData, userProfile, analysis);
+      // Load usage so we can show the usage bar
+      getUsageSummary(userId).then(setUsageSummary).catch(() => {});
     }
   }, [isOpen, userId]);
 
@@ -91,17 +99,25 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
     }
   };
 
-  const getAIResponse = async (userMessage, onChunk) => {
+  const getAIResponse = async (userMessage, onChunk, model) => {
     if (!agentRef.current) {
       agentRef.current = createAgent();
       await agentRef.current.initialize(githubData, userProfile, analysis);
     }
-    const result = await agentRef.current.processMessage(userMessage, 'QUICK_CHAT', onChunk);
+    const result = await agentRef.current.processMessage(userMessage, 'QUICK_CHAT', onChunk, model);
     return result.response;
   };
 
   const handleNewChatWithQuery = async (query) => {
     if (!query.trim() || loading) return;
+
+    // Check usage limit before making the AI call
+    const limitCheck = await checkLimit(userId, USAGE_TYPES.MESSAGE);
+    if (!limitCheck.allowed) {
+      toast.error(`You've used all ${formatLimit(limitCheck.limit)} messages for this period. Upgrade your plan to continue.`);
+      return;
+    }
+    setUsingFallback(limitCheck.usingFallback);
 
     setLoading(true);
     try {
@@ -118,7 +134,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       setActiveChat({ id: chatId, title: query.trim().substring(0, 50), messages: [...newMessages, assistantMessage] });
       if (window.innerWidth < 640) setShowSidebar(false);
 
-      // Get AI response via agent with streaming
+      // Get AI response via agent with streaming, using the resolved model
       let fullResponse = '';
       await getAIResponse(query.trim(), (chunk) => {
         fullResponse += chunk;
@@ -132,7 +148,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
           };
           return { ...prev, messages: updated };
         });
-      });
+      }, limitCheck.model);
 
       // Set timestamp after streaming completes
       setActiveChat(prev => {
@@ -143,6 +159,9 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       });
 
       await addMessage(userId, chatId, 'assistant', fullResponse);
+      await incrementUsage(userId, USAGE_TYPES.MESSAGE);
+      // Refresh usage display
+      getUsageSummary(userId).then(setUsageSummary).catch(() => {});
       await loadChats();
     } catch (error) {
       console.error('Error starting chat:', error);
@@ -155,6 +174,14 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
 
   const handleSendMessage = async () => {
     if (!input.trim() || loading || !activeChat) return;
+
+    // Check usage limit before making the AI call
+    const limitCheck = await checkLimit(userId, USAGE_TYPES.MESSAGE);
+    if (!limitCheck.allowed) {
+      toast.error(`You've used all ${formatLimit(limitCheck.limit)} messages for this period. Upgrade your plan to continue.`);
+      return;
+    }
+    setUsingFallback(limitCheck.usingFallback);
 
     const userMessage = input.trim();
     setInput('');
@@ -189,7 +216,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
           };
           return { ...prev, messages: updated };
         });
-      });
+      }, limitCheck.model);
 
       // Set timestamp after streaming completes
       setActiveChat(prev => {
@@ -200,6 +227,9 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       });
 
       await addMessage(userId, activeChat.id, 'assistant', fullResponse);
+      await incrementUsage(userId, USAGE_TYPES.MESSAGE);
+      // Refresh usage display
+      getUsageSummary(userId).then(setUsageSummary).catch(() => {});
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMsg = { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.', timestamp: new Date().toISOString() };
@@ -383,6 +413,13 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
 
               {/* Input */}
               <div className="border-t border-border bg-card p-3 sm:p-4">
+                {/* Fallback model notice */}
+                {usingFallback && (
+                  <div className="max-w-4xl mx-auto mb-2 flex items-center gap-2 text-xs text-amber-400/80 bg-amber-400/5 border border-amber-400/20 rounded-md px-3 py-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Free model active — <a href="/pricing" className="underline hover:text-amber-400">upgrade your plan</a> for better responses.</span>
+                  </div>
+                )}
                 <div className="max-w-4xl mx-auto relative">
                   <input
                     ref={inputRef}
@@ -402,6 +439,29 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                   </button>
                 </div>
+                {/* Usage bar */}
+                {usageSummary && usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE] !== null && (
+                  <div className="max-w-4xl mx-auto mt-2 flex items-center gap-2">
+                    <div className="flex-1 h-1 rounded-full bg-surface overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          (usageSummary.usage[USAGE_TYPES.MESSAGE] ?? 0) >= usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE]
+                            ? 'bg-red-500'
+                            : 'bg-accent'
+                        }`}
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            ((usageSummary.usage[USAGE_TYPES.MESSAGE] ?? 0) / usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE]) * 100
+                          )}%`
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {usageSummary.usage[USAGE_TYPES.MESSAGE] ?? 0} / {usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE]} messages
+                    </span>
+                  </div>
+                )}
               </div>
             </>
           ) : (
@@ -437,6 +497,13 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
               </div>
               {/* New chat input */}
               <div className="border-t border-border bg-card p-3 sm:p-4">
+                {/* Fallback model notice */}
+                {usingFallback && (
+                  <div className="max-w-4xl mx-auto mb-2 flex items-center gap-2 text-xs text-amber-400/80 bg-amber-400/5 border border-amber-400/20 rounded-md px-3 py-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Free model active — <a href="/pricing" className="underline hover:text-amber-400">upgrade your plan</a> for better responses.</span>
+                  </div>
+                )}
                 <div className="max-w-4xl mx-auto relative">
                   <input
                     ref={inputRef}
@@ -467,6 +534,29 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                   </button>
                 </div>
+                {/* Usage bar */}
+                {usageSummary && usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE] !== null && (
+                  <div className="max-w-4xl mx-auto mt-2 flex items-center gap-2">
+                    <div className="flex-1 h-1 rounded-full bg-surface overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          (usageSummary.usage[USAGE_TYPES.MESSAGE] ?? 0) >= usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE]
+                            ? 'bg-red-500'
+                            : 'bg-accent'
+                        }`}
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            ((usageSummary.usage[USAGE_TYPES.MESSAGE] ?? 0) / usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE]) * 100
+                          )}%`
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {usageSummary.usage[USAGE_TYPES.MESSAGE] ?? 0} / {usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE]} messages
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}

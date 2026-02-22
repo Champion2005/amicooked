@@ -3,7 +3,7 @@
  * Orchestrates analysis using comprehensive instructions, conversation memory, and pluggable skills
  */
 
-import { callOpenRouter, formatGitHubMetrics } from './openrouter';
+import { callOpenRouter, formatGitHubMetrics, DEFAULT_MODEL } from './openrouter';
 import { getChatInstructions, getAnalysisModeInstructions } from '@/config/agent-instructions';
 import { buildProjectSystemPrompt } from './projectChat';
 import { getChat, addMessage } from './chat';
@@ -194,8 +194,9 @@ export class AnalysisAgent {
    * @param {string} userMessage - The user's message
    * @param {string} mode - The processing mode (QUICK_CHAT, etc.)
    * @param {Function} onChunk - Optional callback for streaming chunks: (text) => void
+   * @param {string} model - Optional model override (from plan config)
    */
-  async processMessage(userMessage, mode = 'QUICK_CHAT', onChunk = null) {
+  async processMessage(userMessage, mode = 'QUICK_CHAT', onChunk = null, model = DEFAULT_MODEL) {
     this.memory.addMessage('user', userMessage);
 
     // Chat instructions — no scoring schema or JSON format requirements
@@ -220,7 +221,7 @@ export class AnalysisAgent {
 
     prompt += `# USER MESSAGE\n${userMessage}\n\nRespond based on the context above. Be specific to their actual metrics and give actionable advice.`;
 
-    const response = await callOpenRouter(prompt, systemPrompt, onChunk);
+    const response = await callOpenRouter(prompt, systemPrompt, onChunk, model);
     this.memory.addMessage('assistant', response);
 
     return {
@@ -238,9 +239,10 @@ export class AnalysisAgent {
    * @param {string} userMessage - The user's message
    * @param {Object} project - The project being discussed
    * @param {Function} onChunk - Optional callback for streaming chunks: (text) => void
+   * @param {string} model - Optional model override (from plan config)
    * @returns {{ response: string, memoryStatus: Object }}
    */
-  async processProjectMessage(userMessage, project, onChunk = null) {
+  async processProjectMessage(userMessage, project, onChunk = null, model = DEFAULT_MODEL) {
     this.memory.addMessage('user', userMessage);
 
     const systemPrompt = buildProjectSystemPrompt(
@@ -259,7 +261,7 @@ export class AnalysisAgent {
 
     prompt += `# USER MESSAGE\n${userMessage}\n\nRespond based on the project context above. Be specific and actionable.`;
 
-    const response = await callOpenRouter(prompt, systemPrompt, onChunk);
+    const response = await callOpenRouter(prompt, systemPrompt, onChunk, model);
     this.memory.addMessage('assistant', response);
 
     return {

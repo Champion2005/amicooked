@@ -9,7 +9,9 @@ import { fetchGitHubData } from '@/services/github';
 import { analyzeCookedLevel } from '@/services/openrouter';
 import { getRecommendedProjects } from '@/services/openrouter';
 import { getUserProfile, getAnalysisResults, saveAnalysisResults } from '@/services/userProfile';
-import { Loader2, Flame, User, Edit2 } from 'lucide-react';
+import { checkLimit, incrementUsage } from '@/services/usage';
+import { USAGE_TYPES, formatLimit } from '@/config/plans';
+import { Loader2, Flame, User, Edit2, RefreshCw, ArrowRight, BarChart2 } from 'lucide-react';
 import { formatEducation } from '@/utils/formatEducation';
 
 export default function Dashboard() {
@@ -18,6 +20,7 @@ export default function Dashboard() {
   const [userProfile, setUserProfile] = useState(null);
   const [status, setStatus] = useState('');
   const [tipIndex, setTipIndex] = useState(0);
+  const [reanalyzeUsage, setReanalyzeUsage] = useState(null); // { current, limit }
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
@@ -61,6 +64,12 @@ export default function Dashboard() {
     }
 
     loadUserProfile(user.uid);
+
+    if (forceReanalyze) {
+      checkLimit(user.uid, USAGE_TYPES.REANALYZE)
+        .then(({ current, limit }) => setReanalyzeUsage({ current, limit }))
+        .catch(() => {});
+    }
   }, [navigate]);
 
   const loadUserProfile = async (userId) => {
@@ -104,6 +113,24 @@ export default function Dashboard() {
         throw new Error('No GitHub token found');
       }
 
+      // Check reanalyze limit before running
+      const userId = auth.currentUser?.uid;
+      let analysisModel;
+      if (userId) {
+        const limitCheck = await checkLimit(userId, USAGE_TYPES.REANALYZE);
+        if (!limitCheck.allowed) {
+          toast.error(
+            `You've used all ${formatLimit(limitCheck.limit)} analyses for this period. Upgrade your plan to continue.`
+          );
+          setLoading(false);
+          return;
+        }
+        analysisModel = limitCheck.model;
+        if (limitCheck.usingFallback) {
+          toast.info('Free model active for this analysis — upgrade for better results.');
+        }
+      }
+
       setStatus('Connecting to GitHub...');
       await new Promise(r => setTimeout(r, 600));
 
@@ -114,13 +141,13 @@ export default function Dashboard() {
       await new Promise(r => setTimeout(r, 400));
 
       setStatus('AI is evaluating your profile — this may take a moment...');
-      const analysis = await analyzeCookedLevel(data, userProfile);
+      const analysis = await analyzeCookedLevel(data, userProfile, null, analysisModel);
 
       setStatus('Generating personalized project recommendations...');
       let recommendedProjects = null;
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          recommendedProjects = await getRecommendedProjects(data, userProfile);
+          recommendedProjects = await getRecommendedProjects(data, userProfile, null, analysisModel);
           break;
         } catch (err) {
           console.warn(`Project recommendations attempt ${attempt}/3 failed:`, err.message);
@@ -133,9 +160,9 @@ export default function Dashboard() {
       }
 
       setStatus('Saving your results...');
-      const userId = auth.currentUser?.uid;
       if (userId) {
         await saveAnalysisResults(userId, { githubData: data, analysis, recommendedProjects });
+        await incrementUsage(userId, USAGE_TYPES.REANALYZE);
       }
 
       setStatus('Done! Redirecting to your results...');
@@ -184,13 +211,34 @@ export default function Dashboard() {
             </button>
           </div>
           <CardTitle className="text-2xl sm:text-3xl text-center text-foreground">
-            Ready to Analyze!
+            {forceReanalyze ? 'Reanalyze Profile' : 'Ready to Analyze!'}
           </CardTitle>
           <CardDescription className="text-center text-muted-foreground">
-            Your profile is complete. Let's see how you measure up!
+            {forceReanalyze
+              ? 'Run a fresh analysis or go back to your existing results.'
+              : "Your profile is complete. Let's see how you measure up!"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 px-4 sm:px-6">
+          {/* Reanalyze usage */}
+          {forceReanalyze && reanalyzeUsage && (
+            <div className="flex items-center justify-between bg-surface border border-border rounded-lg px-3 sm:px-4 py-2.5 text-sm">
+              <span className="flex items-center gap-2 text-muted-foreground">
+                <BarChart2 className="w-4 h-4 text-accent" />
+                Reanalyses used this period
+              </span>
+              <span className="font-semibold text-foreground">
+                {reanalyzeUsage.current}
+                {reanalyzeUsage.limit !== null && (
+                  <span className="text-muted-foreground font-normal"> / {reanalyzeUsage.limit}</span>
+                )}
+                {reanalyzeUsage.limit === null && (
+                  <span className="text-muted-foreground font-normal"> / ∞</span>
+                )}
+              </span>
+            </div>
+          )}
+
           {/* Profile Summary */}
           <div className="bg-surface p-3 sm:p-4 rounded-lg border border-border space-y-2">
             <div className="flex items-center justify-between mb-3">
@@ -256,11 +304,22 @@ export default function Dashboard() {
               </>
             ) : (
               <>
-                <Flame className="mr-2 h-5 w-5" />
-                Analyze My Profile
+                {forceReanalyze ? <RefreshCw className="mr-2 h-5 w-5" /> : <Flame className="mr-2 h-5 w-5" />}
+                {forceReanalyze ? 'Reanalyze My Profile' : 'Analyze My Profile'}
               </>
             )}
           </Button>
+
+          {forceReanalyze && !loading && (
+            <Button
+              onClick={() => navigate('/results')}
+              variant="ghost"
+              className="w-full h-10 text-sm text-muted-foreground hover:text-foreground border border-border hover:border-border hover:bg-surface"
+            >
+              <ArrowRight className="mr-2 h-4 w-4" />
+              Return to existing results
+            </Button>
+          )}
         </CardContent>
       </Card>
     </div>

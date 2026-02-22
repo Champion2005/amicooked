@@ -2,11 +2,56 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // User profiles - users can read/write their own profile
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      // Chat history - users can read/write their own chats
+    // ─── Usage & plan helpers ───────────────────────────────────────────────
+
+    // Returns true if the client is trying to change the plan field.
+    // plan can only be set via Admin SDK (server-side); clients may not touch it.
+    function planUnchanged() {
+      let oldPlan = resource.data.get('plan', 'free');
+      let newPlan = request.resource.data.get('plan', 'free');
+      return newPlan == oldPlan;
+    }
+
+    // Returns true if the usage update is either:
+    //   (a) a legitimate period reset (periodStart advances + all counters reset to 0), or
+    //   (b) a counter increment within the same period (counters can only go up).
+    // This prevents clients from manually zeroing counters to bypass limits.
+    function usageUpdateValid() {
+      let touchingUsage = 'usage' in request.resource.data;
+      let hasOldUsage   = 'usage' in resource.data;
+      let newU      = request.resource.data.get('usage', {});
+      let oldU      = resource.data.get('usage', {});
+      let oldStart  = oldU.get('periodStart', '');
+      let newStart  = newU.get('periodStart', '');
+      return !touchingUsage
+          || !hasOldUsage
+          || (newStart > oldStart
+                ? (newU.get('messages', 0)     == 0
+                && newU.get('reanalyzes', 0)   == 0
+                && newU.get('projectChats', 0) == 0)
+                : (newStart == oldStart
+                && newU.get('messages', 0)     >= oldU.get('messages', 0)
+                && newU.get('reanalyzes', 0)   >= oldU.get('reanalyzes', 0)
+                && newU.get('projectChats', 0) >= oldU.get('projectChats', 0)));
+    }
+
+    // ─── User profiles ──────────────────────────────────────────────────────
+    match /users/{userId} {
+      // Read: own doc only
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Create: any authenticated user can create their own doc
+      allow create: if request.auth != null && request.auth.uid == userId;
+
+      // Update: own doc, but plan cannot be changed client-side and usage
+      //         counters may only increase (or reset when period advances).
+      allow update: if request.auth != null
+                    && request.auth.uid == userId
+                    && planUnchanged()
+                    && usageUpdateValid();
+
+      // Chat history
       match /chats/{chatId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
@@ -16,13 +61,13 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
 
-      // Saved analysis results - users can read/write their own results
+      // Saved analysis results
       match /results/{resultId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
-    
-    // Analysis results - users can read/write their own results
+
+    // Analysis results
     match /analyses/{analysisId} {
       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;

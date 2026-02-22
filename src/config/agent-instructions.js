@@ -346,7 +346,7 @@ export function getChatInstructions() {
 export const ANALYSIS_MODES = {
   INITIAL_ASSESSMENT: {
     focus: "First-time profile analysis",
-    additionalContext: "First analysis. Be thorough. Set baseline expectations. Focus on quick wins and long-term strategy."
+    additionalContext: "First analysis. Be thorough. Set baseline expectations. Focus on quick wins and refer to users timeframe for improvement (e.g. students have more time to grow than experienced devs)."
   },
 
   SYNTHESIS: {
@@ -388,7 +388,7 @@ Return ONLY this JSON — no extra text:
 - 70% familiar tech, 30% new
 - Completable in 2-8 weeks
 - Clear learning outcomes
-- suggestedStack MUST contain between 3 and 6 items — no fewer than 3, no more than 6
+- CRITICAL: Every project's suggestedStack must have AT LEAST 1 and AT MOST 6 entries. This is a hard requirement.
 
 Return JSON array:
 [{
@@ -398,12 +398,9 @@ Return JSON array:
   "alignment": "<1-2 sentence fit explanation>",
   "suggestedStack": [
     { "name": "<tech>", "description": "<role in project>" },
-    { "name": "<tech>", "description": "<role in project>" },
-    { "name": "<tech>", "description": "<role in project>" }
+    ...
   ]
-}]
-
-CRITICAL: Every project's suggestedStack must have AT LEAST 3 and AT MOST 6 entries. This is a hard requirement.`
+}]`
   },
 
   LEARNING_PATH: {

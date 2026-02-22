@@ -10,6 +10,8 @@ import {
   slugify,
 } from "@/services/savedProjects";
 import { createAgent } from "@/services/agent";
+import { checkLimit, incrementUsage } from "@/services/usage";
+import { USAGE_TYPES, formatLimit } from "@/config/plans";
 import {
   X,
   Bookmark,
@@ -28,7 +30,9 @@ import {
   CheckSquare,
   Square,
   MoreVertical,
+  AlertCircle,
 } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
 import ChatMessage from "@/components/ChatMessage";
 
 /**
@@ -59,10 +63,12 @@ export default function SavedProjectsOverlay({
   const [recommendedSaveStatus, setRecommendedSaveStatus] = useState({}); // {projectName: boolean}
   const [recommendedProjectsData, setRecommendedProjectsData] = useState([]); // Enriched with updatedAt
   const [savingBookmark, setSavingBookmark] = useState(false);
+  const [usingFallback, setUsingFallback] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const agentRef = useRef(null);
   const userId = auth.currentUser?.uid;
+  const toast = useToast();
 
   // Load projects when overlay opens
   useEffect(() => {
@@ -347,6 +353,15 @@ export default function SavedProjectsOverlay({
   // ── Chat ──
   const handleSendMessage = async () => {
     if (!input.trim() || chatLoading || !activeProject) return;
+
+    // Check project chat usage limit
+    const limitCheck = await checkLimit(userId, USAGE_TYPES.PROJECT_CHAT);
+    if (!limitCheck.allowed) {
+      toast.error(`You've used all ${formatLimit(limitCheck.limit)} project chat messages for this period. Upgrade your plan to continue.`);
+      return;
+    }
+    setUsingFallback(limitCheck.usingFallback);
+
     const userMsg = input.trim();
     setInput("");
 
@@ -383,7 +398,7 @@ export default function SavedProjectsOverlay({
       const assistantMessage = { role: "assistant", content: "" };
       setActiveProject((prev) => ({ ...prev, messages: [...newMessages, assistantMessage] }));
 
-      // Stream the response
+      // Stream the response using the resolved model
       let fullResponse = '';
       await agentRef.current.processProjectMessage(userMsg, activeProject, (chunk) => {
         fullResponse += chunk;
@@ -396,7 +411,7 @@ export default function SavedProjectsOverlay({
           };
           return { ...prev, messages: updated };
         });
-      });
+      }, limitCheck.model);
 
       // Set timestamp after streaming completes
       setActiveProject(prev => {
@@ -407,6 +422,8 @@ export default function SavedProjectsOverlay({
 
       // Persist AI response
       await addProjectMessage(userId, activeProject.id, "assistant", fullResponse);
+      // Increment usage counter
+      await incrementUsage(userId, USAGE_TYPES.PROJECT_CHAT);
     } catch (error) {
       console.error("Project chat error:", error);
       setActiveProject((prev) => ({
@@ -845,6 +862,13 @@ export default function SavedProjectsOverlay({
 
                 {/* Input */}
                 <div className="border-t border-border bg-card p-3 sm:p-4 shrink-0">
+                  {/* Fallback model notice */}
+                  {usingFallback && (
+                    <div className="max-w-4xl mx-auto mb-2 flex items-center gap-2 text-xs text-amber-400/80 bg-amber-400/5 border border-amber-400/20 rounded-md px-3 py-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Free model active — <a href="/pricing" className="underline hover:text-amber-400">upgrade</a> for better responses.</span>
+                    </div>
+                  )}
                   <div className="max-w-4xl mx-auto relative">
                     <input
                       ref={inputRef}

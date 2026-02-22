@@ -1,9 +1,12 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '@/assets/amicooked_logo.png';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { useToast } from '@/components/ui/Toast';
 import { useGitHubSignIn } from '@/hooks/useGitHubSignIn';
+import { auth } from '@/config/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { Flame, Github, Target, TrendingUp, Lightbulb, FolderGit2, BrainCircuit, ArrowRight } from 'lucide-react';
 
 export default function Landing() {
@@ -12,6 +15,12 @@ export default function Landing() {
   const { handleGitHubSignIn, loading } = useGitHubSignIn({
     onError: () => toast.error('Failed to sign in with GitHub. Please try again.'),
   });
+  const [currentUser, setCurrentUser] = useState(auth.currentUser);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => setCurrentUser(user));
+    return unsubscribe;
+  }, []);
 
   return (
       <div className="min-h-screen bg-background text-foreground">
@@ -30,14 +39,24 @@ export default function Landing() {
               >
                 See Pricing
               </Button>
-              <Button
-                  onClick={handleGitHubSignIn}
-                  disabled={loading}
-                  className="bg-primary hover:bg-primary-hover text-foreground text-xs sm:text-sm"
-              >
-                <Github className="mr-1 sm:mr-2 h-4 w-4" />
-                {loading ? 'Signing in...' : 'Sign in with GitHub'}
-              </Button>
+              {currentUser ? (
+                <Button
+                    onClick={() => navigate('/results')}
+                    className="bg-primary hover:bg-primary-hover text-foreground text-xs sm:text-sm"
+                >
+                  <ArrowRight className="mr-1 sm:mr-2 h-4 w-4" />
+                  Return to Results
+                </Button>
+              ) : (
+                <Button
+                    onClick={handleGitHubSignIn}
+                    disabled={loading}
+                    className="bg-primary hover:bg-primary-hover text-foreground text-xs sm:text-sm"
+                >
+                  <Github className="mr-1 sm:mr-2 h-4 w-4" />
+                  {loading ? 'Signing in...' : 'Sign in with GitHub'}
+                </Button>
+              )}
             </div>
           </div>
         </nav>
@@ -57,13 +76,13 @@ export default function Landing() {
             AmICooked analyzes your GitHub, matches it against real job requirements, and gives you a personalized roadmap of projects and skills to build — so your profile actually lands you interviews.
           </p>
           <Button
-              onClick={handleGitHubSignIn}
-              disabled={loading}
+              onClick={currentUser ? () => navigate('/dashboard', { state: { reanalyze: true } }) : handleGitHubSignIn}
+              disabled={!currentUser && loading}
               className="h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg bg-primary hover:bg-primary-hover text-foreground rounded-lg"
               size="lg"
           >
             <Github className="mr-2 h-5 w-5" />
-            {loading ? 'Signing in...' : 'Analyze My GitHub — Free'}
+            {!currentUser && loading ? 'Signing in...' : 'Analyze My GitHub — Free'}
           </Button>
           <p className="text-xs text-muted-foreground mt-4">
             Takes 30 seconds. We only read your public data.
@@ -219,13 +238,13 @@ export default function Landing() {
               Connect your GitHub and get a full 4-dimension breakdown, project roadmap, and a context-aware AI ready to answer anything about your profile — in under a minute.
             </p>
             <Button
-                onClick={handleGitHubSignIn}
-                disabled={loading}
+                onClick={currentUser ? () => navigate('/dashboard', { state: { reanalyze: true } }) : handleGitHubSignIn}
+                disabled={!currentUser && loading}
                 className="h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg bg-primary hover:bg-primary-hover text-foreground rounded-lg"
                 size="lg"
             >
               <Github className="mr-2 h-5 w-5" />
-              {loading ? 'Signing in...' : 'Get My Analysis'}
+              {!currentUser && loading ? 'Signing in...' : 'Get My Analysis'}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </div>
