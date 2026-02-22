@@ -4,7 +4,7 @@ import logo from '@/assets/amicooked_logo.png';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { useGitHubSignIn } from '@/hooks/useGitHubSignIn';
-import { Github, Check, Zap, Crown, GraduationCap, ArrowRight, MessageSquare, RefreshCw } from 'lucide-react';
+import { Github, Check, Zap, Crown, GraduationCap, ArrowRight, MessageSquare, RefreshCw, Sparkles } from 'lucide-react';
 
 const plans = [
     {
@@ -22,6 +22,7 @@ const plans = [
         description: 'Perfect for students building their first real portfolio.',
         aiMessages: '50 / month',
         regenerations: '15 / month',
+        model: 'Basic AI Model',
         cta: 'Get Student Plan',
         ctaStyle: 'bg-surface hover:bg-track border border-border text-foreground',
     },
@@ -40,6 +41,7 @@ const plans = [
         description: 'For developers serious about landing their next role.',
         aiMessages: '200 / month',
         regenerations: '50 / month',
+        model: 'Advanced AI Model',
         cta: 'Get Pro Plan',
         ctaStyle: 'bg-primary hover:bg-primary-hover text-foreground',
     },
@@ -58,6 +60,7 @@ const plans = [
         description: 'Unlimited power for developers who refuse to stay cooked.',
         aiMessages: 'Unlimited',
         regenerations: 'Unlimited',
+        model: 'State-of-the-art AI Model',
         cta: 'Get Ultimate Plan',
         ctaStyle: 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-foreground',
     },
@@ -67,7 +70,7 @@ const sharedFeatures = [
     'GitHub Profile Analysis',
     'Job Fit Checker',
     'Project Recommendations',
-    'AI Career Coach',
+    'AI Agent',
     'Progress Tracking',
     'Public Data Only — Always',
 ];
@@ -79,7 +82,7 @@ const faqs = [
     },
     {
         q: 'What counts as an "AI message"?',
-        a: 'Every message to the AI Career Coach or a Job Fit analysis counts as one AI message.',
+        a: 'Every message to the AI agent or a Job Fit analysis counts as one AI message.',
     },
     {
         q: "What's a \"regeneration\"?",
@@ -249,7 +252,8 @@ export default function Pricing() {
                                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                                             plan.aiMessages === 'Unlimited'
                                                 ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-300 border border-orange-500/20'
-                                                : 'bg-plan-student-bg text-accent'
+                                                : plan.id === 'pro' ? 'bg-green-500/15 text-green-400 border border-green-500/20'
+                                                : 'bg-plan-student-bg text-accent border border-accent/20'
                                         }`}>
                                             {plan.aiMessages}
                                         </span>
@@ -262,9 +266,25 @@ export default function Pricing() {
                                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                                             plan.regenerations === 'Unlimited'
                                                 ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-300 border border-orange-500/20'
-                                                : 'bg-accent/10 text-accent border border-accent/20'
+                                                : plan.id === 'pro' ? 'bg-green-500/15 text-green-400 border border-green-500/20'
+                                                : 'bg-plan-student-bg text-accent border border-accent/20'
                                         }`}>
                                             {plan.regenerations}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-sm text-foreground">
+                                            <Sparkles className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+                                            AI Model
+                                        </div>
+                                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                            plan.id === 'ultimate'
+                                                ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-300 border border-orange-500/20'
+                                                : plan.id === 'pro'
+                                                    ? 'bg-green-500/15 text-green-400 border border-green-500/20'
+                                                    : 'bg-plan-student-bg text-accent border border-accent/20'
+                                        }`}>
+                                            {plan.model}
                                         </span>
                                     </div>
                                 </div>

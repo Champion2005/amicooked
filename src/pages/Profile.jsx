@@ -29,7 +29,10 @@ export default function Profile() {
     hobbies: '',
     careerGoal: '',
     experienceYears: '',
-    currentRole: ''
+    currentRole: '',
+    learningStyle: '',
+    collaborationPreference: '',
+    jobUrgency: '',
   });
 
   useEffect(() => {
@@ -140,113 +143,90 @@ export default function Profile() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 px-4 sm:px-6">
-          {/* Profile Form */}
+          {/* ─── Required Fields ─── */}
           <div className="space-y-4">
-            {/* Age */}
-            <div className="space-y-2">
-              <label htmlFor="age" className="text-sm font-medium text-foreground">
-                Age <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="age"
-                name="age"
-                type="number"
-                min="13"
-                max="100"
-                placeholder="e.g., 21"
-                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
-                value={formData.age}
-                onChange={handleInputChange}
-                disabled={loading}
-              />
+            {/* Row: Age + Experience */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="age" className="text-sm font-medium text-foreground">
+                  Age <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="age"
+                  name="age"
+                  type="number"
+                  min="13"
+                  max="100"
+                  placeholder="e.g., 21"
+                  className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={formData.age}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <label htmlFor="experienceYears" className="text-sm font-medium text-foreground">
+                  Coding Experience <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="experienceYears"
+                  name="experienceYears"
+                  className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={formData.experienceYears}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                >
+                  <option value="">Select experience level</option>
+                  <option value="less_than_1">Less than 1 year</option>
+                  <option value="1-2">1–2 years</option>
+                  <option value="2-3">2–3 years</option>
+                  <option value="3-5">3–5 years</option>
+                  <option value="5+">5+ years</option>
+                </select>
+              </div>
             </div>
 
-            {/* Education Level */}
-            <div className="space-y-2">
-              <label htmlFor="education" className="text-sm font-medium text-foreground">
-                Education Level <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="education"
-                name="education"
-                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                value={formData.education}
-                onChange={handleInputChange}
-                disabled={loading}
-              >
-                <option value="">Select your education level</option>
-                <option value="high_school">High School</option>
-                <option value="undergrad_freshman">Undergrad - Freshman</option>
-                <option value="undergrad_sophomore">Undergrad - Sophomore</option>
-                <option value="undergrad_junior">Undergrad - Junior</option>
-                <option value="undergrad_senior">Undergrad - Senior</option>
-                <option value="graduate">Graduate Student</option>
-                <option value="bootcamp">Bootcamp Graduate</option>
-                <option value="self_taught">Self-Taught</option>
-                <option value="full_time">Full-Time Professional</option>
-              </select>
-            </div>
-
-            {/* Technical Skills */}
-            <div className="space-y-2">
-              <label htmlFor="technicalSkills" className="text-sm font-medium text-foreground">
-                Technical Skills <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                id="technicalSkills"
-                name="technicalSkills"
-                rows="3"
-                placeholder="e.g., JavaScript, React, Python, SQL, Docker, Git"
-                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                value={formData.technicalSkills}
-                onChange={handleInputChange}
-                disabled={loading}
-              />
-              <p className="text-xs text-muted-foreground">
-                List languages, frameworks, and tools you have experience with
-              </p>
-            </div>
-
-            {/* Technical Interests */}
-            <div className="space-y-2">
-              <label htmlFor="technicalInterests" className="text-sm font-medium text-foreground">
-                Technical Interests <span className="text-muted-foreground">(Optional)</span>
-              </label>
-              <textarea
-                id="technicalInterests"
-                name="technicalInterests"
-                rows="3"
-                placeholder="e.g., Web Development, Machine Learning, Cloud Computing, Mobile Apps"
-                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                value={formData.technicalInterests}
-                onChange={handleInputChange}
-                disabled={loading}
-              />
-              <p className="text-xs text-muted-foreground">
-                Areas of tech you're passionate about or want to explore
-              </p>
-            </div>
-
-            {/* Years of Experience */}
-            <div className="space-y-2">
-              <label htmlFor="experienceYears" className="text-sm font-medium text-foreground">
-                Years of Coding Experience <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="experienceYears"
-                name="experienceYears"
-                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                value={formData.experienceYears}
-                onChange={handleInputChange}
-                disabled={loading}
-              >
-                <option value="">Select experience level</option>
-                <option value="less_than_1">Less than 1 year</option>
-                <option value="1-2">1-2 years</option>
-                <option value="2-3">2-3 years</option>
-                <option value="3-5">3-5 years</option>
-                <option value="5+">5+ years</option>
-              </select>
+            {/* Row: Education + Current Status */}
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="education" className="text-sm font-medium text-foreground">
+                  Education Level <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="education"
+                  name="education"
+                  className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={formData.education}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                >
+                  <option value="">Select education level</option>
+                  <option value="high_school">High School</option>
+                  <option value="undergrad_freshman">Undergrad – Freshman</option>
+                  <option value="undergrad_sophomore">Undergrad – Sophomore</option>
+                  <option value="undergrad_junior">Undergrad – Junior</option>
+                  <option value="undergrad_senior">Undergrad – Senior</option>
+                  <option value="graduate">Graduate Student</option>
+                  <option value="bootcamp">Bootcamp Graduate</option>
+                  <option value="self_taught">Self-Taught</option>
+                  <option value="full_time">Full-Time Professional</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="currentRole" className="text-sm font-medium text-foreground">
+                  Current Status <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="currentRole"
+                  name="currentRole"
+                  type="text"
+                  placeholder="e.g., CS Student, Junior Dev, Career Switcher"
+                  className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={formData.currentRole}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                />
+              </div>
             </div>
 
             {/* Career Goal */}
@@ -264,32 +244,123 @@ export default function Profile() {
                 onChange={handleInputChange}
                 disabled={loading}
               />
-              <p className="text-xs text-muted-foreground">
-                What's your dream role or career path?
-              </p>
+              <p className="text-xs text-muted-foreground">What's your dream role or career path?</p>
             </div>
 
-            {/* Current Role/Status */}
+            {/* Technical Skills */}
             <div className="space-y-2">
-              <label htmlFor="currentRole" className="text-sm font-medium text-foreground">
-                Current Status <span className="text-red-500">*</span>
+              <label htmlFor="technicalSkills" className="text-sm font-medium text-foreground">
+                Technical Skills <span className="text-red-500">*</span>
               </label>
-              <input
-                id="currentRole"
-                name="currentRole"
-                type="text"
-                placeholder="e.g., CS Student, Junior Developer, Career Switcher, Actively Job Hunting"
-                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
-                value={formData.currentRole}
+              <textarea
+                id="technicalSkills"
+                name="technicalSkills"
+                rows="2"
+                placeholder="e.g., JavaScript, React, Python, SQL, Docker, Git"
+                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                value={formData.technicalSkills}
                 onChange={handleInputChange}
                 disabled={loading}
               />
+              <p className="text-xs text-muted-foreground">Languages, frameworks, and tools you have experience with</p>
+            </div>
+          </div>
+
+          {/* ─── Optional Fields ─── */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest whitespace-nowrap">Optional — helps personalize your results</span>
+              <div className="flex-1 h-px bg-border" />
             </div>
 
-            {/* Hobbies (Optional) */}
+            {/* Technical Interests */}
+            <div className="space-y-2">
+              <label htmlFor="technicalInterests" className="text-sm font-medium text-foreground">
+                Technical Interests
+              </label>
+              <textarea
+                id="technicalInterests"
+                name="technicalInterests"
+                rows="2"
+                placeholder="e.g., Web Dev, Machine Learning, Cloud, Mobile Apps"
+                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                value={formData.technicalInterests}
+                onChange={handleInputChange}
+                disabled={loading}
+              />
+              <p className="text-xs text-muted-foreground">Areas of tech you're passionate about or want to explore</p>
+            </div>
+
+            {/* Row: Learning Style + Work Approach */}
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="learningStyle" className="text-sm font-medium text-foreground">
+                  Learning Style
+                </label>
+                <select
+                  id="learningStyle"
+                  name="learningStyle"
+                  className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={formData.learningStyle}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                >
+                  <option value="">How do you learn best?</option>
+                  <option value="self_paced">Self-paced / Independent</option>
+                  <option value="structured">Structured / Course-driven</option>
+                  <option value="project_based">Project-based / Build to learn</option>
+                  <option value="hands_on">Hands-on / Trial and error</option>
+                  <option value="collaborative">Collaborative / Learn with others</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="collaborationPreference" className="text-sm font-medium text-foreground">
+                  Work Approach
+                </label>
+                <select
+                  id="collaborationPreference"
+                  name="collaborationPreference"
+                  className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={formData.collaborationPreference}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                >
+                  <option value="">How do you prefer to work?</option>
+                  <option value="solo">Mostly solo</option>
+                  <option value="small_team">Small team (2–4 people)</option>
+                  <option value="large_team">Larger team / org structure</option>
+                  <option value="mixed">Flexible / mixed</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Job Search Timeline */}
+            <div className="space-y-2">
+              <label htmlFor="jobUrgency" className="text-sm font-medium text-foreground">
+                Job Search Timeline
+              </label>
+              <select
+                id="jobUrgency"
+                name="jobUrgency"
+                className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                value={formData.jobUrgency}
+                onChange={handleInputChange}
+                disabled={loading}
+              >
+                <option value="">When are you looking to land a role?</option>
+                <option value="exploring">Just exploring — no rush</option>
+                <option value="few_months">In the next few months</option>
+                <option value="asap">As soon as possible</option>
+                <option value="already_employed">Already employed — improving skills</option>
+              </select>
+              <p className="text-xs text-muted-foreground">Helps us tailor advice for quick wins vs. long-term growth</p>
+            </div>
+
+            {/* Hobbies */}
             <div className="space-y-2">
               <label htmlFor="hobbies" className="text-sm font-medium text-foreground">
-                Hobbies & Interests <span className="text-muted-foreground">(Optional)</span>
+                Hobbies & Interests
               </label>
               <textarea
                 id="hobbies"
@@ -301,14 +372,12 @@ export default function Profile() {
                 onChange={handleInputChange}
                 disabled={loading}
               />
-              <p className="text-xs text-muted-foreground">
-                Helps us suggest projects that align with your interests
-              </p>
+              <p className="text-xs text-muted-foreground">Helps us suggest projects that align with your passions</p>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-row gap-3">
             {isEditing && (
               <Button 
                 onClick={handleCancel}

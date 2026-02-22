@@ -125,7 +125,7 @@ export function formatGitHubMetrics(githubData, userProfile) {
 - Experience: ${exp}
 - Current Status: ${userProfile.currentRole || "Unknown"}
 - Career Goal: ${userProfile.careerGoal || "Not specified"}
-- Technical Skills: ${userProfile.technicalSkills || "Not specified"}${userProfile.technicalInterests ? `\n- Technical Interests: ${userProfile.technicalInterests}` : ""}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ""}
+- Technical Skills: ${userProfile.technicalSkills || "Not specified"}${userProfile.technicalInterests ? `\n- Technical Interests: ${userProfile.technicalInterests}` : ""}${userProfile.learningStyle ? `\n- Learning Style: ${userProfile.learningStyle.replace(/_/g, ' ')}` : ""}${userProfile.collaborationPreference ? `\n- Work Approach: ${userProfile.collaborationPreference.replace(/_/g, ' ')}` : ""}${userProfile.jobUrgency ? `\n- Job Search Timeline: ${userProfile.jobUrgency.replace(/_/g, ' ')}` : ""}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ""}
 
 ## GITHUB METRICS
 

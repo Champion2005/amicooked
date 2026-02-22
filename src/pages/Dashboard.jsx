@@ -114,18 +114,7 @@ export default function Dashboard() {
       await new Promise(r => setTimeout(r, 400));
 
       setStatus('AI is evaluating your profile — this may take a moment...');
-      // Stream the synthesis chunks to show real-time progress
-      let streamedText = '';
-      const analysis = await analyzeCookedLevel(data, userProfile, (chunk) => {
-        streamedText += chunk;
-        // Show the first 120 chars of the synthesis streaming in real time
-        if (streamedText.length < 300) {
-          setStatus(`${streamedText}${chunk ? '▌' : ''}`);
-        } else {
-          // Once we have enough, just show a fixed message
-          setStatus('AI is analyzing your profile...');
-        }
-      });
+      const analysis = await analyzeCookedLevel(data, userProfile);
 
       setStatus('Generating personalized project recommendations...');
       let recommendedProjects = null;

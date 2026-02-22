@@ -833,7 +833,7 @@ export default function SavedProjectsOverlay({
                           <div className="px-4 py-3">
                             <div className="flex items-center gap-2 text-muted-foreground">
                               <Loader2 className="w-4 h-4 animate-spin" />
-                              <span className="text-sm">Streaming...</span>
+                              <span className="text-sm">Thinking...</span>
                             </div>
                           </div>
                         </div>
