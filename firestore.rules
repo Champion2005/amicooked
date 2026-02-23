@@ -13,6 +13,13 @@ service cloud.firestore {
       return newPlan == oldPlan;
     }
 
+    // On document creation, plan must be 'free' (or absent).
+    // Paid plans can only be granted server-side via Admin SDK.
+    function planIsValidOnCreate() {
+      let p = request.resource.data.get('plan', 'free');
+      return p == 'free';
+    }
+
     // Returns true if the usage update is either:
     //   (a) a legitimate period reset (periodStart advances + all counters reset to 0), or
     //   (b) a counter increment within the same period (counters can only go up).
@@ -41,8 +48,11 @@ service cloud.firestore {
       // Read: own doc only
       allow read: if request.auth != null && request.auth.uid == userId;
 
-      // Create: any authenticated user can create their own doc
-      allow create: if request.auth != null && request.auth.uid == userId;
+      // Create: own doc only, and plan must be 'free' (or absent).
+      // Paid plans are granted server-side only.
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && planIsValidOnCreate();
 
       // Update: own doc, but plan cannot be changed client-side and usage
       //         counters may only increase (or reset when period advances).
@@ -50,6 +60,10 @@ service cloud.firestore {
                     && request.auth.uid == userId
                     && planUnchanged()
                     && usageUpdateValid();
+
+      // Delete: own doc only — used by the account-deletion flow.
+      // Subcollections (chats, savedProjects, results) inherit their own write rules.
+      allow delete: if request.auth != null && request.auth.uid == userId;
 
       // Chat history
       match /chats/{chatId} {
@@ -63,6 +77,11 @@ service cloud.firestore {
 
       // Saved analysis results
       match /results/{resultId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Persistent agent state and memory
+      match /agent/{docId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }

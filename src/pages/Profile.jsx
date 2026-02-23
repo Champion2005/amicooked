@@ -5,12 +5,14 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { useToast } from '@/components/ui/Toast';
 import TagInput from '@/components/ui/TagInput';
-import { getUserProfile, saveUserProfile } from '@/services/userProfile';
+import { getUserProfile, saveUserProfile, getUserPreferences, saveUserPreferences } from '@/services/userProfile';
+import { DEV_NICKNAME_MAX_LENGTH } from '@/config/preferences';
 import logo from '@/assets/amicooked_logo.png';
 import { Loader2, User, ArrowLeft, CreditCard } from 'lucide-react';
 import { getUsageSummary } from '@/services/usage';
 import { USAGE_TYPES, formatLimit, PERIOD_DAYS } from '@/config/plans';
 import { SKILL_SUGGESTIONS, INTEREST_SUGGESTIONS } from '@/config/tagSuggestions';
+import { addMemoryItem, MEMORY_TYPES } from '@/services/agentPersistence';
 
 // Character limits for free-text fields
 const CHAR_LIMITS = {
@@ -46,6 +48,11 @@ export default function Profile() {
   // Form state
   const [usageSummary, setUsageSummary] = useState(null);
 
+  // Preferences state (nickname + confetti)
+  const [devNickname, setDevNickname] = useState('');
+  const [confetti, setConfetti] = useState(true);
+  const prefsSnapshot = useRef(null);
+
   const [formData, setFormData] = useState({
     age: '',
     education: '',
@@ -74,30 +81,61 @@ export default function Profile() {
     // Load existing profile if available
     loadUserProfile(user.uid);
 
+    // Load preferences (nickname + confetti)
+    getUserPreferences(user.uid)
+      .then((prefs) => {
+        setDevNickname(prefs.devNickname ?? '');
+        setConfetti(prefs.confetti !== false);
+        prefsSnapshot.current = {
+          devNickname: prefs.devNickname ?? '',
+          confetti: prefs.confetti !== false,
+        };
+      })
+      .catch(() => {});
+
     // Load usage summary for plan badge & stats
     getUsageSummary(user.uid).then(setUsageSummary).catch(() => {});
   }, [navigate]);
 
-  // Show a one-time toast when the user first makes an unsaved change
+  // Also include prefs in unsaved-changes detection
   useEffect(() => {
     if (!savedSnapshot.current) return;
-    const dirty = JSON.stringify(formData) !== JSON.stringify(savedSnapshot.current);
+    const profileDirty = JSON.stringify(formData) !== JSON.stringify(savedSnapshot.current);
+    const prefsDirty = prefsSnapshot.current
+      ? devNickname !== prefsSnapshot.current.devNickname || confetti !== prefsSnapshot.current.confetti
+      : false;
+    const dirty = profileDirty || prefsDirty;
     if (dirty && !unsavedToastShown.current) {
       toast.warning('You have unsaved changes');
       unsavedToastShown.current = true;
     }
-    // Reset the flag when form matches saved state again (e.g. after undo)
     if (!dirty) {
       unsavedToastShown.current = false;
     }
-  }, [formData, toast]);
+  }, [formData, devNickname, confetti, toast]);
 
   const loadUserProfile = async (userId) => {
     try {
       setProfileLoading(true);
       const profile = await getUserProfile(userId);
       if (profile) {
+        // Merge profile into the default shape so missing fields (e.g. after
+        // a data reset) fall back to safe defaults instead of undefined.
+        const defaults = {
+          age: '',
+          education: '',
+          technicalSkills: [],
+          technicalInterests: [],
+          hobbies: '',
+          careerGoal: '',
+          experienceYears: '',
+          currentRole: '',
+          learningStyle: '',
+          collaborationPreference: '',
+          jobUrgency: '',
+        };
         const normalised = {
+          ...defaults,
           ...profile,
           technicalSkills: normaliseTags(profile.technicalSkills),
           technicalInterests: normaliseTags(profile.technicalInterests),
@@ -143,8 +181,34 @@ export default function Profile() {
       setLoading(true);
       // Save raw form data (keep education as the select value e.g. "high_school")
       await saveUserProfile(user.uid, formData);
+      // Save preferences (nickname + confetti) alongside the profile
+      await saveUserPreferences(user.uid, {
+        devNickname: devNickname.trim().slice(0, DEV_NICKNAME_MAX_LENGTH),
+        confetti,
+      });
       savedSnapshot.current = { ...formData };
+      prefsSnapshot.current = { devNickname: devNickname.trim().slice(0, DEV_NICKNAME_MAX_LENGTH), confetti };
       unsavedToastShown.current = false;
+
+      // Push profile updates to agent memory (paid plans, fire-and-forget)
+      const planId = usageSummary?.plan || 'free';
+      const memoryItems = [];
+      if (formData.careerGoal) {
+        memoryItems.push({ type: MEMORY_TYPES.GOAL, content: `Career goal: ${formData.careerGoal}`, meta: { source: 'profile-update' } });
+      }
+      if (formData.currentRole) {
+        memoryItems.push({ type: MEMORY_TYPES.INSIGHT, content: `User identifies as: ${formData.currentRole}`, meta: { source: 'profile-update' } });
+      }
+      if (formData.technicalSkills?.length) {
+        memoryItems.push({ type: MEMORY_TYPES.INSIGHT, content: `Technical skills: ${formData.technicalSkills.join(', ')}`, meta: { source: 'profile-update' } });
+      }
+      if (formData.technicalInterests?.length) {
+        memoryItems.push({ type: MEMORY_TYPES.INSIGHT, content: `Interested in: ${formData.technicalInterests.join(', ')}`, meta: { source: 'profile-update' } });
+      }
+      for (const item of memoryItems) {
+        addMemoryItem(user.uid, planId, item).catch(() => {});
+      }
+
       toast.success(isEditing ? 'Profile updated!' : 'Profile saved!');
       
       // If we have results data, pass it back when navigating to results
@@ -492,6 +556,71 @@ export default function Profile() {
                 <p className="text-xs text-muted-foreground">Helps us suggest projects that align with your passions</p>
                 <p className="text-xs text-muted-foreground">{formData.hobbies.length}/{CHAR_LIMITS.hobbies}</p>
               </div>
+            </div>
+          </div>
+
+          {/* ─── For Fun ─── */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest whitespace-nowrap">For Fun</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            {/* Nickname */}
+            <div className="space-y-2">
+              <label htmlFor="devNickname" className="text-sm font-medium text-foreground">
+                Nickname{' '}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <p className="text-xs text-muted-foreground">
+                The AI will call you by this name during chats and analysis.
+              </p>
+              <div className="relative">
+                <input
+                  id="devNickname"
+                  type="text"
+                  maxLength={DEV_NICKNAME_MAX_LENGTH}
+                  placeholder="e.g., TerminalTerror, CSSWizard…"
+                  className="w-full px-4 py-3 rounded-md bg-background border border-border text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={devNickname}
+                  onChange={(e) => setDevNickname(e.target.value)}
+                  disabled={loading}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                  {devNickname.length}/{DEV_NICKNAME_MAX_LENGTH}
+                </span>
+              </div>
+            </div>
+
+            {/* Confetti toggle */}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  Confetti on good scores 🎉
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Celebrate when your Cooked Level is Toasted or higher.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={confetti}
+                onClick={() => setConfetti((v) => !v)}
+                disabled={loading}
+                className={`relative flex-shrink-0 w-11 h-6 rounded-full border transition-colors ${
+                  confetti
+                    ? 'bg-accent border-accent'
+                    : 'bg-surface border-border'
+                }`}
+              >
+                <span
+                  className={`absolute top-[1px] left-[1px] w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
+                    confetti ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
             </div>
           </div>
 

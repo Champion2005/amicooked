@@ -66,6 +66,42 @@ export async function saveAnalysisResults(userId, { githubData, analysis, recomm
 }
 
 /**
+ * Get user preferences from Firestore.
+ * Returns an empty object if no preferences have been saved yet.
+ *
+ * @param {string} userId - The user's Firebase Auth UID
+ * @returns {Promise<Object>} Preferences object
+ */
+export async function getUserPreferences(userId) {
+  try {
+    const ref = doc(db, 'users', userId);
+    const snap = await getDoc(ref);
+    return snap.exists() ? (snap.data().preferences ?? {}) : {};
+  } catch (error) {
+    console.error('Error fetching user preferences:', error);
+    throw error;
+  }
+}
+
+/**
+ * Save (merge) user preferences into Firestore.
+ * Only the keys provided in `preferences` are updated; all others are left intact.
+ *
+ * @param {string} userId - The user's Firebase Auth UID
+ * @param {Object} preferences - Partial preferences to persist
+ * @returns {Promise<void>}
+ */
+export async function saveUserPreferences(userId, preferences) {
+  try {
+    const ref = doc(db, 'users', userId);
+    await setDoc(ref, { preferences }, { merge: true });
+  } catch (error) {
+    console.error('Error saving user preferences:', error);
+    throw error;
+  }
+}
+
+/**
  * Get saved analysis results from Firestore
  * @param {string} userId - The user's Firebase Auth UID
  * @returns {Promise<Object|null>} Saved results or null

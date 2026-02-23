@@ -24,8 +24,18 @@ export default function Landing() {
 
   return (
       <div className="min-h-screen bg-background text-foreground">
+        {/* Background grid */}
+        <div
+            className="fixed inset-0 pointer-events-none z-0"
+            style={{
+                backgroundImage:
+                    'linear-gradient(rgba(48,54,61,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(48,54,61,0.15) 1px, transparent 1px)',
+                backgroundSize: '40px 40px',
+            }}
+        />
+
         {/* Nav */}
-        <nav className="border-b border-border bg-background-dark">
+        <nav className="relative z-50 border-b border-border bg-background-dark">
           <div className="max-w-full mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <img src={logo} alt="AmICooked" className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover" />
@@ -62,7 +72,7 @@ export default function Landing() {
         </nav>
 
         {/* Hero */}
-        <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-10 sm:pb-16 text-center">
+        <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-10 sm:pb-16 text-center">
           <div className="inline-block mb-4 sm:mb-6 px-3 sm:px-4 py-1.5 rounded-md border border-border bg-card text-xs sm:text-sm text-muted-foreground">
             🔥 Stop guessing. Start building what matters.
           </div>
@@ -90,7 +100,7 @@ export default function Landing() {
         </section>
 
         {/* Problem → Solution */}
-        <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
+        <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
           <div className="grid md:grid-cols-2 gap-6 sm:gap-8">
             <Card className="bg-card border-border p-5 sm:p-8">
               <CardContent className="p-0">
@@ -145,10 +155,10 @@ export default function Landing() {
         </section>
 
         {/* Features */}
-        <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
+        <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-3">How it works</h2>
           <p className="text-muted-foreground text-center mb-12 max-w-xl mx-auto">
-            Connect your GitHub, tell us your goals, and get a deep analysis — scored, explained, and remembered by an agent that stays in context throughout your session.
+            Connect your GitHub, tell us your goals, and get a deep analysis — scored, explained, and remembered by your personal AI agent that learns and grows with you.
           </p>
 
           <div className="grid md:grid-cols-3 gap-6">
@@ -207,9 +217,9 @@ export default function Landing() {
                 <div className="w-12 h-12 rounded-lg bg-background border border-border flex items-center justify-center mb-4">
                   <Lightbulb className="w-6 h-6 text-yellow-400" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Context-Aware Agent Chat</h3>
+                <h3 className="text-lg font-semibold mb-2">Your Personal AI Agent</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  The AI chat runs on a stateful agent — it holds your full GitHub context, your scores, and the conversation history, so every answer is specific to your actual profile, not generic advice.
+                  Your AI agent holds your full GitHub context, scores, and conversation history — and on paid plans, remembers your goals and progress across sessions for advice that's always specific to you.
                 </p>
               </CardContent>
             </Card>
@@ -229,13 +239,13 @@ export default function Landing() {
         </section>
 
         {/* CTA */}
-        <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+        <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
           <div className="bg-gradient-to-br from-card to-surface border border-border rounded-xl p-6 sm:p-12 text-center">
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
               Ready to find out if you're <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">cooked</span>?
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto mb-8">
-              Connect your GitHub and get a full 4-dimension breakdown, project roadmap, and a context-aware AI ready to answer anything about your profile — in under a minute.
+              Connect your GitHub and get a full 4-dimension breakdown, project roadmap, and a personal AI agent ready to answer anything about your profile — in under a minute.
             </p>
             <Button
                 onClick={currentUser ? () => navigate('/dashboard', { state: { reanalyze: true } }) : handleGitHubSignIn}
@@ -251,7 +261,7 @@ export default function Landing() {
         </section>
 
         {/* Footer */}
-        <footer className="border-t border-border bg-background-dark">
+        <footer className="relative z-10 border-t border-border bg-background-dark">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
               {/* Brand */}

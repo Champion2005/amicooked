@@ -4,6 +4,12 @@
  * Reads and writes rolling 30-day usage counters stored on the user's Firestore doc:
  *   users/{userId}.usage = { messages, reanalyzes, projectChats, periodStart }
  *
+ * Behavior:
+ *   - Free plan: Hard limits. No fallback.
+ *   - Student & Pro: Limits apply to premium model requests. After reaching limit,
+ *     continued usage falls back to free-tier models (unlimited via fallback).
+ *   - Ultimate: Unlimited access with premium models. No limits, no fallback needed.
+ *
  * Security model:
  *   - Firestore rules prevent clients from lowering any counter (only increment allowed)
  *     unless they also advance periodStart (period reset).

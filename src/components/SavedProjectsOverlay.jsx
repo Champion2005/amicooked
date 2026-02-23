@@ -47,6 +47,7 @@ export default function SavedProjectsOverlay({
   analysis,
   recommendedProjects = [],
   initialProjectId = null,
+  planId = 'free',
 }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -70,16 +71,19 @@ export default function SavedProjectsOverlay({
   const userId = auth.currentUser?.uid;
   const toast = useToast();
 
-  // Load projects when overlay opens
+  // Load projects when overlay opens; end session when it closes
   useEffect(() => {
-    if (isOpen && userId) {
-      loadProjects();
-      loadRecommendedSaveStatus();
-      setShowSidebar(true);
-      // Reset active project if no initial selection
-      if (!initialProjectId) {
-        setActiveProject(null);
-      }
+    if (!isOpen) {
+      agentRef.current?.endSession();
+      return;
+    }
+    if (!userId) return;
+    loadProjects();
+    loadRecommendedSaveStatus();
+    setShowSidebar(true);
+    // Reset active project if no initial selection
+    if (!initialProjectId) {
+      setActiveProject(null);
     }
   }, [isOpen, userId]);
   
@@ -200,7 +204,7 @@ export default function SavedProjectsOverlay({
 
   const initAgentForProject = (projectMessages) => {
     agentRef.current = createAgent();
-    agentRef.current.initialize(githubData, userProfile, analysis);
+    agentRef.current.initialize(githubData, userProfile, analysis, null, userId, planId);
     // Seed agent memory with existing conversation history
     if (projectMessages?.length) {
       projectMessages.slice(-10).forEach(m => {
@@ -251,8 +255,15 @@ export default function SavedProjectsOverlay({
         // Reload projects list
         await loadProjects();
       } else {
+        // Check project save limit before creating a new saved project
+        const saveCheck = await checkLimit(userId, USAGE_TYPES.PROJECT_CHAT);
+        if (!saveCheck.allowed) {
+          toast.error(`You've reached the project limit (${formatLimit(saveCheck.limit)}) for your plan. Upgrade to save more projects.`);
+          return;
+        }
         // Save
         await saveProject(userId, proj);
+        await incrementUsage(userId, USAGE_TYPES.PROJECT_CHAT);
         setRecommendedSaveStatus(prev => ({ ...prev, [proj.name]: true }));
         
         // Reload projects list
@@ -354,12 +365,14 @@ export default function SavedProjectsOverlay({
   const handleSendMessage = async () => {
     if (!input.trim() || chatLoading || !activeProject) return;
 
-    // Check project chat usage limit
-    const limitCheck = await checkLimit(userId, USAGE_TYPES.PROJECT_CHAT);
+    // Check the shared message limit (PROJECT_CHAT limit governs project saves, not messages)
+    const limitCheck = await checkLimit(userId, USAGE_TYPES.MESSAGE);
+
     if (!limitCheck.allowed) {
-      toast.error(`You've used all ${formatLimit(limitCheck.limit)} project chat messages for this period. Upgrade your plan to continue.`);
+      toast.error(`You've used all ${formatLimit(limitCheck.limit)} AI messages for this period. Upgrade your plan to continue.`);
       return;
     }
+
     setUsingFallback(limitCheck.usingFallback);
 
     const userMsg = input.trim();
@@ -375,8 +388,15 @@ export default function SavedProjectsOverlay({
     // Auto-save recommended project on first chat
     const isSaved = await isProjectSaved(userId, activeProject.name);
     if (!isSaved && activeProject.name) {
+      // Check project save limit before creating a new saved project
+      const saveCheck = await checkLimit(userId, USAGE_TYPES.PROJECT_CHAT);
+      if (!saveCheck.allowed) {
+        toast.error(`You've reached the project limit (${formatLimit(saveCheck.limit)}) for your plan. Upgrade to save more projects.`);
+        return;
+      }
       try {
         await saveProject(userId, activeProject);
+        await incrementUsage(userId, USAGE_TYPES.PROJECT_CHAT);
         setRecommendedSaveStatus(prev => ({ ...prev, [activeProject.name]: true }));
         await loadProjects(); // Refresh projects list
       } catch (err) {
@@ -422,8 +442,8 @@ export default function SavedProjectsOverlay({
 
       // Persist AI response
       await addProjectMessage(userId, activeProject.id, "assistant", fullResponse);
-      // Increment usage counter
-      await incrementUsage(userId, USAGE_TYPES.PROJECT_CHAT);
+      // Increment the shared message counter
+      await incrementUsage(userId, USAGE_TYPES.MESSAGE);
     } catch (error) {
       console.error("Project chat error:", error);
       setActiveProject((prev) => ({

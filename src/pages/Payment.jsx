@@ -1,103 +1,63 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
 import logo from '@/assets/amicooked_logo.png';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { useGitHubSignIn } from '@/hooks/useGitHubSignIn';
-import { auth } from '@/config/firebase';
+import { auth, db } from '@/config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { Github, Check, Zap, Crown, GraduationCap, ArrowRight, MessageSquare, RefreshCw, Sparkles } from 'lucide-react';
+import { PLANS, USAGE_TYPES, PLAN_ORDER, FAQS, getIcon, formatLimit, getFeatures, getExclusiveFeatures } from '@/config/plans';
+import { Github, Check, ArrowRight, MessageSquare, RefreshCw, Sparkles, Info, BarChart2, Zap } from 'lucide-react';
 
-const plans = [
-    {
-        id: 'student',
-        name: 'Student',
-        icon: GraduationCap,
-        iconColor: 'text-accent',
-        iconBg: 'bg-plan-student-bg',
-        borderColor: 'border-border',
-        badgeColor: 'bg-plan-student-bg text-accent border border-plan-student-border',
-        monthlyPrice: 3,
-        yearlyPrice: 20,
-        tag: null,
-        highlight: false,
-        description: 'Perfect for students building their first real portfolio.',
-        aiMessages: '50 / month',
-        regenerations: '15 / month',
-        model: 'Basic AI Model',
-        cta: 'Get Student Plan',
-        ctaStyle: 'bg-surface hover:bg-track border border-border text-foreground',
-    },
-    {
-        id: 'pro',
-        name: 'Pro',
-        icon: Zap,
-        iconColor: 'text-green-400',
-        iconBg: 'bg-plan-pro-bg',
-        borderColor: 'border-primary',
-        badgeColor: 'bg-plan-pro-bg text-green-400 border border-primary/40',
-        monthlyPrice: 8,
-        yearlyPrice: 80,
-        tag: 'Most Popular',
-        highlight: true,
-        description: 'For developers serious about landing their next role.',
-        aiMessages: '200 / month',
-        regenerations: '50 / month',
-        model: 'Advanced AI Model',
-        cta: 'Get Pro Plan',
-        ctaStyle: 'bg-primary hover:bg-primary-hover text-foreground',
-    },
-    {
-        id: 'ultimate',
-        name: 'Ultimate',
-        icon: Crown,
-        iconColor: 'text-orange-400',
-        iconBg: 'bg-plan-ultimate-bg',
-        borderColor: 'border-plan-ultimate-accent/40',
-        badgeColor: 'bg-plan-ultimate-bg text-orange-400 border border-plan-ultimate-accent/30',
-        monthlyPrice: 15,
-        yearlyPrice: 100,
-        tag: 'Best Results',
-        highlight: false,
-        description: 'Unlimited power for developers who refuse to stay cooked.',
-        aiMessages: 'Unlimited',
-        regenerations: 'Unlimited',
-        model: 'State-of-the-art AI Model',
-        cta: 'Get Ultimate Plan',
-        ctaStyle: 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-foreground',
-    },
-];
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const sharedFeatures = [
-    'GitHub Profile Analysis',
-    'Job Fit Checker',
-    'Project Recommendations',
-    'AI Agent',
-    'Progress Tracking',
-    'Public Data Only — Always',
-];
+// All plan data is now sourced from plans.js (PLANS, SHARED_FEATURES, FAQS, etc.)
 
-const faqs = [
-    {
-        q: 'Can I cancel anytime?',
-        a: 'Yes — monthly plans cancel immediately. Yearly plans are billed upfront and non-refundable.',
-    },
-    {
-        q: 'What counts as an "AI message"?',
-        a: 'Every message to the AI agent or a Job Fit analysis counts as one AI message.',
-    },
-    {
-        q: "What's a \"regeneration\"?",
-        a: "When you want a fresh take on a project recommendation or analysis — that's a regeneration.",
-    },
-    {
-        q: 'Is the Student plan really just $3/mo?',
-        a: 'Yep. We built this at a hackathon. We get it.',
-    },
-];
+/** Build displayable plans by merging config with UI metadata */
+const buildPlansArray = () => {
+    return PLAN_ORDER.map((id, idx) => {
+        const plan = PLANS[id];
+        const ui = plan.ui;
+        const pricing = plan.pricing;
+        const prevId = idx > 0 ? PLAN_ORDER[idx - 1] : null;
+        const previousPlanName = prevId ? PLANS[prevId].name : null;
+        const features = getFeatures(id);
+        const exclusiveFeatures = getExclusiveFeatures(id);
+        return {
+            id,
+            name: plan.name,
+            description: plan.description,
+            aiMessages: formatLimit(plan.limits[USAGE_TYPES.MESSAGE]),
+            regenerations: formatLimit(plan.limits[USAGE_TYPES.REANALYZE]),
+            hasFallback: plan.hasFallback,
+            isPaid: pricing.monthlyPrice > 0,
+            icon: ui.icon,
+            iconColor: ui.iconColor,
+            iconBg: ui.iconBg,
+            borderColor: ui.borderColor,
+            badgeColor: ui.badgeColor,
+            monthlyPrice: pricing.monthlyPrice,
+            halfYearlyPrice: pricing.halfYearlyPrice,
+            halfYearlyDiscount: pricing.halfYearlyDiscount,
+            yearlyPrice: pricing.yearlyPrice,
+            yearlyDiscount: pricing.yearlyDiscount,
+            tag: ui.tag,
+            highlight: ui.highlight,
+            modelLabel: ui.modelLabel,
+            cta: ui.cta,
+            ctaStyle: ui.ctaStyle,
+            features,
+            previousPlanName,
+            exclusiveFeatures,
+        };
+    });
+};
+
+const plans = buildPlansArray();
 
 export default function Pricing() {
-    const [yearly, setYearly] = useState(false);
+    const [billingCycle, setBillingCycle] = useState('monthly');
     const [hoveredPlan, setHoveredPlan] = useState(null);
     const navigate = useNavigate();
     const toast = useToast();
@@ -105,11 +65,24 @@ export default function Pricing() {
         onError: () => toast.error('Failed to sign in with GitHub. Please try again.'),
     });
     const [currentUser, setCurrentUser] = useState(auth.currentUser);
+    // null = unknown/loading, string = resolved plan id (e.g. 'free', 'pro')
+    const [userPlan, setUserPlan] = useState(null);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => setCurrentUser(user));
         return unsubscribe;
     }, []);
+
+    // Fetch the user's current plan from Firestore whenever auth state changes.
+    useEffect(() => {
+        if (!currentUser) {
+            setUserPlan(null);
+            return;
+        }
+        getDoc(doc(db, 'users', currentUser.uid))
+            .then((snap) => setUserPlan(snap.exists() ? (snap.data().plan || 'free') : 'free'))
+            .catch(() => setUserPlan('free'));
+    }, [currentUser]);
 
     return (
         <div className="min-h-screen bg-background text-foreground">
@@ -174,43 +147,140 @@ export default function Pricing() {
                 <p className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed mb-8">
                     Whether you're just starting out or grinding hard for your next offer — there's a plan for where you are right now.
                 </p>
-
-                {/* Billing toggle */}
-                <div className="inline-flex items-center gap-3 bg-card border border-border rounded-lg p-1">
-                    <button
-                        onClick={() => setYearly(false)}
-                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-                            !yearly
-                                ? 'bg-background text-foreground shadow border border-border'
-                                : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                    >
-                        Monthly
-                    </button>
-                    <button
-                        onClick={() => setYearly(true)}
-                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
-                            yearly
-                                ? 'bg-background text-foreground shadow border border-border'
-                                : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                    >
-                        Yearly
-                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">
-                            Save up to 44%
-                        </span>
-                    </button>
-                </div>
             </section>
 
             {/* Plans */}
             <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
-                <div className="grid md:grid-cols-3 gap-6">
-                    {plans.map((plan) => {
-                        const Icon = plan.icon;
+                {/* Free tier — full width */}
+                {plans.filter((p) => !p.isPaid).map((plan) => {
+                    const Icon = getIcon(plan.icon);
+                    const isCurrentPlan = !!currentUser && userPlan === plan.id;
+
+                    const handleCta = () => {
+                        if (isCurrentPlan) return;
+                        currentUser ? navigate('/dashboard') : handleGitHubSignIn();
+                    };
+
+                    return (
+                        <div
+                            key={plan.id}
+                            className="relative rounded-xl border border-border bg-card p-6 mb-8 flex flex-col gap-5"
+                            style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}
+                        >
+                            {/* Top row: icon + name | usage stats | CTA */}
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+                                {/* Left: icon + name + description */}
+                                <div className="flex items-center gap-4 sm:w-56 shrink-0">
+                                    <div className={`w-10 h-10 rounded-lg ${plan.iconBg} flex items-center justify-center shrink-0`}>
+                                        <Icon className={`w-5 h-5 ${plan.iconColor}`} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold leading-tight">Free</h3>
+                                        <p className="text-xs text-muted-foreground leading-snug mt-0.5">{plan.description}</p>
+                                    </div>
+                                </div>
+
+                                {/* Middle: usage limits */}
+                                <div className="flex flex-wrap gap-x-6 gap-y-2 flex-1">
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <MessageSquare className="w-3.5 h-3.5 text-accent shrink-0" />
+                                        <span className="text-muted-foreground">AI Messages:</span>
+                                        <span className="font-semibold text-foreground">{plan.aiMessages}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <RefreshCw className="w-3.5 h-3.5 text-accent shrink-0" />
+                                        <span className="text-muted-foreground">Regenerations:</span>
+                                        <span className="font-semibold text-foreground">{plan.regenerations}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
+                                        <span className="text-muted-foreground">AI Model:</span>
+                                        <span className="font-semibold text-foreground">{plan.modelLabel}</span>
+                                    </div>
+                                </div>
+
+                                {/* Right: CTA */}
+                                <button
+                                    onClick={handleCta}
+                                    disabled={isCurrentPlan || loading}
+                                    className={`
+                                        h-11 px-6 rounded-lg text-sm font-semibold transition-all duration-200
+                                        flex items-center justify-center gap-2 shrink-0
+                                        disabled:opacity-60 disabled:cursor-default
+                                        ${isCurrentPlan
+                                            ? 'bg-surface border border-border text-muted-foreground cursor-default'
+                                            : plan.ctaStyle}
+                                    `}
+                                >
+                                    {isCurrentPlan ? 'Current Plan' : plan.cta}
+                                    {!isCurrentPlan && <ArrowRight className="w-4 h-4" />}
+                                </button>
+                            </div>
+
+                            {/* Feature grid — 3 per row */}
+                            <div className="border-t border-border pt-4 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2.5">
+                                {plan.features.map((f, i) => (
+                                    <span key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Check className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+                                        {f}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })}
+                {/* Billing toggle */}
+                <div className="my-8 flex justify-center">
+                    <div className="inline-flex items-center gap-1 bg-card border border-border rounded-lg p-1">
+                        <button
+                            onClick={() => setBillingCycle('monthly')}
+                            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                                billingCycle === 'monthly'
+                                    ? 'bg-background text-foreground shadow border border-border'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            Monthly
+                        </button>
+                        <button
+                            onClick={() => setBillingCycle('halfYearly')}
+                            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                                billingCycle === 'halfYearly'
+                                    ? 'bg-background text-foreground shadow border border-border'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            6-Month
+                        </button>
+                        <button
+                            onClick={() => setBillingCycle('yearly')}
+                            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                                billingCycle === 'yearly'
+                                    ? 'bg-background text-foreground shadow border border-border'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            Yearly
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">
+                                Best Deal
+                            </span>
+                        </button>
+                    </div>
+                </div>
+                {/* Paid tiers — 3 columns */}
+                <div className="grid lg:grid-cols-3 gap-6">
+                    {plans.filter((p) => p.isPaid).map((plan) => {
+                        const Icon = getIcon(plan.icon);
                         const isHovered = hoveredPlan === plan.id;
-                        const price = yearly ? plan.yearlyPrice : plan.monthlyPrice;
-                        const period = yearly ? 'year' : 'month';
+                        const price = billingCycle === 'yearly' ? plan.yearlyPrice
+                            : billingCycle === 'halfYearly' ? plan.halfYearlyPrice
+                            : plan.monthlyPrice;
+                        const period = billingCycle === 'yearly' ? 'year'
+                            : billingCycle === 'halfYearly' ? '6 mo'
+                            : 'month';
+                        const activeDiscount = billingCycle === 'yearly' ? plan.yearlyDiscount
+                            : billingCycle === 'halfYearly' ? plan.halfYearlyDiscount
+                            : null;
 
                         return (
                             <div
@@ -249,11 +319,25 @@ export default function Pricing() {
 
                                 {/* Price */}
                                 <div className="mb-1">
-                                    <div className="flex items-end gap-1">
+                                    <div className="flex items-end gap-x-2">
                                         <span className="text-4xl font-extrabold">${price}</span>
-                                        <span className="text-muted-foreground text-sm mb-1.5">/ {period}</span>
+                                        <span className="text-muted-foreground text-sm mb-1">/ {period}</span>
+                                        {activeDiscount && (
+                                            <span
+                                                className="mb-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/20"
+                                            >
+                                                {activeDiscount}% off
+                                            </span>
+                                        )}
                                     </div>
-
+                                    {billingCycle !== 'yearly' && plan.yearlyDiscount && (
+                                        <span
+                                            onClick={() => setBillingCycle('yearly')}
+                                            className="block text-xs font-semibold text-green-400/70 mt-2 cursor-pointer hover:text-green-400 transition-colors"
+                                        >
+                                            Save {plan.yearlyDiscount}% yearly →
+                                        </span>
+                                    )}
                                 </div>
 
                                 <p className="text-sm text-muted-foreground mb-6 leading-relaxed mt-2">{plan.description}</p>
@@ -261,6 +345,20 @@ export default function Pricing() {
                                 <div className={`border-t ${plan.highlight ? 'border-primary/30' : 'border-border'} mb-5`} />
 
                                 {/* Usage limits */}
+                                <div className="flex items-center gap-2 mb-4">
+                                    <h4 className="text-sm font-semibold text-foreground">Usage Limits</h4>
+                                    <div className="group relative cursor-help">
+                                        <Info className="w-4 h-4 text-muted-foreground hover:text-accent transition-colors" />
+                                        <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-background border border-border rounded-lg p-3 w-56 text-xs text-muted-foreground shadow-lg z-50">
+                                            {plan.hasFallback
+                                                ? "Limits apply to premium model requests. After reaching your limit, you'll continue with unlimited access using our free tier model."
+                                                : plan.id === 'free'
+                                                    ? 'Hard limits — usage resets monthly.'
+                                                    : 'Truly unlimited access with premium models.'
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
                                 <div className="space-y-2.5 mb-5">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2 text-sm text-foreground">
@@ -268,12 +366,12 @@ export default function Pricing() {
                                             AI Messages
                                         </div>
                                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                            plan.aiMessages === 'Unlimited'
+                                            plan.id === 'ultimate'
                                                 ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-300 border border-orange-500/20'
                                                 : plan.id === 'pro' ? 'bg-green-500/15 text-green-400 border border-green-500/20'
                                                 : 'bg-plan-student-bg text-accent border border-accent/20'
                                         }`}>
-                                            {plan.aiMessages}
+                                            {plan.aiMessages} /month
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between">
@@ -282,12 +380,12 @@ export default function Pricing() {
                                             Regenerations
                                         </div>
                                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                            plan.regenerations === 'Unlimited'
+                                            plan.id === 'ultimate'
                                                 ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-300 border border-orange-500/20'
                                                 : plan.id === 'pro' ? 'bg-green-500/15 text-green-400 border border-green-500/20'
                                                 : 'bg-plan-student-bg text-accent border border-accent/20'
                                         }`}>
-                                            {plan.regenerations}
+                                            {plan.regenerations} /month
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between">
@@ -302,34 +400,75 @@ export default function Pricing() {
                                                     ? 'bg-green-500/15 text-green-400 border border-green-500/20'
                                                     : 'bg-plan-student-bg text-accent border border-accent/20'
                                         }`}>
-                                            {plan.model}
+                                            {plan.modelLabel}
                                         </span>
                                     </div>
                                 </div>
 
                                 <div className={`border-t ${plan.highlight ? 'border-primary/30' : 'border-border'} mb-5`} />
 
-                                {/* Shared features — single checkmark list */}
-                                <ul className="space-y-2.5 flex-1 mb-7">
-                                    {sharedFeatures.map((feature, i) => (
-                                        <li key={i} className="flex items-center gap-2 text-sm text-foreground">
-                                            <Check className={`w-3.5 h-3.5 flex-shrink-0 ${plan.highlight ? 'text-green-400' : 'text-muted-foreground'}`} />
-                                            {feature}
-                                        </li>
-                                    ))}
-                                </ul>
+                                {/* Plan-exclusive features with 'everything in X, plus:' heading */}
+                                <div className="flex-1 mb-7 space-y-3">
+                                    {plan.previousPlanName && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Everything in{' '}
+                                            <span className="font-semibold text-foreground">{plan.previousPlanName}</span>
+                                            , plus:
+                                        </p>
+                                    )}
+                                    <ul className="space-y-2.5">
+                                        {plan.exclusiveFeatures.map((feature, i) => (
+                                            <li key={i} className="flex items-center gap-2 text-sm text-foreground">
+                                                <Check className={`w-3.5 h-3.5 flex-shrink-0 ${
+                                                    plan.highlight
+                                                        ? 'text-green-400'
+                                                        : plan.id === 'ultimate'
+                                                            ? 'text-orange-400'
+                                                            : 'text-accent'
+                                                }`} />
+                                                {feature}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
 
                                 {/* CTA */}
-                                <button
-                                    onClick={handleGitHubSignIn}
-                                    className={`
-                                        w-full h-11 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2
-                                        ${plan.ctaStyle}
-                                    `}
-                                >
-                                    {plan.cta}
-                                    <ArrowRight className={`w-4 h-4 transition-transform duration-200 ${isHovered ? 'translate-x-1' : ''}`} />
-                                </button>
+                                {(() => {
+                                    const isCurrentPlan = !!currentUser && userPlan === plan.id;
+
+                                    const handleCta = () => {
+                                        if (isCurrentPlan) return;
+                                        if (!plan.isPaid) {
+                                            // Free plan: sign in if not auth'd, else go to dashboard
+                                            currentUser ? navigate('/dashboard') : handleGitHubSignIn();
+                                        } else {
+                                            // Paid plans: payment not yet set up
+                                            toast.info('Coming soon — billing is on the way!');
+                                        }
+                                    };
+
+                                    return (
+                                        <button
+                                            onClick={handleCta}
+                                            disabled={isCurrentPlan || loading}
+                                            className={`
+                                                w-full h-11 rounded-lg text-sm font-semibold transition-all duration-200
+                                                flex items-center justify-center gap-2
+                                                disabled:opacity-60 disabled:cursor-default disabled:scale-100
+                                                ${isCurrentPlan
+                                                    ? 'bg-surface border border-border text-muted-foreground cursor-default'
+                                                    : plan.ctaStyle}
+                                            `}
+                                        >
+                                            {isCurrentPlan ? 'Current Plan' : plan.cta}
+                                            {!isCurrentPlan && (
+                                                <ArrowRight
+                                                    className={`w-4 h-4 transition-transform duration-200 ${isHovered ? 'translate-x-1' : ''}`}
+                                                />
+                                            )}
+                                        </button>
+                                    );
+                                })()}
                             </div>
                         );
                     })}
@@ -340,7 +479,7 @@ export default function Pricing() {
             <section className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 pb-16">
                 <h3 className="text-xl font-bold text-center mb-6">Quick answers</h3>
                 <div className="grid sm:grid-cols-2 gap-4">
-                    {faqs.map((faq, i) => (
+                    {FAQS.map((faq, i) => (
                         <div key={i} className="border border-border rounded-lg p-4 bg-card">
                             <p className="text-sm font-semibold text-foreground mb-1">{faq.q}</p>
                             <p className="text-sm text-muted-foreground leading-relaxed">{faq.a}</p>

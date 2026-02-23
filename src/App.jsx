@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Results from './pages/Results';
 import Payment from './pages/Payment';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/results" element={<Results />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </Router>
       </ToastProvider>

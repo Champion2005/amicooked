@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { signOut } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import logo from '@/assets/amicooked_logo.png';
 import { Button } from '@/components/ui/Button';
@@ -8,7 +9,7 @@ import { useToast } from '@/components/ui/Toast';
 import { fetchGitHubData } from '@/services/github';
 import { analyzeCookedLevel } from '@/services/openrouter';
 import { getRecommendedProjects } from '@/services/openrouter';
-import { getUserProfile, getAnalysisResults, saveAnalysisResults } from '@/services/userProfile';
+import { getUserProfile, getAnalysisResults, saveAnalysisResults, getUserPreferences } from '@/services/userProfile';
 import { checkLimit, incrementUsage } from '@/services/usage';
 import { USAGE_TYPES, formatLimit } from '@/config/plans';
 import { Loader2, Flame, User, Edit2, RefreshCw, ArrowRight, BarChart2 } from 'lucide-react';
@@ -18,6 +19,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [userProfile, setUserProfile] = useState(null);
+  const [userPreferences, setUserPreferences] = useState({});
   const [status, setStatus] = useState('');
   const [tipIndex, setTipIndex] = useState(0);
   const [reanalyzeUsage, setReanalyzeUsage] = useState(null); // { current, limit }
@@ -40,7 +42,8 @@ export default function Dashboard() {
     "💡 Tip: The AI is most effective when it has a complete profile to analyze. Make sure to fill out all sections of your profile for the best insights!",
     "💡 Tip: Don't be discouraged by critical feedback. The AI is designed to help you identify areas for improvement, and every developer has room to grow!",
     "💡 Tip: Use the recommended projects as a starting point for learning new skills and building your portfolio. They're tailored to your profile and career goals!",
-    "💡 Tip: Constantly reanalyze your profile to get updated insights, track your progress, and see new features as we roll them out."
+    "💡 Tip: Constantly reanalyze your profile to get updated insights, track your progress, and see new features as we roll them out.",
+    "💡 Tip: Paid plans unlock persistent agent memory — your AI remembers your goals and tracks your progress between sessions."
   ];
 
   // Rotate tips while loading
@@ -64,6 +67,7 @@ export default function Dashboard() {
     }
 
     loadUserProfile(user.uid);
+    getUserPreferences(user.uid).then(setUserPreferences).catch(() => {});
 
     if (forceReanalyze) {
       checkLimit(user.uid, USAGE_TYPES.REANALYZE)
@@ -76,7 +80,11 @@ export default function Dashboard() {
     try {
       setProfileLoading(true);
       const profile = await getUserProfile(userId);
-      if (profile) {
+      // Treat a profile as incomplete if essential fields are missing
+      // (e.g. after a data reset the doc exists but only has plan + timestamps)
+      const isComplete = profile && profile.age && profile.education && profile.experienceYears;
+
+      if (isComplete) {
         setUserProfile(profile);
 
         // If not reanalyzing, check for cached results
@@ -110,7 +118,11 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem('github_token');
       if (!token) {
-        throw new Error('No GitHub token found');
+        toast.error('GitHub session expired. Please sign in again.');
+        await signOut(auth);
+        localStorage.removeItem('github_token');
+        navigate('/');
+        return;
       }
 
       // Check reanalyze limit before running
@@ -141,7 +153,7 @@ export default function Dashboard() {
       await new Promise(r => setTimeout(r, 400));
 
       setStatus('AI is evaluating your profile — this may take a moment...');
-      const analysis = await analyzeCookedLevel(data, userProfile, null, analysisModel);
+      const analysis = await analyzeCookedLevel(data, userProfile, null, analysisModel, userPreferences.roastIntensity, userPreferences.devNickname);
 
       setStatus('Generating personalized project recommendations...');
       let recommendedProjects = null;
@@ -173,7 +185,8 @@ export default function Dashboard() {
           githubData: data, 
           analysis, 
           userProfile, 
-          recommendedProjects
+          recommendedProjects,
+          isNewAnalysis: true,
         } 
       });
     } catch (error) {
@@ -266,7 +279,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <span className="text-muted-foreground">Experience:</span>
-                <span className="text-foreground ml-2">{userProfile.experienceYears.replace(/_/g, ' ')}</span>
+                <span className="text-foreground ml-2">{userProfile.experienceYears?.replace(/_/g, ' ') || 'Not set'}</span>
               </div>
               <div className="min-w-0">
                 <span className="text-muted-foreground">Career Goal:</span>

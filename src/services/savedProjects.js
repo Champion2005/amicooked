@@ -1,4 +1,5 @@
 import { db } from '@/config/firebase';
+import { addMemoryItem, MEMORY_TYPES } from './agentPersistence';
 import {
   collection,
   doc,
@@ -118,6 +119,24 @@ export async function getSavedProject(userId, projectId) {
     console.error('Error getting saved project:', error);
     return null;
   }
+}
+
+/**
+ * Record a bookmarked project in agent memory (fire-and-forget).
+ * Called from the UI layer after a successful save.
+ *
+ * @param {string} userId
+ * @param {string} planId
+ * @param {Object} project - The project object with at least { name, description }
+ */
+export function recordProjectBookmark(userId, planId, project) {
+  if (!userId || !project?.name) return;
+  const content = `Bookmarked project: "${project.name}"${project.description ? ` — ${project.description}` : ''}`;
+  addMemoryItem(userId, planId, {
+    type: MEMORY_TYPES.ACTION,
+    content: content.slice(0, 500),
+    meta: { source: 'project-bookmark', projectName: project.name },
+  }).catch(() => {});
 }
 
 // ── helpers ──────────────────────────────────────────────

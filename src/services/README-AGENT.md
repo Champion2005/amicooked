@@ -16,12 +16,27 @@ This ensures **consistent, accurate analysis** across all users.
 
 ### 2. **Agent Service** (`agent.js`)
 The main orchestrator that coordinates:
-- **Memory system**: Stores conversation history and user context
+- **Memory system**: Short-term conversation history + long-term persistent memory (Firestore)
 - **Skills execution**: Can call different analysis skills as needed
 - **Context awareness**: Maintains user profile, GitHub data, and previous analyses
 - **Multi-turn conversations**: Handles follow-up questions with consistent context
+- **Persistence**: Paid plans (Student+) save agent state to Firestore so it survives across sessions
+- **Identity**: Pro+ users can customise agent name, personality, and icon
 
-### 3. **Skills System** (`skills.js`)
+### 3. **Agent Persistence** (`agentPersistence.js`)
+Manages saving/loading agent state to/from Firestore (`users/{uid}/agent/state`):
+- Long-term memory (capped at 50 items): insights, chat summaries, goals, action tracking
+- Agent identity: custom name, personality preset/custom, icon (base64)
+- Memory toggle: users can enable/disable persistent memory
+- Plan-gated: memory requires Student+, custom identity requires Pro+
+
+### 4. **Agent Personality** (`/config/agentPersonality.js`)
+Preset and custom personality options for Pro+ users:
+- 6 presets: Coach, Mentor, Drill Sergeant, Hype Man, Strategist, Friend
+- Custom option: user writes their own personality instruction
+- Falls back to base prompt tone for non-Pro users
+
+### 5. **Skills System** (`skills.js`)
 Pluggable analysis capabilities:
 - `analyzeProfile` - Full Cooked Level analysis with recommendations
 - `recommendProjects` - Generate personalized project ideas
@@ -29,7 +44,7 @@ Pluggable analysis capabilities:
 - `generateLearningPath` - Create structured learning roadmaps
 - `answerQuestion` - Context-aware Q&A about their profile
 
-### 4. **OpenRouter Integration** (`openrouter.js`)
+### 6. **OpenRouter Integration** (`openrouter.js`)
 Updated to use comprehensive instructions for all LLM calls, ensuring consistency.
 
 ---

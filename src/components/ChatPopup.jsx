@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import ChatMessage from '@/components/ChatMessage';
+import { getRoastInstruction } from '@/config/preferences';
 
 /**
  * Full-screen AI chat popup
@@ -21,8 +22,11 @@ import ChatMessage from '@/components/ChatMessage';
  * @param {Object} props.githubData - GitHub data for AI context
  * @param {Object} props.userProfile - User profile for AI context
  * @param {Object} props.analysis - Analysis results for AI context
+ * @param {string} [props.planId='free'] - User's plan ID; controls which metrics are exposed to the AI
+ * @param {string} [props.roastIntensity='balanced'] - Roast intensity preference ID
+ * @param {string} [props.nickname=''] - User's chosen nickname for AI addressing
  */
-export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, userProfile, analysis, onOpenSavedProjects }) {
+export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, userProfile, analysis, onOpenSavedProjects, planId = 'free', roastIntensity = 'balanced', nickname = '' }) {
   const [chats, setChats] = useState([]);
   const [activeChat, setActiveChat] = useState(null); // { id, title, messages }
   const [input, setInput] = useState('');
@@ -41,12 +45,13 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
 
   // Load chat history, usage summary, and initialise agent on open
   useEffect(() => {
-    if (isOpen && userId) {
+    if (isOpen && userId && auth.currentUser) {
       loadChats();
       hasHandledInitialQuery.current = false;
-      // Create a fresh agent with full context (including pre-computed analysis)
+      // Create agent and load persisted state (memory, identity) for paid plans
       agentRef.current = createAgent();
-      agentRef.current.initialize(githubData, userProfile, analysis);
+      // Pass the currentUser's UID to ensure it matches the signed-in user
+      agentRef.current.initialize(githubData, userProfile, analysis, null, auth.currentUser.uid, planId, getRoastInstruction(roastIntensity), nickname);
       // Load usage so we can show the usage bar
       getUsageSummary(userId).then(setUsageSummary).catch(() => {});
     }
@@ -102,7 +107,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
   const getAIResponse = async (userMessage, onChunk, model) => {
     if (!agentRef.current) {
       agentRef.current = createAgent();
-      await agentRef.current.initialize(githubData, userProfile, analysis);
+      await agentRef.current.initialize(githubData, userProfile, analysis, null, userId, planId);
     }
     const result = await agentRef.current.processMessage(userMessage, 'QUICK_CHAT', onChunk, model);
     return result.response;
@@ -247,6 +252,8 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
   };
 
   const handleSelectChat = (chat) => {
+    // End previous session before switching to another chat
+    agentRef.current?.endSession();
     setActiveChat({
       id: chat.id,
       title: chat.title,
@@ -263,14 +270,22 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
   };
 
   const handleNewChat = () => {
+    // End current session before starting a new one
+    agentRef.current?.endSession();
     setActiveChat(null);
-    setShowSidebar(true);
+    if (window.innerWidth < 640) {
+      setShowSidebar(false);
+    } else {
+      setShowSidebar(true);
+    }
     setInput('');
     // Reset conversation history, keep context (githubData/analysis stay in agent)
     agentRef.current?.memory.clearHistory();
   };
 
   const handleClose = () => {
+    // Extract memory from this session before closing
+    agentRef.current?.endSession();
     setActiveChat(null);
     setShowSidebar(true);
     setInput('');
@@ -300,9 +315,9 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
               <ChevronLeft className="w-5 h-5" />
             </button>
           )}
-          <img src={logo} alt="AmICooked" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover shrink-0" />
+          <img src={agentRef.current?.getIcon() || logo} alt="Agent" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover shrink-0" />
           <div className="min-w-0">
-            <h1 className="text-base sm:text-xl font-bold text-foreground truncate">AmICooked Bot</h1>
+            <h1 className="text-base sm:text-xl font-bold text-foreground truncate">{agentRef.current?.getDisplayName() || 'AI Agent'}</h1>
             <p className="text-xs text-muted-foreground hidden sm:block">Ask anything about your profile</p>
           </div>
         </div>

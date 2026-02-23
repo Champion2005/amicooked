@@ -1,6 +1,8 @@
 /**
- * Plan definitions — single source of truth for all plan limits, models, and badges.
- * To add / change a plan, only edit this file.
+ * Plan definitions — single source of truth for all plan configuration.
+ * Includes limits, models, pricing, UI metadata, features, and FAQs.
+ *
+ * To add / change a plan or edit pricing/features, only edit this file.
  *
  * Limits:
  *   null  = unlimited
@@ -19,10 +21,134 @@ export const PERIOD_DAYS = 30;
  * Add new keys here to track additional AI call types.
  */
 export const USAGE_TYPES = {
-  MESSAGE: 'messages',       // AI chat messages (ChatPopup)
+  MESSAGE: 'messages',       // AI chat messages (ChatPopup + SavedProjectsOverlay)
   REANALYZE: 'reanalyzes',   // Full GitHub re-analyses (Dashboard)
-  PROJECT_CHAT: 'projectChats', // Project-specific chat messages (ProjectPopup / SavedProjectsOverlay)
+  PROJECT_CHAT: 'projectChats', // Number of saved projects (SavedProjectsOverlay)
 };
+
+/** Order of plans on pricing page — change here to reorder cards */
+export const PLAN_ORDER = ['free', 'student', 'pro', 'ultimate'];
+
+/**
+ * Plan tier order for feature inheritance checks.
+ * A plan includes everything from all plans ranked at or below it.
+ */
+export const PLAN_TIER = { free: 0, student: 1, pro: 2, ultimate: 3 };
+
+/**
+ * ─── SINGLE SOURCE OF TRUTH FOR ALL FEATURES ────────────────────────────────
+ * Add a feature once with its tier, everything downstream auto-updates.
+ * To add a feature: just add { name: '...', availableFrom: 'pro' } here.
+ */
+export const ALL_FEATURES = [
+  // Free + shared across all plans
+  { name: 'GitHub Profile Analysis', availableFrom: 'free' },
+  { name: 'Basic Score Breakdown', availableFrom: 'free' },
+  { name: 'Job Fit Checker', availableFrom: 'free' },
+  { name: 'Project Recommendations', availableFrom: 'free' },
+  { name: 'AI Agent', availableFrom: 'free' },
+  { name: 'Progress Tracking', availableFrom: 'free' },
+  { name: 'Public Data Only — Always', availableFrom: 'free' },
+
+  // Student plan exclusives
+  { name: 'Increased Usage Limits I', availableFrom: 'student' },
+  { name: 'In-Depth Statistics', availableFrom: 'student' },
+  { name: 'Richer AI Analysis Data', availableFrom: 'student' },
+  { name: 'Score History', availableFrom: 'student' },
+  { name: '75 Agent Memories', availableFrom: 'student' },
+
+  // Pro plan exclusives
+  { name: 'Increased Usage Limits II', availableFrom: 'pro' },
+  { name: '200 Agent Memories', availableFrom: 'pro' },
+  { name: 'Interactive Improvement Roadmap', availableFrom: 'pro' },
+  { name: 'Custom Agent Identity', availableFrom: 'pro' },
+
+  // Ultimate plan exclusives
+  { name: 'Increased Usage Limits III', availableFrom: 'ultimate' },
+  { name: '500 Agent Memories', availableFrom: 'ultimate' },
+];
+
+/**
+ * Get all features available on a given plan (cumulative — includes all lower tiers).
+ * @param {string} planId
+ * @returns {string[]} Array of feature names
+ */
+export function getFeatures(planId) {
+  const planTier = PLAN_TIER[planId] ?? PLAN_TIER.free;
+  return ALL_FEATURES.filter((f) => PLAN_TIER[f.availableFrom] <= planTier).map((f) => f.name);
+}
+
+/**
+ * Get only the exclusive features for a specific plan (not in the tier below).
+ * @param {string} planId
+ * @returns {string[]} Array of exclusive feature names
+ */
+export function getExclusiveFeatures(planId) {
+  const idx = PLAN_ORDER.indexOf(planId);
+  if (idx <= 0) return [];
+  const prevPlanId = PLAN_ORDER[idx - 1];
+  const prevFeatures = new Set(getFeatures(prevPlanId));
+  return getFeatures(planId).filter((f) => !prevFeatures.has(f));
+}
+
+/**
+ * Returns true when the given planId has access to In-Depth Statistics.
+ * Student plan and above unlock the full raw-metrics view.
+ * @param {string} planId
+ * @returns {boolean}
+ */
+export function hasDetailedStats(planId) {
+  return PLAN_TIER[planId] >= PLAN_TIER.student;
+}
+
+/**
+ * Returns true when the given planId has access to persistent agent memory.
+ * Student plan and above.
+ * @param {string} planId
+ * @returns {boolean}
+ */
+export function hasAgentMemory(planId) {
+  return PLAN_TIER[planId] >= PLAN_TIER.student;
+}
+
+/**
+ * Get the memory item limit for a given plan.
+ * @param {string} planId
+ * @returns {number}
+ */
+export function getMemoryLimit(planId) {
+  return (PLANS[planId] ?? PLANS.free).memoryLimit
+}
+
+/**
+ * Returns true when the given planId can customise the agent identity
+ * (name, personality preset/custom, icon). Pro plan and above.
+ * @param {string} planId
+ * @returns {boolean}
+ */
+export function hasCustomAgent(planId) {
+  return PLAN_TIER[planId] >= PLAN_TIER.pro;
+}
+
+/** Frequently asked questions (shared across all plans) */
+export const FAQS = [
+  {
+    q: 'Can I cancel anytime?',
+    a: 'Yes — monthly plans cancel immediately. Yearly plans are billed upfront and non-refundable.',
+  },
+  {
+    q: 'What counts as an "AI message"?',
+    a: 'Every message to the AI agent or a Job Fit analysis counts as one AI message.',
+  },
+  {
+    q: "What's a \"regeneration\"?",
+    a: "When you want a fresh take on a project recommendation or analysis — that's a regeneration.",
+  },
+  {
+    q: 'Is the Student plan really just $3/mo?',
+    a: 'Yep — $3/mo monthly, or $21/yr (40% off) if you go yearly. We built this at a hackathon. We get it.',
+  },
+];
 
 export const PLANS = {
   free: {
@@ -34,18 +160,41 @@ export const PLANS = {
     },
     // Per-period limits for each usage type
     limits: {
-      [USAGE_TYPES.MESSAGE]: 20,
-      [USAGE_TYPES.REANALYZE]: 3,
-      [USAGE_TYPES.PROJECT_CHAT]: 3,
+      [USAGE_TYPES.MESSAGE]: 5,
+      [USAGE_TYPES.REANALYZE]: 1,
+      [USAGE_TYPES.PROJECT_CHAT]: 1,
     },
     // AI models
     models: {
-      primary: 'meta-llama/llama-4-scout',
-      fallback: 'meta-llama/llama-3.3-70b-instruct:free', // used after limits hit
+      primary: 'openrouter/free',
+      fallback: null,
     },
-    // Switch to fallback model instead of hard-blocking
-    hasFallback: true,
-    description: 'Basic features with monthly limits.',
+    hasFallback: false,
+    memoryLimit: 0,
+    description: 'Basic features to try out the platform.',
+
+    // ─── Pricing ───────────────────────────────────────────────────────────
+    pricing: {
+      monthlyPrice: 0,
+      halfYearlyPrice: 0,
+      halfYearlyDiscount: null,
+      yearlyPrice: 0,
+      yearlyDiscount: null,
+    },
+
+    // ─── UI Metadata ────────────────────────────────────────────────────────
+    ui: {
+      icon: 'Sparkles',
+      iconColor: 'text-muted-foreground',
+      iconBg: 'bg-surface',
+      borderColor: 'border-border',
+      badgeColor: 'bg-surface text-muted-foreground border border-border',
+      tag: null,
+      highlight: false,
+      modelLabel: 'Free AI Model',
+      cta: 'Get Started Free',
+      ctaStyle: 'bg-surface hover:bg-track border border-border text-foreground',
+    },
   },
 
   student: {
@@ -56,16 +205,39 @@ export const PLANS = {
       className: 'bg-plan-student-bg text-accent border border-plan-student-border',
     },
     limits: {
-      [USAGE_TYPES.MESSAGE]: 50,
-      [USAGE_TYPES.REANALYZE]: 15,
-      [USAGE_TYPES.PROJECT_CHAT]: 15,
+      [USAGE_TYPES.MESSAGE]: 100,
+      [USAGE_TYPES.REANALYZE]: 25,
+      [USAGE_TYPES.PROJECT_CHAT]: 5,
     },
     models: {
-      primary: 'meta-llama/llama-4-scout',
-      fallback: null,
+      primary: 'x-ai/grok-4.1-fast',
+      fallback: 'openrouter/free',
     },
-    hasFallback: false,
-    description: 'For students building their first real portfolio.',
+    hasFallback: true,
+    memoryLimit: 75,
+    description: 'Built for students and hobbyists growing their portfolio.',
+    // Student plan unlocks In-Depth Statistics.
+
+    pricing: {
+      monthlyPrice: 3,
+      halfYearlyPrice: 15,
+      halfYearlyDiscount: 15,
+      yearlyPrice: 21,
+      yearlyDiscount: 40,
+    },
+
+    ui: {
+      icon: 'GraduationCap',
+      iconColor: 'text-accent',
+      iconBg: 'bg-plan-student-bg',
+      borderColor: 'border-accent/40',
+      badgeColor: 'bg-plan-student-bg text-accent border border-plan-student-border',
+      tag: 'Best Value',
+      highlight: false,
+      modelLabel: 'Basic AI Model',
+      cta: 'Get Student Plan',
+      ctaStyle: 'bg-surface hover:bg-track border border-border text-foreground',
+    },
   },
 
   pro: {
@@ -76,16 +248,38 @@ export const PLANS = {
       className: 'bg-plan-pro-bg text-green-400 border border-primary/40',
     },
     limits: {
-      [USAGE_TYPES.MESSAGE]: 200,
-      [USAGE_TYPES.REANALYZE]: 50,
-      [USAGE_TYPES.PROJECT_CHAT]: null, // unlimited
+      [USAGE_TYPES.MESSAGE]: 300,
+      [USAGE_TYPES.REANALYZE]: 75,
+      [USAGE_TYPES.PROJECT_CHAT]: 15,
     },
     models: {
-      primary: 'meta-llama/llama-4-maverick',
-      fallback: null,
+      primary: 'qwen/qwen3.5-397b-a17b',
+      fallback: 'openrouter/free',
     },
-    hasFallback: false,
+    hasFallback: true,
+    memoryLimit: 200,
     description: 'For developers serious about landing their next role.',
+
+    pricing: {
+      monthlyPrice: 10,
+      halfYearlyPrice: 54,
+      halfYearlyDiscount: 10,
+      yearlyPrice: 84,
+      yearlyDiscount: 30,
+    },
+
+    ui: {
+      icon: 'Zap',
+      iconColor: 'text-green-400',
+      iconBg: 'bg-plan-pro-bg',
+      borderColor: 'border-primary',
+      badgeColor: 'bg-plan-pro-bg text-green-400 border border-primary/40',
+      tag: 'Most Popular',
+      highlight: true,
+      modelLabel: 'Advanced AI Model',
+      cta: 'Get Pro Plan',
+      ctaStyle: 'bg-primary hover:bg-primary-hover text-foreground',
+    },
   },
 
   ultimate: {
@@ -96,16 +290,38 @@ export const PLANS = {
       className: 'bg-plan-ultimate-bg text-orange-400 border border-plan-ultimate-accent/30',
     },
     limits: {
-      [USAGE_TYPES.MESSAGE]: null,      // unlimited
-      [USAGE_TYPES.REANALYZE]: null,
-      [USAGE_TYPES.PROJECT_CHAT]: null,
+      [USAGE_TYPES.MESSAGE]: 1200,
+      [USAGE_TYPES.REANALYZE]: 300,
+      [USAGE_TYPES.PROJECT_CHAT]: 50,
     },
     models: {
-      primary: 'google/gemini-3.1-pro-preview',
-      fallback: null,
+      primary: 'google/gemini-3-flash-preview',
+      fallback: 'openrouter/free',
     },
-    hasFallback: false,
+    hasFallback: true,
+    memoryLimit: 500,
     description: 'Unlimited power for developers who refuse to stay cooked.',
+
+    pricing: {
+      monthlyPrice: 15,
+      halfYearlyPrice: 81,
+      halfYearlyDiscount: 10,
+      yearlyPrice: 126,
+      yearlyDiscount: 30,
+    },
+
+    ui: {
+      icon: 'Crown',
+      iconColor: 'text-orange-400',
+      iconBg: 'bg-plan-ultimate-bg',
+      borderColor: 'border-plan-ultimate-accent/40',
+      badgeColor: 'bg-plan-ultimate-bg text-orange-400 border border-plan-ultimate-accent/30',
+      tag: 'Best Results',
+      highlight: false,
+      modelLabel: 'State-of-the-art AI Model',
+      cta: 'Get Ultimate Plan',
+      ctaStyle: 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-foreground',
+    },
   },
 };
 
@@ -125,4 +341,32 @@ export function getPlan(planId) {
  */
 export function formatLimit(limit) {
   return limit === null ? 'Unlimited' : String(limit);
+}
+
+/**
+ * Map of Lucide icon names to actual imports.
+ * Used by Payment.jsx to dynamically instantiate icons from their string names.
+ */
+import { Sparkles, GraduationCap, Zap, Crown, Check, Info, MessageSquare, RefreshCw, Github, ArrowRight } from 'lucide-react';
+
+export const ICON_MAP = {
+  Sparkles,
+  GraduationCap,
+  Zap,
+  Crown,
+  Check,
+  Info,
+  MessageSquare,
+  RefreshCw,
+  Github,
+  ArrowRight,
+};
+
+/**
+ * Get a Lucide icon component by string name.
+ * @param {string} iconName - Name of the icon (e.g., 'Sparkles')
+ * @returns {React.Component|null}
+ */
+export function getIcon(iconName) {
+  return ICON_MAP[iconName] || null;
 }

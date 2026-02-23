@@ -1,11 +1,11 @@
 /**
  * Shared project chat utilities
- * Builds the system prompt used by ProjectPopup and SavedProjectsOverlay
+ * Builds the system prompt used by SavedProjectsOverlay
  * when chatting about a specific project.
  */
 
-import { getChatInstructions, getAnalysisModeInstructions } from '@/config/agent-instructions';
-import { formatGitHubMetrics } from '@/services/openrouter';
+import { getChatInstructionsForPlan, getAnalysisModeInstructions } from '@/config/agent-instructions';
+import { formatGitHubMetricsForPlan } from '@/services/openrouter';
 
 /**
  * Build a system prompt for project-specific AI chat.
@@ -17,13 +17,14 @@ import { formatGitHubMetrics } from '@/services/openrouter';
  * @param {Object} [userProfile] - Optional user profile data
  * @param {Object} [githubData] - Optional GitHub metrics
  * @param {Object} [analysis] - Optional pre-computed analysis (cooked level, scores, etc.)
+ * @param {string} [planId='free'] - User's plan ID; controls which metrics are exposed to the AI
  * @returns {string}
  */
-export function buildProjectSystemPrompt(project, userProfile, githubData, analysis) {
+export function buildProjectSystemPrompt(project, userProfile, githubData, analysis, planId = 'free') {
   if (!project) return '';
 
   const parts = [
-    getChatInstructions(),
+    getChatInstructionsForPlan(planId),
     getAnalysisModeInstructions('PROJECT_CHAT'),
     '',
     '# PROJECT CONTEXT',
@@ -38,9 +39,9 @@ export function buildProjectSystemPrompt(project, userProfile, githubData, analy
     parts.push(`- Stack: ${project.suggestedStack.map(s => `${s.name} (${s.description})`).join(', ')}`);
   }
 
-  // Use the canonical formatGitHubMetrics for full user + GitHub context
+  // Use plan-aware metrics formatter — free users only see summary data
   if (githubData && userProfile) {
-    parts.push('', formatGitHubMetrics(githubData, userProfile));
+    parts.push('', formatGitHubMetricsForPlan(githubData, userProfile, planId));
   }
 
   // Include pre-computed analysis so the AI knows the user's cooked level
@@ -61,7 +62,7 @@ export function buildProjectSystemPrompt(project, userProfile, githubData, analy
 
 /**
  * Format recent conversation history into a contextual prompt.
- * Shared by ProjectPopup and SavedProjectsOverlay to avoid duplication.
+ * Used by SavedProjectsOverlay to avoid duplication.
  *
  * @param {Array} messages - Array of { role, content } message objects
  * @param {string} latestMessage - The user's latest message

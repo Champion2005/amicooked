@@ -1,6 +1,8 @@
 // OpenRouter API configuration
 import { formatEducation } from "@/utils/formatEducation";
 import { getScoringInstructions, getChatInstructions, getAnalysisModeInstructions } from "@/config/agent-instructions";
+import { hasDetailedStats } from "@/config/plans";
+import { getRoastInstruction } from "@/config/preferences";
 
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
 
@@ -187,6 +189,73 @@ export function formatGitHubMetrics(githubData, userProfile) {
 }
 
 /**
+ * Free-plan version of formatGitHubMetrics.
+ * Exposes only the 1-2 most important aggregate stats per category.
+ * Detailed per-period and derived statistics are intentionally omitted —
+ * they are gated behind the In-Depth Statistics feature (Student plan+).
+ * The AI genuinely won't have the data to reveal, even under prompt injection.
+ */
+export function formatGitHubMetricsFree(githubData, userProfile) {
+  const ed = formatEducation(userProfile.education);
+  const exp = userProfile.experienceYears?.replace(/_/g, ' ') || 'Unknown';
+
+  const skills = Array.isArray(userProfile.technicalSkills)
+    ? userProfile.technicalSkills.join(', ')
+    : (userProfile.technicalSkills || 'Not specified');
+  const interests = Array.isArray(userProfile.technicalInterests)
+    ? userProfile.technicalInterests.join(', ')
+    : (userProfile.technicalInterests || '');
+
+  // Cap language list to top 3 to avoid leaking full breadth data
+  const topLanguages = (githubData.languages || []).slice(0, 3).join(', ') || 'Unknown';
+
+  return `
+## USER PROFILE
+- Age: ${userProfile.age}
+- Education: ${ed}
+- Experience: ${exp}
+- Current Status: ${userProfile.currentRole || 'Unknown'}
+- Career Goal: ${userProfile.careerGoal || 'Not specified'}
+- Technical Skills: ${skills}${interests ? `\n- Technical Interests: ${interests}` : ''}${userProfile.learningStyle ? `\n- Learning Style: ${userProfile.learningStyle.replace(/_/g, ' ')}` : ''}${userProfile.collaborationPreference ? `\n- Work Approach: ${userProfile.collaborationPreference.replace(/_/g, ' ')}` : ''}${userProfile.jobUrgency ? `\n- Job Search Timeline: ${userProfile.jobUrgency.replace(/_/g, ' ')}` : ''}${userProfile.hobbies ? `\n- Hobbies: ${userProfile.hobbies}` : ''}
+
+## GITHUB METRICS (Free Plan — Summary View)
+
+### Activity (40% of score)
+- Commits last 365 days: ${githubData.commitsLast365 ?? githubData.totalCommits}
+- Current streak: ${githubData.streak ?? 0} days
+
+### Skill Signals (30% of score)
+- Total repositories: ${githubData.totalRepos}
+- Unique languages: ${githubData.languageCount ?? githubData.languages?.length ?? 'N/A'}
+- Top languages: ${topLanguages}
+- Stars received: ${githubData.totalStars}
+- Forks: ${githubData.totalForks}
+
+### Growth (15% of score)
+- Commit velocity trend: ${githubData.commitVelocityTrend ?? 'N/A'} (>1 = accelerating vs prior year)
+
+### Collaboration (15% of score)
+- Total PRs: ${githubData.totalPRs ?? 0}
+- Merged PRs: ${githubData.mergedPRs ?? 'N/A'}
+`.trim();
+}
+
+/**
+ * Route to the correct metrics formatter based on the user's plan.
+ * Free plan: curated summary subset only.
+ * Student plan and above: full metrics.
+ * @param {Object} githubData
+ * @param {Object} userProfile
+ * @param {string} planId
+ * @returns {string}
+ */
+export function formatGitHubMetricsForPlan(githubData, userProfile, planId) {
+  return hasDetailedStats(planId)
+    ? formatGitHubMetrics(githubData, userProfile)
+    : formatGitHubMetricsFree(githubData, userProfile);
+}
+
+/**
  * Attempt to parse JSON from an AI response, with progressive sanitization
  */
 function safeParseJSON(raw) {
@@ -228,75 +297,72 @@ function safeParseJSON(raw) {
  * @returns {Promise<string>} - AI response text
  */
 export async function callOpenRouter(prompt, systemPrompt = "", onChunk = null, model = DEFAULT_MODEL) {
-  try {
-    const response = await fetch(OPENROUTER_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": window.location.origin,
-        "X-Title": "amicooked",
-      },
-      body: JSON.stringify({
-        model, // injected from plan config or DEFAULT_MODEL
-        stream: !!onChunk, // Enable streaming if callback provided
-        messages: [
-          ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
+  const useStreaming = !!onChunk;
 
-    if (!response.ok) {
-      throw new Error(`OpenRouter API error: ${response.status}`);
-    }
+  const response = await fetch(OPENROUTER_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": window.location.origin,
+      "X-Title": "amicooked",
+    },
+    body: JSON.stringify({
+      model,
+      stream: useStreaming,
+      messages: [
+        ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
+        { role: "user", content: prompt },
+      ],
+    }),
+  });
 
-    // Streaming mode
-    if (onChunk) {
-      let fullText = "";
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+  if (!response.ok) {
+    throw new Error(`OpenRouter API error: ${response.status}`);
+  }
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+  // Streaming mode
+  if (useStreaming) {
+    let fullText = "";
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6);
-              if (data === "[DONE]") continue;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n");
 
-              try {
-                const parsed = JSON.parse(data);
-                const content = parsed.choices?.[0]?.delta?.content;
-                if (content) {
-                  fullText += content;
-                  onChunk(content);
-                }
-              } catch (e) {
-                // Ignore JSON parse errors for malformed SSE lines
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+            if (data === "[DONE]") continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                fullText += content;
+                onChunk(content);
               }
+            } catch (e) {
+              // Ignore JSON parse errors for malformed SSE lines
             }
           }
         }
-      } finally {
-        reader.releaseLock();
       }
-
-      return fullText;
+    } finally {
+      reader.releaseLock();
     }
 
-    // Non-streaming mode (backwards compatible)
-    const data = await response.json();
-    return data.choices[0].message.content;
-  } catch (error) {
-    console.error("OpenRouter API error:", error);
-    throw error;
+    return fullText;
   }
+
+  // Non-streaming mode
+  const data = await response.json();
+  return data.choices[0].message.content;
 }
 
 /**
@@ -358,9 +424,15 @@ ${missing.map((k) => `    "${k}": { "score": <integer 0-100>, "notes": "<1 sente
 /**
  * Phase 2: Given pre-computed category scores, ask the AI for the
  * summary, recommendations, and insights.
+ * @param {string} [intensityId] - Roast intensity preference ID (from preferences.js)
+ * @param {string} [nickname=''] - User's chosen nickname for personalized addressing
  */
-async function fetchSynthesis(githubData, userProfile, categoryScores, onChunk = null, model = DEFAULT_MODEL) {
-  const systemPrompt = getChatInstructions() + getAnalysisModeInstructions("SYNTHESIS");
+async function fetchSynthesis(githubData, userProfile, categoryScores, onChunk = null, model = DEFAULT_MODEL, intensityId, nickname = '') {
+  const roastInstruction = getRoastInstruction(intensityId);
+  let systemPrompt = getChatInstructions(roastInstruction) + getAnalysisModeInstructions("SYNTHESIS");
+  if (nickname) {
+    systemPrompt += `\n\n# USER NICKNAME\nThe user's chosen nickname is "${nickname}". Address them by this name naturally in your summary and recommendations.`;
+  }
   const metricsBlock = formatGitHubMetrics(githubData, userProfile);
 
   // Format the pre-computed scores for the prompt
@@ -385,10 +457,7 @@ Return ONLY this JSON (no extra text):
 }`;
 
   let fullResponse = "";
-  const response = await callOpenRouter(prompt, systemPrompt, (chunk) => {
-    fullResponse += chunk;
-    if (onChunk) onChunk(chunk);
-  }, model);
+  const response = await callOpenRouter(prompt, systemPrompt, null, model);
 
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   const parsed = jsonMatch ? safeParseJSON(jsonMatch[0]) : null;
@@ -403,15 +472,17 @@ Return ONLY this JSON (no extra text):
  * @param {Object} userProfile - User's profile data (age, education, interests, etc.)
  * @param {Function} onSynthesisChunk - Optional callback for streaming synthesis chunks
  * @param {string} model - Optional model override
+ * @param {string} [intensityId] - Roast intensity preference ID (from preferences.js)
+ * @param {string} [nickname=''] - User's chosen nickname for personalized addressing
  * @returns {Promise<Object>} - { cookedLevel, levelName, summary, recommendations, categoryScores, ... }
  */
-export async function analyzeCookedLevel(githubData, userProfile, onSynthesisChunk = null, model = DEFAULT_MODEL) {
+export async function analyzeCookedLevel(githubData, userProfile, onSynthesisChunk = null, model = DEFAULT_MODEL, intensityId, nickname = '') {
   try {
     // Phase 1 — Scoring
     const rawCategoryScores = await fetchCategoryScores(githubData, userProfile, model);
 
     // Phase 2 — Synthesis (summary, recommendations, insights) with optional streaming
-    const synthesis = await fetchSynthesis(githubData, userProfile, rawCategoryScores, onSynthesisChunk, model);
+    const synthesis = await fetchSynthesis(githubData, userProfile, rawCategoryScores, onSynthesisChunk, model, intensityId, nickname);
 
     // Combine and normalize
     const combined = { ...synthesis, categoryScores: rawCategoryScores };

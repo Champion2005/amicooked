@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import logo from "@/assets/amicooked_logo.png";
@@ -26,18 +26,25 @@ import {
   CreditCard,
   BarChart2,
   Zap,
+  Lock,
+  Settings,
 } from "lucide-react";
 import { signOut } from "firebase/auth";
-import { auth } from "@/config/firebase";
+import { getDoc, doc } from "firebase/firestore";
+import { auth, db } from "@/config/firebase";
+import { hasDetailedStats } from "@/config/plans";
 import ChatPopup from "@/components/ChatPopup";
-import ProjectPopup from "@/components/ProjectPopup";
 import SavedProjectsOverlay from "@/components/SavedProjectsOverlay";
 import LanguageBreakdown from "@/components/LanguageBreakdown";
 import { formatEducation } from "@/utils/formatEducation";
-import { isProjectSaved, saveProject, slugify } from "@/services/savedProjects";
+import { isProjectSaved, saveProject, slugify, recordProjectBookmark } from "@/services/savedProjects";
 import { getUsageSummary } from "@/services/usage";
 import { USAGE_TYPES, formatLimit, PERIOD_DAYS } from "@/config/plans";
 import { useToast } from "@/components/ui/Toast";
+import { getUserPreferences } from "@/services/userProfile";
+import { learnFromAnalysis } from "@/services/agent";
+import { fireConfetti } from "@/utils/confetti";
+import { CONFETTI_SCORE_THRESHOLD } from "@/config/preferences";
 
 export default function Results() {
   const location = useLocation();
@@ -60,9 +67,18 @@ export default function Results() {
   const [savedProjectNames, setSavedProjectNames] = useState(new Set());
   const [metricPopupOpen, setMetricPopupOpen] = useState(false);
   const [statsPopupOpen, setStatsPopupOpen] = useState(false);
+  // Plan ID verified fresh from Firestore each time the stats popup opens.
+  // null = still loading, string = resolved plan (e.g. 'free', 'student').
+  const [verifiedPlan, setVerifiedPlan] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
   const [usageSummary, setUsageSummary] = useState(null);
   const [usageOverlayOpen, setUsageOverlayOpen] = useState(false);
+  const [userPreferences, setUserPreferences] = useState({});
   const profileMenuRef = useRef(null);
+  // Prevents confetti from firing more than once per session/mount
+  const confettiFiredRef = useRef(false);
+  // Prevents analysis-learning from firing more than once per mount
+  const analysisLearningFiredRef = useRef(false);
 
   // Load AI usage for plan badge & usage overlay
   useEffect(() => {
@@ -71,6 +87,39 @@ export default function Results() {
       getUsageSummary(uid)
         .then(setUsageSummary)
         .catch(() => {});
+  }, []);
+
+  // Store analysis insights in agent long-term memory (paid plans, new analyses only)
+  useEffect(() => {
+    if (!usageSummary || !location.state?.isNewAnalysis || analysisLearningFiredRef.current) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid || !analysis) return;
+    analysisLearningFiredRef.current = true;
+    learnFromAnalysis(uid, usageSummary.plan || 'free', analysis, userProfile).catch(() => {});
+  }, [usageSummary]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load user preferences (roast intensity, confetti, dev nickname) and fire confetti once
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    getUserPreferences(uid)
+      .then((prefs) => {
+        setUserPreferences(prefs);
+        // Fire confetti only for brand-new analyses, only once per mount,
+        // and only when the user has confetti enabled (defaults to true).
+        const confettiEnabled = prefs.confetti !== false;
+        if (
+          !confettiFiredRef.current &&
+          location.state?.isNewAnalysis &&
+          confettiEnabled &&
+          analysis?.cookedLevel >= CONFETTI_SCORE_THRESHOLD
+        ) {
+          confettiFiredRef.current = true;
+          setTimeout(fireConfetti, 600);
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load saved project status for bookmark icons
@@ -88,6 +137,27 @@ export default function Results() {
     };
     checkSaved();
   }, [recommendedProjects]);
+
+  // Opens the stats popup and fresh-fetches the user's plan from Firestore.
+  // Keeps verification server-driven so client-side state tampering can't bypass gating.
+  const openStatsPopup = useCallback(async () => {
+    setStatsPopupOpen(true);
+    setVerifiedPlan(null);
+    setStatsLoading(true);
+    try {
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        const snap = await getDoc(doc(db, 'users', uid));
+        setVerifiedPlan(snap.exists() ? (snap.data().plan || 'free') : 'free');
+      } else {
+        setVerifiedPlan('free');
+      }
+    } catch {
+      setVerifiedPlan('free');
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
 
   const refreshSavedStatus = async () => {
     const userId = auth.currentUser?.uid;
@@ -107,6 +177,8 @@ export default function Results() {
     if (!userId) return;
     try {
       await saveProject(userId, rec);
+      const planId = usageSummary?.plan || 'free';
+      recordProjectBookmark(userId, planId, rec);
       setSavedProjectNames((prev) => new Set([...prev, rec.name]));
     } catch (err) {
       console.error("Save error:", err);
@@ -566,6 +638,16 @@ export default function Results() {
                   <User className="w-4 h-4" />
                   Edit Profile
                 </button>
+                <button
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    navigate("/settings");
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </button>
 
                 {/* Analysis */}
                 <div className="border-t border-border/50 my-1.5" />
@@ -575,7 +657,7 @@ export default function Results() {
                 <button
                   onClick={() => {
                     setProfileMenuOpen(false);
-                    setStatsPopupOpen(true);
+                    openStatsPopup();
                   }}
                   className="w-full flex items-center gap-3 px-4 py-2 text-sm text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
                 >
@@ -676,6 +758,11 @@ export default function Results() {
                       {githubData.username}
                     </p>
                   )}
+                  {userPreferences.devNickname && (
+                    <p className="text-xs text-accent font-medium tracking-wide mb-1">
+                      aka {userPreferences.devNickname}
+                    </p>
+                  )}
                   <div className="mt-4">
                     <div className="flex items-center justify-center lg:justify-start gap-2">
                       <p className="text-sm text-muted-foreground">
@@ -724,7 +811,7 @@ export default function Results() {
                 <Button
                   variant="outline"
                   className="w-full mb-5 border-border text-foreground hover:bg-surface"
-                  onClick={() => setStatsPopupOpen(true)}
+                  onClick={() => openStatsPopup()}
                 >
                   <BarChart2 className="w-4 h-4 mr-2" />
                   View Statistics
@@ -965,7 +1052,7 @@ export default function Results() {
                   GitHub Activity
                 </h2>
                 <button
-                  onClick={() => setStatsPopupOpen(true)}
+                  onClick={() => openStatsPopup()}
                   className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-accent transition-colors"
                 >
                   <Info className="w-3.5 h-3.5" />
@@ -1286,22 +1373,14 @@ export default function Results() {
         githubData={githubData}
         userProfile={userProfile}
         analysis={analysis}
+        planId={usageSummary?.plan ?? 'free'}
+        roastIntensity={userPreferences.roastIntensity ?? 'balanced'}
+        nickname={userPreferences.devNickname ?? ''}
         onOpenSavedProjects={() => {
           setChatOpen(false);
           setChatQuery("");
           setSavedProjectsOpen(true);
         }}
-      />
-
-      {/* Project Detail Popup */}
-      <ProjectPopup
-        isOpen={!!selectedProject}
-        onClose={() => setSelectedProject(null)}
-        project={selectedProject}
-        githubData={githubData}
-        userProfile={userProfile}
-        analysis={analysis}
-        onSaveChange={refreshSavedStatus}
       />
 
       {/* My Projects Overlay */}
@@ -1316,6 +1395,7 @@ export default function Results() {
         analysis={analysis}
         recommendedProjects={recommendedProjects || []}
         initialProjectId={initialProjectId}
+        planId={usageSummary?.plan ?? 'free'}
       />
 
       {/* Reanalyze Confirmation */}
@@ -1438,6 +1518,17 @@ export default function Results() {
                 {renderBreakdown()}
               </div>
             )}
+
+            {/* ── In-Depth Statistics — Student plan and above only ─────── */}
+            {statsLoading || verifiedPlan === null ? (
+              /* Loading state while Firestore verifies the plan */
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <RefreshCw className="w-6 h-6 text-muted-foreground animate-spin" />
+                <p className="text-sm text-muted-foreground">Verifying access…</p>
+              </div>
+            ) : hasDetailedStats(verifiedPlan) ? (
+              /* Paid plan: render all in-depth metric sections */
+              <>
 
             {/* Activity */}
             <div>
@@ -1785,6 +1876,34 @@ export default function Results() {
             <p className="text-xs text-muted-foreground text-center pb-2">
               All data sourced from the GitHub GraphQL API at time of analysis.
             </p>
+
+              </> /* end paid-plan in-depth block */
+            ) : (
+              /* Free plan: upsell lock screen */
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                <div className="w-14 h-14 rounded-full bg-surface border border-border flex items-center justify-center mb-5">
+                  <Lock className="w-7 h-7 text-muted-foreground" />
+                </div>
+                <h4 className="text-lg font-semibold text-foreground mb-2">
+                  In-Depth Statistics
+                </h4>
+                <p className="text-sm text-muted-foreground max-w-sm leading-relaxed mb-1">
+                  The full breakdown — Activity, Skill Signals, Growth, Collaboration, and Repository metrics — is available on the
+                  <strong className="text-foreground"> Student plan</strong> and above.
+                </p>
+                <p className="text-xs text-muted-foreground/60 max-w-xs mb-3">
+                  On the free plan, the AI works from a summary view.
+                  Upgrading feeds the AI your complete metrics — leading to a more precise score, sharper recommendations, and deeper chat answers.
+                </p>
+                <a
+                  href="/pricing"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent text-background text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  <Zap className="w-4 h-4" />
+                  Upgrade to Student — $3/mo
+                </a>
+              </div>
+            )}
           </div>
         </div>
       )}
