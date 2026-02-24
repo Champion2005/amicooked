@@ -80,6 +80,7 @@ export async function deleteAccount() {
 
   // Clear all client-side state
   localStorage.clear();
+  sessionStorage.clear();
 }
 
 /**
@@ -118,7 +119,7 @@ export async function resetAllData() {
     updatedAt: new Date().toISOString(),
   });
 
-  // No need to clear localStorage for a data reset — the github_token
+  // No need to clear sessionStorage for a data reset — the github_token
   // must remain intact for API calls, and Firebase Auth state is managed
   // via IndexedDB. Only Firestore data was wiped above.
 }

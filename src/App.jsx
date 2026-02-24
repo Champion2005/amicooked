@@ -1,11 +1,12 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/ui/Toast';
+import ProtectedRoute from './components/ProtectedRoute';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Results from './pages/Results';
-import Payment from './pages/Payment';
+import Pricing from './pages/Pricing';
 import Settings from './pages/Settings';
 
 function App() {
@@ -15,11 +16,11 @@ function App() {
         <Router>
           <Routes>
             <Route path="/" element={<Landing />} />
-            <Route path="/pricing" element={<Payment />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/results" element={<Results />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/results" element={<ProtectedRoute><Results /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           </Routes>
         </Router>
       </ToastProvider>

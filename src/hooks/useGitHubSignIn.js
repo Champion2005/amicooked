@@ -6,7 +6,7 @@ import { auth, githubProvider, db } from '@/config/firebase';
 
 /**
  * Shared hook for GitHub OAuth sign-in.
- * Used by Landing and Payment pages.
+ * Used by Landing and Pricing pages.
  *
  * @param {Object} [options]
  * @param {string} [options.redirectTo='/dashboard'] - Where to navigate after sign-in
@@ -22,7 +22,7 @@ export function useGitHubSignIn({ redirectTo = '/dashboard', onError } = {}) {
     try {
       const result = await signInWithPopup(auth, githubProvider);
       const credential = result._tokenResponse.oauthAccessToken;
-      localStorage.setItem('github_token', credential);
+      sessionStorage.setItem('github_token', credential);
 
       // ── Initialize user doc ────────────────────────────────────────────────
       // Always upsert metadata (displayName, photoURL, etc.).

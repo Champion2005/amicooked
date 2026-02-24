@@ -251,7 +251,7 @@ export default function Results() {
     setShowSignOutConfirm(false);
     try {
       await signOut(auth);
-      localStorage.removeItem("github_token");
+      sessionStorage.removeItem("github_token");
       navigate("/");
     } catch (error) {
       console.error("Sign out error:", error);

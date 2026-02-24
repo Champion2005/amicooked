@@ -250,7 +250,7 @@ export default function Pricing() {
                                     : 'text-muted-foreground hover:text-foreground'
                             }`}
                         >
-                            6-Month
+                            Bi-annual
                         </button>
                         <button
                             onClick={() => setBillingCycle('yearly')}
@@ -260,7 +260,7 @@ export default function Pricing() {
                                     : 'text-muted-foreground hover:text-foreground'
                             }`}
                         >
-                            Yearly
+                            Annual
                             <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">
                                 Best Deal
                             </span>
@@ -335,7 +335,7 @@ export default function Pricing() {
                                             onClick={() => setBillingCycle('yearly')}
                                             className="block text-xs font-semibold text-green-400/70 mt-2 cursor-pointer hover:text-green-400 transition-colors"
                                         >
-                                            Save {plan.yearlyDiscount}% yearly →
+                                            Save {plan.yearlyDiscount}% annually →
                                         </span>
                                     )}
                                 </div>

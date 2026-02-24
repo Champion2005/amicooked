@@ -146,7 +146,7 @@ export const FAQS = [
   },
   {
     q: 'Is the Student plan really just $3/mo?',
-    a: 'Yep — $3/mo monthly, or $21/yr (40% off) if you go yearly. We built this at a hackathon. We get it.',
+    a: 'Yep — $3/mo monthly, or $21/yr (42% off) if you go yearly. We built this at a hackathon. We get it.',
   },
 ];
 
@@ -221,9 +221,9 @@ export const PLANS = {
     pricing: {
       monthlyPrice: 3,
       halfYearlyPrice: 15,
-      halfYearlyDiscount: 15,
+      halfYearlyDiscount: 17,
       yearlyPrice: 21,
-      yearlyDiscount: 40,
+      yearlyDiscount: 42,
     },
 
     ui: {
@@ -345,7 +345,7 @@ export function formatLimit(limit) {
 
 /**
  * Map of Lucide icon names to actual imports.
- * Used by Payment.jsx to dynamically instantiate icons from their string names.
+ * Used by Pricing.jsx to dynamically instantiate icons from their string names.
  */
 import { Sparkles, GraduationCap, Zap, Crown, Check, Info, MessageSquare, RefreshCw, Github, ArrowRight } from 'lucide-react';
 

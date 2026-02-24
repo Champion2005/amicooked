@@ -218,7 +218,7 @@ export default function Settings() {
     setShowSignOutConfirm(false);
     try {
       await signOut(auth);
-      localStorage.removeItem("github_token");
+      sessionStorage.removeItem("github_token");
       navigate("/");
     } catch {
       toast.error("Sign-out failed. Please try again.");

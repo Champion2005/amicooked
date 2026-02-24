@@ -116,11 +116,11 @@ export default function Dashboard() {
   const handleAnalyze = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('github_token');
+      const token = sessionStorage.getItem('github_token');
       if (!token) {
         toast.error('GitHub session expired. Please sign in again.');
         await signOut(auth);
-        localStorage.removeItem('github_token');
+        sessionStorage.removeItem('github_token');
         navigate('/');
         return;
       }

@@ -104,6 +104,11 @@ class AgentMemory {
       summary: [],
       goal: [],
       action: [],
+      preference: [],
+      skill: [],
+      feedback: [],
+      milestone: [],
+      context: [],
     };
 
     for (const item of this.longTermMemory) {
@@ -116,7 +121,12 @@ class AgentMemory {
     if (sections.insight.length) out += '\n### User Insights\n' + sections.insight.map(i => `- ${i}`).join('\n');
     if (sections.action.length) out += '\n### Tracked Actions\n' + sections.action.map(a => `- ${a}`).join('\n');
     if (sections.summary.length) out += '\n### Past Session Summaries\n' + sections.summary.map(s => `- ${s}`).join('\n');
-    out += '\n\nUse this knowledge to provide continuity. Reference past goals and tracked progress when relevant.';
+    if (sections.preference.length) out += '\n### User Preferences\n' + sections.preference.map(p => `- ${p}`).join('\n');
+    if (sections.skill.length) out += '\n### Known Skills\n' + sections.skill.map(s => `- ${s}`).join('\n');
+    if (sections.feedback.length) out += '\n### User Feedback\n' + sections.feedback.map(f => `- ${f}`).join('\n');
+    if (sections.milestone.length) out += '\n### Milestones & Progress\n' + sections.milestone.map(m => `- ${m}`).join('\n');
+    if (sections.context.length) out += '\n### Background Context\n' + sections.context.map(c => `- ${c}`).join('\n');
+    out += '\n\nUse this knowledge to provide continuity. Reference past goals, preferences, skills, milestones, and tracked progress when relevant.';
     return out;
   }
 

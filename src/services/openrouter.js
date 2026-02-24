@@ -456,7 +456,6 @@ Return ONLY this JSON (no extra text):
   "activityInsight": "<1 sentence on contribution patterns>"
 }`;
 
-  let fullResponse = "";
   const response = await callOpenRouter(prompt, systemPrompt, null, model);
 
   const jsonMatch = response.match(/\{[\s\S]*\}/);

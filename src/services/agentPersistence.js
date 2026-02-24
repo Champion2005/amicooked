@@ -37,6 +37,11 @@ export const MEMORY_TYPES = {
   SUMMARY: 'summary',
   GOAL: 'goal',
   ACTION: 'action',
+  PREFERENCE: 'preference',
+  SKILL: 'skill',
+  FEEDBACK: 'feedback',
+  MILESTONE: 'milestone',
+  CONTEXT: 'context',
 }
 
 // ─── Firestore helpers ──────────────────────────────────────────────────────
@@ -157,7 +162,47 @@ export async function saveAgentIdentity(uid, planId, identity) {
 // ─── Memory management ──────────────────────────────────────────────────────
 
 /**
+ * Tokenize a string into a set of lowercase words for overlap comparison.
+ * @param {string} text
+ * @returns {Set<string>}
+ */
+function tokenize(text) {
+  return new Set(
+    String(text)
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean)
+  )
+}
+
+/**
+ * Calculate word-level overlap ratio between two strings.
+ * Returns a value from 0 to 1 where 1 means identical word sets.
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
+function wordOverlap(a, b) {
+  const setA = tokenize(a)
+  const setB = tokenize(b)
+  if (setA.size === 0 && setB.size === 0) return 1
+  if (setA.size === 0 || setB.size === 0) return 0
+  let intersection = 0
+  for (const word of setA) {
+    if (setB.has(word)) intersection++
+  }
+  const union = new Set([...setA, ...setB]).size
+  return union > 0 ? intersection / union : 0
+}
+
+/** Minimum word-overlap ratio (Jaccard similarity) to consider two memory items fuzzy duplicates */
+const FUZZY_OVERLAP_THRESHOLD = 0.8
+
+/**
  * Add a memory item and persist immediately.
+ * Deduplicates before inserting:
+ *   - Exact match (same type + identical trimmed lowercase content) → skip entirely
+ *   - Fuzzy match (same type + >80% word overlap) → replace the older item with the newer one
  *
  * @param {string} uid
  * @param {string} planId
@@ -175,6 +220,33 @@ export async function addMemoryItem(uid, planId, item) {
     content: String(item.content).trim().slice(0, MEMORY_ITEM_MAX_LENGTH),
     meta: item.meta || {},
     createdAt: new Date().toISOString(),
+  }
+
+  const normalizedNew = sanitized.content.toLowerCase()
+
+  // ── Deduplication ──────────────────────────────────────────────────────────
+  // Check existing items of the same type for exact or fuzzy duplicates.
+  let fuzzyMatchIndex = -1
+
+  for (let i = 0; i < memory.length; i++) {
+    if (memory[i].type !== sanitized.type) continue
+
+    const normalizedExisting = String(memory[i].content).trim().toLowerCase()
+
+    // Exact duplicate → skip the new item entirely
+    if (normalizedExisting === normalizedNew) {
+      return memory
+    }
+
+    // Fuzzy duplicate → mark for replacement (keep last match to replace oldest)
+    if (fuzzyMatchIndex === -1 && wordOverlap(normalizedExisting, normalizedNew) >= FUZZY_OVERLAP_THRESHOLD) {
+      fuzzyMatchIndex = i
+    }
+  }
+
+  // If a fuzzy match was found, replace the older item with the new one
+  if (fuzzyMatchIndex !== -1) {
+    memory.splice(fuzzyMatchIndex, 1)
   }
 
   memory.push(sanitized)
