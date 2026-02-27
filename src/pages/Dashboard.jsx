@@ -131,13 +131,13 @@ export default function Dashboard() {
         return;
       }
 
-      // Check reanalyze limit before running
+      // Resolve model & plan info; only enforce reanalyze quota on re-runs
       const userId = auth.currentUser?.uid;
       let analysisModel;
       let userPlanId = 'free';
       if (userId) {
         const limitCheck = await checkLimit(userId, USAGE_TYPES.REANALYZE);
-        if (!limitCheck.allowed) {
+        if (forceReanalyze && !limitCheck.allowed) {
           toast.error(
             `You've used all ${formatLimit(limitCheck.limit)} analyses for this period. Upgrade your plan to continue.`
           );
@@ -184,7 +184,10 @@ export default function Dashboard() {
       setStatus('Saving your results...');
       if (userId) {
         await saveAnalysisResults(userId, { githubData: data, analysis, recommendedProjects });
-        await incrementUsage(userId, USAGE_TYPES.REANALYZE);
+        // Only count against the reanalyze quota for re-runs, not the initial analysis
+        if (forceReanalyze) {
+          await incrementUsage(userId, USAGE_TYPES.REANALYZE);
+        }
       }
 
       setStatus('Done! Redirecting to your results...');
