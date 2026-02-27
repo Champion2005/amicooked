@@ -8,9 +8,9 @@ import TagInput from '@/components/ui/TagInput';
 import { getUserProfile, saveUserProfile, getUserPreferences, saveUserPreferences } from '@/services/userProfile';
 import { DEV_NICKNAME_MAX_LENGTH } from '@/config/preferences';
 import logo from '@/assets/amicooked_logo.png';
-import { Loader2, User, ArrowLeft, CreditCard } from 'lucide-react';
+import { Loader2, User, ArrowLeft } from 'lucide-react';
 import { getUsageSummary } from '@/services/usage';
-import { USAGE_TYPES, formatLimit, PERIOD_DAYS } from '@/config/plans';
+
 import { SKILL_SUGGESTIONS, INTEREST_SUGGESTIONS } from '@/config/tagSuggestions';
 import { addMemoryItem, MEMORY_TYPES } from '@/services/agentPersistence';
 
@@ -252,7 +252,7 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="max-w-3xl w-full bg-card border-border">
+      <Card className="max-w-3xl w-full bg-background border-border">
         <CardHeader className="px-4 sm:px-6">
           <div className="flex justify-center mb-4">
             <img src={logo} alt="AmICooked" className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover" />
@@ -266,60 +266,8 @@ export default function Profile() {
               : "Tell us about yourself so we can provide personalized recommendations"
             }
           </CardDescription>
-          {usageSummary && (
-            <div className="flex justify-center mt-3">
-              <span className={`text-xs font-semibold px-3 py-1 rounded-full ${usageSummary.planConfig.badge.className}`}>
-                {usageSummary.planConfig.badge.label} Plan
-              </span>
-            </div>
-          )}
         </CardHeader>
         <CardContent className="space-y-6 px-4 sm:px-6">
-          {/* ─── Plan Usage Card ─── */}
-          {usageSummary && (
-            <div className="bg-surface border border-border rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-accent" />
-                  AI Usage — {usageSummary.planConfig.name} Plan
-                </h3>
-                {usageSummary.plan === 'free' && (
-                  <a href="/pricing" className="text-xs text-accent hover:underline">Upgrade →</a>
-                )}
-              </div>
-              {[
-                [USAGE_TYPES.MESSAGE, 'Messages'],
-                [USAGE_TYPES.REANALYZE, 'Reanalyzes'],
-                [USAGE_TYPES.PROJECT_CHAT, 'Project Chats'],
-              ].map(([type, label]) => {
-                const limit = usageSummary.planConfig.limits[type] ?? null;
-                const current = usageSummary.usage[type] ?? 0;
-                const pct = limit === null ? 0 : Math.min(100, (current / limit) * 100);
-                return (
-                  <div key={type} className="space-y-1">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{label}</span>
-                      <span>{current} / {formatLimit(limit)}</span>
-                    </div>
-                    {limit !== null && (
-                      <div className="h-1.5 rounded-full bg-background overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            pct >= 100 ? 'bg-red-500' : 'bg-accent'
-                          }`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              <p className="text-xs text-muted-foreground">
-                Resets every {PERIOD_DAYS} days from your first use.
-              </p>
-            </div>
-          )}
-
           {/* ─── Required Fields ─── */}
           <div className="space-y-4">
             {/* Row: Age + Experience */}

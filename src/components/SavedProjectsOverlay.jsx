@@ -10,7 +10,7 @@ import {
   slugify,
 } from "@/services/savedProjects";
 import { createAgent } from "@/services/agent";
-import { checkLimit, incrementUsage } from "@/services/usage";
+import { checkLimit, incrementUsage, getUsageSummary } from "@/services/usage";
 import { USAGE_TYPES, formatLimit } from "@/config/plans";
 import {
   X,
@@ -65,6 +65,7 @@ export default function SavedProjectsOverlay({
   const [recommendedProjectsData, setRecommendedProjectsData] = useState([]); // Enriched with updatedAt
   const [savingBookmark, setSavingBookmark] = useState(false);
   const [usingFallback, setUsingFallback] = useState(false);
+  const [usageSummary, setUsageSummary] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const agentRef = useRef(null);
@@ -80,6 +81,7 @@ export default function SavedProjectsOverlay({
     if (!userId) return;
     loadProjects();
     loadRecommendedSaveStatus();
+    getUsageSummary(userId).then(setUsageSummary).catch(() => {});
     setShowSidebar(true);
     // Reset active project if no initial selection
     if (!initialProjectId) {
@@ -459,6 +461,9 @@ export default function SavedProjectsOverlay({
       }));
     } finally {
       setChatLoading(false);
+      if (window.innerWidth > 768) inputRef.current?.focus();
+      // Refresh usage summary after sending a message
+      getUsageSummary(userId).then(setUsageSummary).catch(() => {});
     }
   };
 
@@ -479,7 +484,7 @@ export default function SavedProjectsOverlay({
     <>
       <div className="fixed inset-0 z-50 bg-background flex flex-col">
         {/* Header */}
-        <header className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
+        <header className="border-b border-border bg-background-dark px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {!showSidebar && (
               <button
@@ -544,7 +549,7 @@ export default function SavedProjectsOverlay({
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar — Projects List */}
           {showSidebar && (
-            <div className="absolute inset-0 sm:relative sm:inset-auto w-full sm:w-80 border-r border-border bg-card flex flex-col shrink-0 z-10">
+            <div className="absolute inset-0 sm:relative sm:inset-auto w-full sm:w-80 border-r border-border bg-background flex flex-col shrink-0 z-10">
               <div className="flex-1 overflow-y-auto">
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
@@ -617,9 +622,16 @@ export default function SavedProjectsOverlay({
                     <div>
                       <div className="p-4 pb-3">
                         <div className="flex items-center justify-between mb-3">
-                          <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">
-                            Saved
-                          </h2>
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">
+                              Saved
+                            </h2>
+                            {usageSummary && usageSummary.planConfig.limits[USAGE_TYPES.PROJECT_CHAT] !== null && (
+                              <span className="text-[10px] text-muted-foreground">
+                                {projects.length}/{formatLimit(usageSummary.planConfig.limits[USAGE_TYPES.PROJECT_CHAT])}
+                              </span>
+                            )}
+                          </div>
                           
                           {/* Delete menu - only show if there are saved projects */}
                           {projects.length > 0 && (
@@ -778,7 +790,7 @@ export default function SavedProjectsOverlay({
                     </div>
 
                     {activeProject.alignment && (
-                      <div className="bg-card rounded-lg p-3 border border-border">
+                      <div className="bg-background rounded-lg p-3 border border-border">
                         <div className="flex items-center gap-2 mb-1">
                           <Lightbulb className="w-3.5 h-3.5 text-yellow-400" />
                           <h3 className="text-xs font-semibold text-yellow-400">
@@ -803,7 +815,7 @@ export default function SavedProjectsOverlay({
                           {stack.map((tech, i) => (
                             <div
                               key={i}
-                              className="flex items-start gap-2 bg-card rounded-lg px-3 py-2 border border-border"
+                              className="flex items-start gap-2 bg-background rounded-lg px-3 py-2 border border-border"
                             >
                               <div className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
                               <div className="text-sm">
@@ -823,13 +835,13 @@ export default function SavedProjectsOverlay({
 
                     {/* Skills pills */}
                     <div className="flex flex-wrap gap-1.5">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-card border border-border text-green-400">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-background border border-border text-green-400">
                         {activeProject.skill1}
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-card border border-border text-blue-400">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-background border border-border text-blue-400">
                         {activeProject.skill2}
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-card border border-border text-yellow-400">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-background border border-border text-yellow-400">
                         {activeProject.skill3}
                       </span>
                     </div>
@@ -841,7 +853,7 @@ export default function SavedProjectsOverlay({
                   {messages.length === 0 ? (
                     <div className="flex-1 flex items-center justify-center h-full">
                       <div className="text-center">
-                        <div className="w-16 h-16 rounded-full bg-card border border-border flex items-center justify-center mx-auto mb-4">
+                        <div className="w-16 h-16 rounded-full bg-background border border-border flex items-center justify-center mx-auto mb-4">
                           <MessageSquare className="w-8 h-8 text-muted-foreground" />
                         </div>
                         <h2 className="text-lg font-semibold text-foreground mb-1">
@@ -881,7 +893,7 @@ export default function SavedProjectsOverlay({
                 </div>
 
                 {/* Input */}
-                <div className="border-t border-border bg-card p-3 sm:p-4 shrink-0">
+                <div className="border-t border-border bg-background p-3 sm:p-4 shrink-0">
                   {/* Fallback model notice */}
                   {usingFallback && (
                     <div className="max-w-4xl mx-auto mb-2 flex items-center gap-2 text-xs text-amber-400/80 bg-amber-400/5 border border-amber-400/20 rounded-md px-3 py-1.5">
@@ -917,6 +929,29 @@ export default function SavedProjectsOverlay({
                       )}
                     </button>
                   </div>
+                  {/* Message usage bar */}
+                  {usageSummary && usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE] !== null && (
+                    <div className="max-w-4xl mx-auto mt-2 flex items-center gap-2">
+                      <div className="flex-1 h-1 rounded-full bg-surface overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            (usageSummary.usage[USAGE_TYPES.MESSAGE] ?? 0) >= usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE]
+                              ? 'bg-red-500'
+                              : 'bg-accent'
+                          }`}
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              ((usageSummary.usage[USAGE_TYPES.MESSAGE] ?? 0) / usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE]) * 100
+                            )}%`
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {Math.round(((usageSummary.usage[USAGE_TYPES.MESSAGE] ?? 0) / usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE]) * 100)}% used
+                      </span>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -924,7 +959,7 @@ export default function SavedProjectsOverlay({
               !showSidebar && (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
-                    <div className="w-20 h-20 rounded-full bg-card border border-border flex items-center justify-center mx-auto mb-4">
+                    <div className="w-20 h-20 rounded-full bg-background border border-border flex items-center justify-center mx-auto mb-4">
                       <FolderOpen className="w-10 h-10 text-muted-foreground" />
                     </div>
                     <h2 className="text-xl font-semibold text-foreground mb-2">

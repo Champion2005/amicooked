@@ -65,8 +65,3 @@ src/
 ## TODO
 Mention this next time if items exist in it to remind. Do not implement unless explicitly asked to. This is just for reference, reminder, and progress tracking.
 
-- make weights adjustable for ultimate plan members: essentially weights for analysis are adjustable (by the AI during analysis only so cant prompt inject to skew rating or wtv), AI chooses weights based on profile and past analysis if any. constrain weight change so AI cannot make one thing worth 100% or something silly like that.
-- make it so the chat input is refocused after sending a message in both saved projects and normal chat.
-- change view statistics text for buttons to just statistics 
-- change weights for ultimate plan to be individual to each statistic instead of overall categories for more granularity and consistency in analysis. 
-- completely delete the AI usage popup and button in menu since usage is shown on profile. additionally, link the plan badge to the usage section of the settings page so users can easily find it.

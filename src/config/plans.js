@@ -23,7 +23,7 @@ export const PERIOD_DAYS = 30;
 export const USAGE_TYPES = {
   MESSAGE: 'messages',       // AI chat messages (ChatPopup + SavedProjectsOverlay)
   REANALYZE: 'reanalyzes',   // Full GitHub re-analyses (Dashboard)
-  PROJECT_CHAT: 'projectChats', // Number of saved projects (SavedProjectsOverlay)
+  PROJECT_CHAT: 'projectChats', // Saved project slots (SavedProjectsOverlay)
 };
 
 /** Order of plans on pricing page — change here to reorder cards */
@@ -55,17 +55,16 @@ export const ALL_FEATURES = [
   { name: 'In-Depth Statistics', availableFrom: 'student' },
   { name: 'Richer AI Analysis Data', availableFrom: 'student' },
   { name: 'Score History', availableFrom: 'student' },
-  { name: '75 Agent Memories', availableFrom: 'student' },
 
   // Pro plan exclusives
   { name: 'Increased Usage Limits II', availableFrom: 'pro' },
-  { name: '200 Agent Memories', availableFrom: 'pro' },
-  { name: 'Interactive Improvement Roadmap', availableFrom: 'pro' },
+  { name: 'Advanced Project Insights (Coming soon)', availableFrom: 'pro' },
   { name: 'Custom Agent Identity', availableFrom: 'pro' },
-
+  
   // Ultimate plan exclusives
   { name: 'Increased Usage Limits III', availableFrom: 'ultimate' },
-  { name: '500 Agent Memories', availableFrom: 'ultimate' },
+  { name: 'Adaptive Score Weights', availableFrom: 'ultimate' },
+  { name: 'Interactive Growth Roadmap (coming soon)', availableFrom: 'ultimate' },
 ];
 
 /**
@@ -130,6 +129,16 @@ export function hasCustomAgent(planId) {
   return PLAN_TIER[planId] >= PLAN_TIER.pro;
 }
 
+/**
+ * Returns true when the given planId has access to adaptive score weights
+ * with per-statistic granularity. Ultimate plan only.
+ * @param {string} planId
+ * @returns {boolean}
+ */
+export function hasAdjustableWeights(planId) {
+  return PLAN_TIER[planId] >= PLAN_TIER.ultimate;
+}
+
 /** Frequently asked questions (shared across all plans) */
 export const FAQS = [
   {
@@ -142,7 +151,7 @@ export const FAQS = [
   },
   {
     q: "What's a \"regeneration\"?",
-    a: "When you want a fresh take on a project recommendation or analysis — that's a regeneration.",
+    a: "When you want a fresh take on your analysis or projects. A full reanalysis counts as 1 regeneration. Regenerating just the analysis costs 0.8, and regenerating just projects costs 0.5.",
   },
   {
     q: 'Is the Student plan really just $3/mo?',
@@ -176,9 +185,7 @@ export const PLANS = {
     // ─── Pricing ───────────────────────────────────────────────────────────
     pricing: {
       monthlyPrice: 0,
-      halfYearlyPrice: 0,
       halfYearlyDiscount: null,
-      yearlyPrice: 0,
       yearlyDiscount: null,
     },
 
@@ -205,8 +212,8 @@ export const PLANS = {
       className: 'bg-plan-student-bg text-accent border border-plan-student-border',
     },
     limits: {
-      [USAGE_TYPES.MESSAGE]: 100,
-      [USAGE_TYPES.REANALYZE]: 25,
+      [USAGE_TYPES.MESSAGE]: 50,
+      [USAGE_TYPES.REANALYZE]: 15,
       [USAGE_TYPES.PROJECT_CHAT]: 5,
     },
     models: {
@@ -219,11 +226,9 @@ export const PLANS = {
     // Student plan unlocks In-Depth Statistics.
 
     pricing: {
-      monthlyPrice: 3,
-      halfYearlyPrice: 15,
-      halfYearlyDiscount: 17,
-      yearlyPrice: 21,
-      yearlyDiscount: 42,
+      monthlyPrice: 2.99,
+      halfYearlyDiscount: 15,
+      yearlyDiscount: 40,
     },
 
     ui: {
@@ -248,23 +253,21 @@ export const PLANS = {
       className: 'bg-plan-pro-bg text-green-400 border border-primary/40',
     },
     limits: {
-      [USAGE_TYPES.MESSAGE]: 300,
-      [USAGE_TYPES.REANALYZE]: 75,
-      [USAGE_TYPES.PROJECT_CHAT]: 15,
+      [USAGE_TYPES.MESSAGE]: 250,
+      [USAGE_TYPES.REANALYZE]: 50,
+      [USAGE_TYPES.PROJECT_CHAT]: 20,
     },
     models: {
       primary: 'qwen/qwen3.5-397b-a17b',
       fallback: 'openrouter/free',
     },
     hasFallback: true,
-    memoryLimit: 200,
+    memoryLimit: 300,
     description: 'For developers serious about landing their next role.',
 
     pricing: {
-      monthlyPrice: 10,
-      halfYearlyPrice: 54,
+      monthlyPrice: 11.99,
       halfYearlyDiscount: 10,
-      yearlyPrice: 84,
       yearlyDiscount: 30,
     },
 
@@ -290,7 +293,7 @@ export const PLANS = {
       className: 'bg-plan-ultimate-bg text-orange-400 border border-plan-ultimate-accent/30',
     },
     limits: {
-      [USAGE_TYPES.MESSAGE]: 1200,
+      [USAGE_TYPES.MESSAGE]: 1000,
       [USAGE_TYPES.REANALYZE]: 300,
       [USAGE_TYPES.PROJECT_CHAT]: 50,
     },
@@ -303,10 +306,8 @@ export const PLANS = {
     description: 'Unlimited power for developers who refuse to stay cooked.',
 
     pricing: {
-      monthlyPrice: 15,
-      halfYearlyPrice: 81,
+      monthlyPrice: 19.99,
       halfYearlyDiscount: 10,
-      yearlyPrice: 126,
       yearlyDiscount: 30,
     },
 
@@ -326,12 +327,41 @@ export const PLANS = {
 };
 
 /**
+ * Calculate a billing period price from monthly base, duration in months, and discount percentage.
+ * @param {number} monthlyPrice - Base monthly price
+ * @param {number} months - Number of months (e.g., 6 for half-yearly, 12 for yearly)
+ * @param {number} discountPercent - Discount applied as a percentage (0-100)
+ * @returns {number} Floored final price
+ */
+function calculatePrice(monthlyPrice, months, discountPercent) {
+  return Math.floor(Math.ceil(monthlyPrice) * months * (1 - discountPercent / 100)) - 0.01;
+}
+
+/**
  * Get a plan config by ID, defaulting to 'free' for unknown IDs.
  * @param {string} planId
  * @returns {Object}
  */
 export function getPlan(planId) {
   return PLANS[planId] ?? PLANS.free;
+}
+
+/**
+ * Get calculated pricing for a plan, with halfYearlyPrice and yearlyPrice computed.
+ * @param {string} planId
+ * @returns {Object} pricing object with calculated prices
+ */
+export function getPlanPricing(planId) {
+  const plan = getPlan(planId);
+  const { monthlyPrice, halfYearlyDiscount, yearlyDiscount } = plan.pricing;
+  
+  return {
+    monthlyPrice,
+    halfYearlyPrice: calculatePrice(monthlyPrice, 6, halfYearlyDiscount),
+    halfYearlyDiscount,
+    yearlyPrice: calculatePrice(monthlyPrice, 12, yearlyDiscount),
+    yearlyDiscount,
+  };
 }
 
 /**

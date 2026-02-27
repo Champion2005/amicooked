@@ -28,21 +28,22 @@ import {
   Zap,
   Lock,
   Settings,
+  Loader2,
 } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { getDoc, doc } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
-import { hasDetailedStats } from "@/config/plans";
+import { hasDetailedStats, USAGE_TYPES } from "@/config/plans";
 import ChatPopup from "@/components/ChatPopup";
 import SavedProjectsOverlay from "@/components/SavedProjectsOverlay";
 import LanguageBreakdown from "@/components/LanguageBreakdown";
 import { formatEducation } from "@/utils/formatEducation";
 import { isProjectSaved, saveProject, slugify, recordProjectBookmark } from "@/services/savedProjects";
-import { getUsageSummary } from "@/services/usage";
-import { USAGE_TYPES, formatLimit, PERIOD_DAYS } from "@/config/plans";
+import { getUsageSummary, checkLimit, incrementUsageBy } from "@/services/usage";
 import { useToast } from "@/components/ui/Toast";
-import { getUserPreferences } from "@/services/userProfile";
-import { learnFromAnalysis } from "@/services/agent";
+import { getUserPreferences, saveAnalysisResults } from "@/services/userProfile";
+import { analyzeCookedLevel, getRecommendedProjects } from "@/services/openrouter";
+import { learnFromAnalysis, getFormattedMemoryForSynthesis } from "@/services/agent";
 import { fireConfetti } from "@/utils/confetti";
 import { CONFETTI_SCORE_THRESHOLD } from "@/config/preferences";
 
@@ -59,26 +60,31 @@ export default function Results() {
   const [jobDescription, setJobDescription] = useState("");
   const [selectedProject, setSelectedProject] = useState(null);
   const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false);
+  const [regeneratingProjects, setRegeneratingProjects] = useState(false);
+  const [regeneratingAnalysis, setRegeneratingAnalysis] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [savedProjectsOpen, setSavedProjectsOpen] = useState(false);
   const [initialProjectId, setInitialProjectId] = useState(null);
   const [savedProjectNames, setSavedProjectNames] = useState(new Set());
-  const [metricPopupOpen, setMetricPopupOpen] = useState(false);
   const [statsPopupOpen, setStatsPopupOpen] = useState(false);
   // Plan ID verified fresh from Firestore each time the stats popup opens.
   // null = still loading, string = resolved plan (e.g. 'free', 'student').
   const [verifiedPlan, setVerifiedPlan] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [usageSummary, setUsageSummary] = useState(null);
-  const [usageOverlayOpen, setUsageOverlayOpen] = useState(false);
   const [userPreferences, setUserPreferences] = useState({});
   const profileMenuRef = useRef(null);
   // Prevents confetti from firing more than once per session/mount
   const confettiFiredRef = useRef(false);
   // Prevents analysis-learning from firing more than once per mount
   const analysisLearningFiredRef = useRef(false);
+
+  // Reset scroll position when navigating back to Results
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   // Load AI usage for plan badge & usage overlay
   useEffect(() => {
@@ -213,9 +219,7 @@ export default function Results() {
       showReanalyzeConfirm ||
       showSignOutConfirm ||
       savedProjectsOpen ||
-      metricPopupOpen ||
-      statsPopupOpen ||
-      usageOverlayOpen;
+      statsPopupOpen;
     document.body.style.overflow = anyOpen ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
@@ -226,9 +230,7 @@ export default function Results() {
     showReanalyzeConfirm,
     showSignOutConfirm,
     savedProjectsOpen,
-    metricPopupOpen,
     statsPopupOpen,
-    usageOverlayOpen,
   ]);
 
   useEffect(() => {
@@ -245,6 +247,119 @@ export default function Results() {
   const handleReanalyze = () => {
     setShowReanalyzeConfirm(false);
     navigate("/dashboard", { state: { reanalyze: true } });
+  };
+
+  // ─── Selective regeneration handlers ──────────────────────────────────
+
+  const handleRegenerateProjects = async () => {
+    const userId = auth.currentUser?.uid;
+    if (!userId || regeneratingProjects) return;
+
+    setRegeneratingProjects(true);
+    try {
+      const limitCheck = await checkLimit(userId, USAGE_TYPES.REANALYZE);
+      if (!limitCheck.allowed) {
+        toast.error('You\'ve used all your regenerations for this period. Upgrade your plan to continue.');
+        return;
+      }
+
+      const model = limitCheck.model;
+      let newProjects = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          newProjects = await getRecommendedProjects(githubData, userProfile, null, model);
+          break;
+        } catch (err) {
+          if (attempt === 3) throw err;
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+
+      if (!newProjects) throw new Error('Failed to generate projects');
+
+      await saveAnalysisResults(userId, {
+        githubData,
+        analysis,
+        recommendedProjects: newProjects,
+      });
+
+      await incrementUsageBy(userId, USAGE_TYPES.REANALYZE, 0.5);
+
+      navigate('/results', {
+        state: {
+          githubData,
+          analysis,
+          userProfile,
+          recommendedProjects: newProjects,
+          isNewAnalysis: false,
+        },
+        replace: true,
+      });
+
+      toast.success('Projects regenerated!');
+    } catch (err) {
+      console.error('Regenerate projects error:', err);
+      toast.error('Failed to regenerate projects. Please try again.');
+    } finally {
+      setRegeneratingProjects(false);
+    }
+  };
+
+  const handleRegenerateAnalysis = async () => {
+    const userId = auth.currentUser?.uid;
+    if (!userId || regeneratingAnalysis) return;
+
+    setRegeneratingAnalysis(true);
+    try {
+      const limitCheck = await checkLimit(userId, USAGE_TYPES.REANALYZE);
+      if (!limitCheck.allowed) {
+        toast.error('You\'ve used all your regenerations for this period. Upgrade your plan to continue.');
+        return;
+      }
+
+      const model = limitCheck.model;
+      const userPlanId = limitCheck.plan || 'free';
+
+      // Fetch past analysis memory so the synthesis can reference growth/setback
+      const memoryBlock = await getFormattedMemoryForSynthesis(userId, userPlanId);
+
+      const newAnalysis = await analyzeCookedLevel(
+        githubData,
+        userProfile,
+        null,
+        model,
+        userPreferences.roastIntensity,
+        userPreferences.devNickname,
+        userPlanId,
+        memoryBlock,
+      );
+
+      await saveAnalysisResults(userId, {
+        githubData,
+        analysis: newAnalysis,
+        recommendedProjects,
+      });
+
+      await incrementUsageBy(userId, USAGE_TYPES.REANALYZE, 0.8);
+
+      navigate('/results', {
+        state: {
+          githubData,
+          analysis: newAnalysis,
+          userProfile,
+          recommendedProjects,
+          isNewAnalysis: false,
+        },
+        replace: true,
+      });
+
+      toast.success('Analysis regenerated!');
+    } catch (err) {
+      console.error('Regenerate analysis error:', err);
+      toast.error('Failed to regenerate analysis. Please try again.');
+    } finally {
+      setRegeneratingAnalysis(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -299,13 +414,23 @@ export default function Results() {
               : "#dc2626";
     return (
       <>
+        {analysis.categoryWeights && (
+          <div className="flex items-center gap-2 mb-4 px-1">
+            <span className="text-xs font-medium text-orange-400 bg-orange-400/10 border border-orange-400/20 px-2.5 py-0.5 rounded-full">
+              Adaptive Weights
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Weights tailored to your profile by the AI
+            </span>
+          </div>
+        )}
         {/* 2x2 Donut Ring Grid */}
-        <div className="grid grid-cols-2 gap-5 mb-5">
+        <div className="grid grid-cols-2 gap-4 mb-5">
           {categories.map(({ key, label, cssColor, textColor }) => {
             const cat = analysis.categoryScores[key];
             if (!cat) return null;
-            const size = 88;
-            const strokeW = 7;
+            const size = 104;
+            const strokeW = 8;
             const r = (size - strokeW) / 2;
             const circ = 2 * Math.PI * r;
             const offset = circ * (1 - cat.score / 100);
@@ -328,9 +453,9 @@ export default function Results() {
             return (
               <div
                 key={key}
-                className="bg-background rounded-lg border border-border p-4 flex flex-col items-center text-center"
+                className="bg-background rounded-lg border border-border px-5 py-4 flex flex-col items-center text-center"
               >
-                <div className="relative w-20 h-20 mb-2">
+                <div className="relative w-24 h-24 mb-3">
                   <svg
                     viewBox={`0 0 ${size} ${size}`}
                     className="w-full h-full -rotate-90"
@@ -357,42 +482,63 @@ export default function Results() {
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className={`text-lg font-bold ${textColor}`}>
+                    <span className={`text-xl font-bold ${textColor}`}>
                       {cat.score}
                     </span>
                   </div>
                 </div>
-                <p className="text-sm font-semibold text-foreground mb-0.5">
+                <p className="text-sm font-semibold text-foreground mb-1">
                   {label}
                 </p>
-                <p className="text-[10px] text-muted-foreground mb-1">
+                <p className="text-xs text-muted-foreground mb-1.5">
                   {cat.weight}% weight
                 </p>
                 <span
-                  className={`text-[10px] font-semibold ${tierColor} px-2 py-0.5 rounded-full bg-surface`}
+                  className={`text-xs font-semibold ${tierColor} px-2.5 py-0.5 rounded-full bg-surface`}
                 >
                   {tierLabel}
                 </span>
                 {cat.notes && (
-                  <p className="text-[10px] text-muted-foreground mt-2 leading-tight">
+                  <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
                     {cat.notes}
                   </p>
+                )}
+                {cat.subMetrics && cat.subMetrics.length > 0 && (
+                  <div className="w-full mt-3 pt-3 border-t border-border/50 space-y-2">
+                    {cat.subMetrics.map((sm, si) => (
+                      <div key={si} className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-xs text-muted-foreground truncate">{sm.name}</span>
+                            <span className="text-xs font-semibold text-foreground ml-1">{sm.score}</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-track overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{ width: `${sm.score}%`, backgroundColor: cssColor }}
+                            />
+                          </div>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground/60 w-8 text-right shrink-0">{sm.weight}%</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             );
           })}
         </div>
         {/* Overall Score Summary */}
-        <div className="bg-background rounded-lg border border-border px-4 py-3 flex items-center justify-between">
+        <div className="bg-background rounded-lg border border-border px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {(() => {
-              const s = 48;
-              const sw = 4;
+              const s = 56;
+              const sw = 5;
               const rv = (s - sw) / 2;
               const cv = 2 * Math.PI * rv;
               const ov = cv * (1 - analysis.cookedLevel / 10);
               return (
-                <div className="relative w-10 h-10 shrink-0">
+                <div className="relative w-12 h-12 shrink-0">
                   <svg
                     viewBox={`0 0 ${s} ${s}`}
                     className="w-full h-full -rotate-90"
@@ -418,7 +564,7 @@ export default function Results() {
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-sm font-bold text-foreground">
+                    <span className="text-base font-bold text-foreground">
                       {analysis.cookedLevel}
                     </span>
                   </div>
@@ -426,16 +572,16 @@ export default function Results() {
               );
             })()}
             <div>
-              <p className="text-xs text-muted-foreground">Weighted Total</p>
+              <p className="text-sm text-muted-foreground">Weighted Total</p>
               <p
-                className={`text-sm font-bold ${getCookedColor(analysis.cookedLevel)}`}
+                className={`text-base font-bold ${getCookedColor(analysis.cookedLevel)}`}
               >
                 {analysis.levelName}
               </p>
             </div>
           </div>
           <span
-            className={`text-lg font-bold ${getCookedColor(analysis.cookedLevel)}`}
+            className={`text-xl font-bold ${getCookedColor(analysis.cookedLevel)}`}
           >
             {analysis.cookedLevel}/10
           </span>
@@ -662,7 +808,7 @@ export default function Results() {
                   className="w-full flex items-center gap-3 px-4 py-2 text-sm text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
                 >
                   <BarChart2 className="w-4 h-4" />
-                  View Statistics
+                  Statistics
                 </button>
                 <button
                   onClick={() => {
@@ -689,16 +835,6 @@ export default function Results() {
                 >
                   <Bookmark className="w-4 h-4" />
                   My Projects
-                </button>
-                <button
-                  onClick={() => {
-                    setProfileMenuOpen(false);
-                    setUsageOverlayOpen(true);
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
-                >
-                  <Zap className="w-4 h-4" />
-                  AI Usage
                 </button>
                 <button
                   onClick={() => {
@@ -746,11 +882,13 @@ export default function Results() {
                       {githubData.name || githubData.username}
                     </h2>
                     {usageSummary && (
-                      <span
-                        className={`text-center text-xs font-semibold px-2.5 py-0.5 rounded-full mb-3 xl:mb-0 ${usageSummary.planConfig.badge.className}`}
+                      <button
+                        onClick={() => navigate('/pricing')}
+                        className={`text-center text-xs font-semibold px-2.5 py-0.5 rounded-full mb-3 xl:mb-0 cursor-pointer hover:opacity-80 transition-opacity ${usageSummary.planConfig.badge.className}`}
+                        aria-label="View AI usage details"
                       >
                         {usageSummary.planConfig.badge.label} Plan
-                      </span>
+                      </button>
                     )}
                   </div>
                   {githubData.name != null && (
@@ -814,7 +952,7 @@ export default function Results() {
                   onClick={() => openStatsPopup()}
                 >
                   <BarChart2 className="w-4 h-4 mr-2" />
-                  View Statistics
+                  Statistics
                 </Button>
 
                 <div className="space-y-4 text-sm">
@@ -855,9 +993,27 @@ export default function Results() {
           {/* Main Content */}
           <div className="lg:col-span-9 space-y-6">
             <div>
-              <h2 className="text-lg font-semibold text-foreground mb-2">
-                Agent Summary
-              </h2>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-lg font-semibold text-foreground">
+                  Agent Summary
+                </h2>
+                <button
+                  onClick={handleRegenerateAnalysis}
+                  disabled={regeneratingAnalysis}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-accent transition-colors disabled:opacity-50"
+                  title="Regenerate analysis (uses 0.8 regeneration)"
+                >
+                  {regeneratingAnalysis ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  )}
+                  {regeneratingAnalysis ? 'Regenerating...' : 'Regenerate'}
+                  {!regeneratingAnalysis && (
+                    <span className="text-[10px] text-muted-foreground/60 ml-0.5">(0.8)</span>
+                  )}
+                </button>
+              </div>
 
               <Card className="bg-background pt-5 border-border overflow-hidden">
                 <CardContent className="flex flex-col gap-4">
@@ -926,7 +1082,7 @@ export default function Results() {
                             </span>
                             {analysis.categoryScores && (
                               <button
-                                onClick={() => setMetricPopupOpen(true)}
+                                onClick={() => openStatsPopup()}
                                 className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-accent transition-colors"
                                 title="View score breakdown"
                               >
@@ -988,6 +1144,22 @@ export default function Results() {
                     Chosen by the agent to close your top skill gaps
                   </p>
                 </div>
+                <button
+                  onClick={handleRegenerateProjects}
+                  disabled={regeneratingProjects}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-accent transition-colors disabled:opacity-50 shrink-0"
+                  title="Regenerate projects (uses 0.5 regeneration)"
+                >
+                  {regeneratingProjects ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  )}
+                  {regeneratingProjects ? 'Regenerating...' : 'Regenerate'}
+                  {!regeneratingProjects && (
+                    <span className="text-[10px] text-muted-foreground/60 ml-0.5">(0.5)</span>
+                  )}
+                </button>
               </div>
 
               <Card className="bg-background border-border">
@@ -1051,13 +1223,6 @@ export default function Results() {
                 <h2 className="text-lg font-semibold text-foreground">
                   GitHub Activity
                 </h2>
-                <button
-                  onClick={() => openStatsPopup()}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-accent transition-colors"
-                >
-                  <Info className="w-3.5 h-3.5" />
-                  View all statistics
-                </button>
               </div>
               <Card className="bg-background border-border w-full">
                 <CardContent className="px-5 py-5 flex flex-col md:flex-row gap-0 items-stretch">
@@ -1464,35 +1629,13 @@ export default function Results() {
         </div>
       )}
 
-      {/* Metric Breakdown Popup */}
-      {metricPopupOpen && analysis.categoryScores && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => setMetricPopupOpen(false)}
-          />
-          <div className="relative bg-card border border-border rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg text-foreground">Score Breakdown</h3>
-              <button
-                onClick={() => setMetricPopupOpen(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors text-xl leading-none"
-              >
-                &times;
-              </button>
-            </div>
-            {renderBreakdown()}
-          </div>
-        </div>
-      )}
-
-      {/* GitHub Statistics Popup — full screen */}
+      {/* Breakdown & Statistics Popup — full screen */}
       {statsPopupOpen && (
-        <div className="fixed inset-0 z-50 bg-card flex flex-col">
+        <div className="fixed inset-0 z-50 bg-background flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between px-8 py-5 border-b border-border shrink-0">
+          <div className="flex items-center justify-between px-4 sm:px-8 lg:px-12 py-5 border-b border-border shrink-0">
             <div>
-              <h3 className="text-xl font-semibold text-foreground">
+              <h3 className="text-2xl font-semibold text-foreground">
                 GitHub Statistics
               </h3>
               <p className="text-sm text-muted-foreground mt-0.5">
@@ -1508,11 +1651,11 @@ export default function Results() {
           </div>
 
           {/* Scrollable content */}
-          <div className="overflow-y-auto px-8 py-8 space-y-10 w-full mx-auto">
+          <div className="overflow-y-auto max-w-7xl px-4 sm:px-8 lg:px-12 py-8 space-y-12 w-full mx-auto">
             {/* Score Breakdown — reuses metric popup content */}
             {analysis.categoryScores && (
               <div>
-                <h4 className="text-base font-semibold text-foreground mb-4">
+                <h4 className="text-lg font-semibold text-foreground mb-4">
                   Score Breakdown
                 </h4>
                 {renderBreakdown()}
@@ -1534,14 +1677,14 @@ export default function Results() {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <span className="w-2.5 h-2.5 rounded-full bg-cat-activity shrink-0" />
-                <h4 className="text-base font-semibold text-foreground">
+                <h4 className="text-lg font-semibold text-foreground">
                   Activity{" "}
                   <span className="font-normal text-muted-foreground">
-                    (40% of score)
+                    ({analysis.categoryScores?.activity?.weight ?? 40}% of score)
                   </span>
                 </h4>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {[
                   {
                     label: "Commits (365d)",
@@ -1591,15 +1734,15 @@ export default function Results() {
                 ].map((s, i) => (
                   <div
                     key={i}
-                    className="bg-background border border-border rounded-lg px-4 py-3"
+                    className="bg-background border border-border rounded-lg px-5 py-4"
                   >
-                    <p className="text-xs text-muted-foreground mb-1">
+                    <p className="text-sm text-muted-foreground mb-1">
                       {s.label}
                     </p>
-                    <p className="text-base font-bold text-foreground">
+                    <p className="text-lg font-bold text-foreground">
                       {s.value}
                     </p>
-                    <p className="text-xs text-muted-foreground/70 mt-1 leading-snug">
+                    <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
                       {s.desc}
                     </p>
                   </div>
@@ -1611,14 +1754,14 @@ export default function Results() {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <span className="w-2.5 h-2.5 rounded-full bg-cat-skills shrink-0" />
-                <h4 className="text-base font-semibold text-foreground">
+                <h4 className="text-lg font-semibold text-foreground">
                   Skill Signals{" "}
                   <span className="font-normal text-muted-foreground">
-                    (30% of score)
+                    ({analysis.categoryScores?.skillSignals?.weight ?? 30}% of score)
                   </span>
                 </h4>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-3">
                 {[
                   {
                     label: "Language Count",
@@ -1638,30 +1781,30 @@ export default function Results() {
                 ].map((s, i) => (
                   <div
                     key={i}
-                    className="bg-background border border-border rounded-lg px-4 py-3"
+                    className="bg-background border border-border rounded-lg px-5 py-4"
                   >
-                    <p className="text-xs text-muted-foreground mb-1">
+                    <p className="text-sm text-muted-foreground mb-1">
                       {s.label}
                     </p>
-                    <p className="text-base font-bold text-foreground">
+                    <p className="text-lg font-bold text-foreground">
                       {s.value}
                     </p>
-                    <p className="text-xs text-muted-foreground/70 mt-1 leading-snug">
+                    <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
                       {s.desc}
                     </p>
                   </div>
                 ))}
               </div>
               {githubData.languages?.length > 0 && (
-                <div className="bg-background border border-border rounded-lg px-4 py-3 mb-3">
-                  <p className="text-xs text-muted-foreground mb-2">
+                <div className="bg-background border border-border rounded-lg px-5 py-4 mb-3">
+                  <p className="text-sm text-muted-foreground mb-2">
                     Top Languages (by repo count)
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {githubData.languages.map((lang, i) => (
                       <span
                         key={i}
-                        className="text-xs px-2.5 py-1 rounded-full bg-surface border border-border text-muted-foreground"
+                        className="text-sm px-2.5 py-1 rounded-full bg-surface border border-border text-muted-foreground"
                       >
                         {lang}
                       </span>
@@ -1671,8 +1814,8 @@ export default function Results() {
               )}
               {githubData.categoryPercentages &&
                 Object.keys(githubData.categoryPercentages).length > 0 && (
-                  <div className="bg-background border border-border rounded-lg px-4 py-3">
-                    <p className="text-xs text-muted-foreground mb-3">
+                  <div className="bg-background border border-border rounded-lg px-5 py-4">
+                    <p className="text-sm text-muted-foreground mb-3">
                       Tech Domain Breakdown (% of codebase)
                     </p>
                     <div className="space-y-2">
@@ -1680,7 +1823,7 @@ export default function Results() {
                         .sort((a, b) => b[1] - a[1])
                         .map(([cat, pct], i) => (
                           <div key={i} className="flex items-center gap-3">
-                            <span className="text-xs text-muted-foreground w-24 capitalize shrink-0">
+                            <span className="text-sm text-muted-foreground w-28 capitalize shrink-0">
                               {cat}
                             </span>
                             <div className="flex-1 h-1.5 bg-track rounded-full overflow-hidden">
@@ -1689,7 +1832,7 @@ export default function Results() {
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
-                            <span className="text-xs text-foreground w-10 text-right shrink-0">
+                            <span className="text-sm text-foreground w-10 text-right shrink-0">
                               {pct}%
                             </span>
                           </div>
@@ -1703,14 +1846,14 @@ export default function Results() {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <span className="w-2.5 h-2.5 rounded-full bg-cat-growth shrink-0" />
-                <h4 className="text-base font-semibold text-foreground">
+                <h4 className="text-lg font-semibold text-foreground">
                   Growth{" "}
                   <span className="font-normal text-muted-foreground">
-                    (15% of score)
+                    ({analysis.categoryScores?.growth?.weight ?? 15}% of score)
                   </span>
                 </h4>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {[
                   {
                     label: "Velocity Trend",
@@ -1733,13 +1876,13 @@ export default function Results() {
                 ].map((s, i) => (
                   <div
                     key={i}
-                    className="bg-background border border-border rounded-lg px-4 py-3"
+                    className="bg-background border border-border rounded-lg px-5 py-4"
                   >
-                    <p className="text-xs text-muted-foreground mb-1">
+                    <p className="text-sm text-muted-foreground mb-1">
                       {s.label}
                     </p>
                     <p
-                      className={`text-base font-bold ${
+                      className={`text-lg font-bold ${
                         s.label === "Velocity Trend"
                           ? githubData.commitVelocityTrend >= 1
                             ? "text-green-400"
@@ -1759,7 +1902,7 @@ export default function Results() {
                     >
                       {s.value}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                    <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
                       {s.desc}
                     </p>
                   </div>
@@ -1771,14 +1914,14 @@ export default function Results() {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <span className="w-2.5 h-2.5 rounded-full bg-cat-collab shrink-0" />
-                <h4 className="text-base font-semibold text-foreground">
+                <h4 className="text-lg font-semibold text-foreground">
                   Collaboration{" "}
                   <span className="font-normal text-muted-foreground">
-                    (15% of score)
+                    ({analysis.categoryScores?.collaboration?.weight ?? 15}% of score)
                   </span>
                 </h4>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {[
                   {
                     label: "Total PRs",
@@ -1808,15 +1951,15 @@ export default function Results() {
                 ].map((s, i) => (
                   <div
                     key={i}
-                    className="bg-background border border-border rounded-lg px-4 py-3"
+                    className="bg-background border border-border rounded-lg px-5 py-4"
                   >
-                    <p className="text-xs text-muted-foreground mb-1">
+                    <p className="text-sm text-muted-foreground mb-1">
                       {s.label}
                     </p>
-                    <p className="text-base font-bold text-foreground">
+                    <p className="text-lg font-bold text-foreground">
                       {s.value}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                    <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
                       {s.desc}
                     </p>
                   </div>
@@ -1828,11 +1971,11 @@ export default function Results() {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <span className="w-2.5 h-2.5 rounded-full bg-muted-foreground shrink-0" />
-                <h4 className="text-base font-semibold text-foreground">
+                <h4 className="text-lg font-semibold text-foreground">
                   Repository Overview
                 </h4>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[
                   {
                     label: "Total Repos",
@@ -1857,15 +2000,15 @@ export default function Results() {
                 ].map((s, i) => (
                   <div
                     key={i}
-                    className="bg-background border border-border rounded-lg px-4 py-3"
+                    className="bg-background border border-border rounded-lg px-5 py-4"
                   >
-                    <p className="text-xs text-muted-foreground mb-1">
+                    <p className="text-sm text-muted-foreground mb-1">
                       {s.label}
                     </p>
-                    <p className="text-base font-bold text-foreground">
+                    <p className="text-lg font-bold text-foreground">
                       {s.value}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                    <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
                       {s.desc}
                     </p>
                   </div>
@@ -1873,7 +2016,7 @@ export default function Results() {
               </div>
             </div>
 
-            <p className="text-xs text-muted-foreground text-center pb-2">
+            <p className="text-sm text-muted-foreground text-center pb-2">
               All data sourced from the GitHub GraphQL API at time of analysis.
             </p>
 
@@ -1903,86 +2046,6 @@ export default function Results() {
                   Upgrade to Student — $3/mo
                 </a>
               </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* AI Usage Overlay */}
-      {usageOverlayOpen && (
-        <div className="fixed inset-0 z-50 bg-card flex flex-col">
-          <div className="flex items-center justify-between px-8 py-5 border-b border-border shrink-0">
-            <div>
-              <h3 className="text-xl font-semibold text-foreground">
-                AI Usage
-              </h3>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {usageSummary?.planConfig?.name ?? "Free"} Plan — resets every{" "}
-                {PERIOD_DAYS} days from first use
-              </p>
-            </div>
-            <button
-              onClick={() => setUsageOverlayOpen(false)}
-              className="text-muted-foreground hover:text-foreground transition-colors text-2xl leading-none"
-            >
-              &times;
-            </button>
-          </div>
-          <div className="overflow-y-auto px-8 py-8 max-w-lg w-full mx-auto space-y-6">
-            {usageSummary ? (
-              <>
-                {[
-                  [USAGE_TYPES.MESSAGE, "Chat Messages"],
-                  [USAGE_TYPES.REANALYZE, "Reanalyzes"],
-                  [USAGE_TYPES.PROJECT_CHAT, "Project Chats"],
-                ].map(([type, label]) => {
-                  const limit = usageSummary.planConfig.limits[type] ?? null;
-                  const current = usageSummary.usage[type] ?? 0;
-                  const pct =
-                    limit === null ? 0 : Math.min(100, (current / limit) * 100);
-                  return (
-                    <div key={type} className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium text-foreground">
-                          {label}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {current} / {formatLimit(limit)}
-                        </span>
-                      </div>
-                      {limit !== null && (
-                        <div className="h-2 rounded-full bg-background overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${pct >= 100 ? "bg-red-500" : "bg-accent"}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {limit === null
-                          ? "Unlimited"
-                          : limit - current > 0
-                            ? `${limit - current} remaining this period`
-                            : "Limit reached — using free model"}
-                      </p>
-                    </div>
-                  );
-                })}
-                {usageSummary.plan !== "ultimate" && (
-                  <div className="pt-4 border-t border-border">
-                    <a
-                      href="/pricing"
-                      className="block w-full text-center px-4 py-2.5 rounded-md bg-accent text-background text-sm font-medium hover:opacity-90 transition-opacity"
-                    >
-                      Upgrade Plan
-                    </a>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                Loading usage data…
-              </p>
             )}
           </div>
         </div>

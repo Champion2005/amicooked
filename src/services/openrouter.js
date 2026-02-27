@@ -59,16 +59,93 @@ function renameKeys(rawCats) {
   return out;
 }
 
+/** Weight constraint constants for Ultimate plan AI-adjustable weights */
+const MIN_CATEGORY_WEIGHT = 15;
+const MAX_CATEGORY_WEIGHT = 45;
+
+/**
+ * Validate and constrain AI-chosen category weights.
+ * Returns null if the input is invalid (falls back to defaults).
+ * @param {Object} rawWeights - e.g. { activity: 35, skillSignals: 30, growth: 20, collaboration: 15 }
+ * @returns {Object|null} Normalized weights or null
+ */
+function normalizeWeights(rawWeights) {
+  if (!rawWeights || typeof rawWeights !== 'object') return null;
+
+  const normalized = {};
+  for (const key of REQUIRED_CATS) {
+    const alias = KEY_ALIASES[key.toLowerCase().replace(/[\s_-]/g, '')] || key;
+    const val = rawWeights[key] ?? rawWeights[alias];
+    if (typeof val !== 'number' || isNaN(val)) return null;
+    normalized[key] = Math.min(MAX_CATEGORY_WEIGHT, Math.max(MIN_CATEGORY_WEIGHT, Math.round(val)));
+  }
+
+  // Ensure weights sum to 100 — redistribute any rounding error proportionally
+  const sum = Object.values(normalized).reduce((a, b) => a + b, 0);
+  if (sum !== 100) {
+    const diff = 100 - sum;
+    // Add/subtract the difference from the largest weight to minimize distortion
+    const largestKey = Object.entries(normalized).sort((a, b) => b[1] - a[1])[0][0];
+    normalized[largestKey] = Math.min(MAX_CATEGORY_WEIGHT, Math.max(MIN_CATEGORY_WEIGHT, normalized[largestKey] + diff));
+  }
+
+  // Final validation: all still in range and sum is 100
+  const finalSum = Object.values(normalized).reduce((a, b) => a + b, 0);
+  if (finalSum !== 100) return null;
+  for (const w of Object.values(normalized)) {
+    if (w < MIN_CATEGORY_WEIGHT || w > MAX_CATEGORY_WEIGHT) return null;
+  }
+
+  return normalized;
+}
+
+/**
+ * Normalize sub-metrics within a category.
+ * Returns the array of normalized sub-metrics, or null if invalid.
+ * @param {Array} subMetrics - Raw sub-metrics from AI
+ * @returns {Array|null}
+ */
+function normalizeSubMetrics(subMetrics) {
+  if (!Array.isArray(subMetrics) || subMetrics.length < 2) return null;
+
+  const normalized = subMetrics.slice(0, 4).map(sm => ({
+    name: String(sm.name || 'Unknown').trim().slice(0, 50),
+    score: Math.min(100, Math.max(0, Math.round(Number(sm.score) || 0))),
+    weight: Math.max(1, Math.round(Number(sm.weight) || 0)),
+  }));
+
+  // Normalize weights to sum to 100
+  const weightSum = normalized.reduce((s, sm) => s + sm.weight, 0);
+  if (weightSum === 0) return null;
+  if (weightSum !== 100) {
+    // Scale proportionally
+    let remaining = 100;
+    for (let i = 0; i < normalized.length - 1; i++) {
+      normalized[i].weight = Math.max(1, Math.round((normalized[i].weight / weightSum) * 100));
+      remaining -= normalized[i].weight;
+    }
+    normalized[normalized.length - 1].weight = Math.max(1, remaining);
+  }
+
+  return normalized;
+}
+
 /**
  * Validate and normalise the raw AI response:
  * - Renames aliased category keys
  * - Clamps scores to 0-100
  * - For any still-missing category, derives a fallback from the mean of
  *   present scores (never an arbitrary constant)
+ * - Handles AI-chosen category weights for Ultimate plan (validates & constrains)
+ * - Handles sub-metric breakdowns for Ultimate plan
  * - Computes cookedLevel and levelName deterministically
  */
 function normalizeAnalysis(raw) {
   const renamed = renameKeys(raw.categoryScores || {});
+
+  // Check for AI-chosen weights (Ultimate plan)
+  const aiWeights = normalizeWeights(raw.categoryWeights);
+  const effectiveWeights = aiWeights || { ...CATEGORY_WEIGHTS };
 
   // Collect the scores that ARE present and valid
   const presentScores = REQUIRED_CATS.map((key) => renamed[key]?.score)
@@ -84,26 +161,48 @@ function normalizeAnalysis(raw) {
       : 50;
 
   const categories = {};
-  for (const [key, weight] of Object.entries(CATEGORY_WEIGHTS)) {
+  for (const key of REQUIRED_CATS) {
     const cat = renamed[key] || {};
-    const rawScore =
-      typeof cat.score === "number" && !isNaN(cat.score) ? cat.score : fallback;
+    const weight = effectiveWeights[key];
+
+    // Process sub-metrics if present
+    const subMetrics = normalizeSubMetrics(cat.subMetrics);
+
+    // If sub-metrics exist, compute category score as their weighted average
+    let categoryScore;
+    if (subMetrics) {
+      const subWeightedSum = subMetrics.reduce((sum, sm) => sum + sm.score * sm.weight, 0);
+      const subWeightTotal = subMetrics.reduce((sum, sm) => sum + sm.weight, 0);
+      categoryScore = Math.min(100, Math.max(0, Math.round(subWeightedSum / subWeightTotal)));
+    } else {
+      const rawScore =
+        typeof cat.score === "number" && !isNaN(cat.score) ? cat.score : fallback;
+      categoryScore = Math.min(100, Math.max(0, Math.round(rawScore)));
+    }
+
     categories[key] = {
-      score: Math.min(100, Math.max(0, Math.round(rawScore))),
+      score: categoryScore,
       weight,
       notes: (cat.notes || "").trim(),
+      ...(subMetrics ? { subMetrics } : {}),
     };
   }
 
   // Derive cookedLevel deterministically: weighted average of 0-100 scores → 0-10
-  const weightedAvg = Object.entries(CATEGORY_WEIGHTS).reduce(
-    (sum, [key, w]) => sum + categories[key].score * (w / 100),
+  const weightedAvg = REQUIRED_CATS.reduce(
+    (sum, key) => sum + categories[key].score * (effectiveWeights[key] / 100),
     0,
   );
   const cookedLevel = Math.min(10, Math.max(0, Math.round(weightedAvg / 10)));
   const levelName = deriveLevelName(cookedLevel);
 
-  return { ...raw, cookedLevel, levelName, categoryScores: categories };
+  return {
+    ...raw,
+    cookedLevel,
+    levelName,
+    categoryScores: categories,
+    ...(aiWeights ? { categoryWeights: aiWeights } : {}),
+  };
 }
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -369,8 +468,8 @@ export async function callOpenRouter(prompt, systemPrompt = "", onChunk = null, 
  * Phase 1: Ask the AI for category scores only.
  * Returns a normalized categoryScores object.
  */
-async function fetchCategoryScores(githubData, userProfile, model = DEFAULT_MODEL) {
-  const systemPrompt = getScoringInstructions();
+async function fetchCategoryScores(githubData, userProfile, model = DEFAULT_MODEL, planId = 'free') {
+  const systemPrompt = getScoringInstructions(planId);
   const metricsBlock = formatGitHubMetrics(githubData, userProfile);
 
   const prompt = `Score all four categories (0-100) for this GitHub profile using the calibration anchors in your instructions.
@@ -418,7 +517,10 @@ ${missing.map((k) => `    "${k}": { "score": <integer 0-100>, "notes": "<1 sente
     }
   }
 
-  return parsed.categoryScores || {};
+  // For Ultimate plan, the response may include categoryWeights at the top level
+  const result = { categoryScores: parsed.categoryScores || {} };
+  if (parsed.categoryWeights) result.categoryWeights = parsed.categoryWeights;
+  return result;
 }
 
 /**
@@ -426,8 +528,10 @@ ${missing.map((k) => `    "${k}": { "score": <integer 0-100>, "notes": "<1 sente
  * summary, recommendations, and insights.
  * @param {string} [intensityId] - Roast intensity preference ID (from preferences.js)
  * @param {string} [nickname=''] - User's chosen nickname for personalized addressing
+ * @param {{ cookedLevel: number, levelName: string }} [preComputedLevel] - Pre-computed level from Phase 1 scores
+ * @param {string} [memoryBlock=''] - Formatted long-term memory for past analysis context
  */
-async function fetchSynthesis(githubData, userProfile, categoryScores, onChunk = null, model = DEFAULT_MODEL, intensityId, nickname = '') {
+async function fetchSynthesis(githubData, userProfile, categoryScores, onChunk = null, model = DEFAULT_MODEL, intensityId, nickname = '', preComputedLevel = null, memoryBlock = '') {
   const roastInstruction = getRoastInstruction(intensityId);
   let systemPrompt = getChatInstructions(roastInstruction) + getAnalysisModeInstructions("SYNTHESIS");
   if (nickname) {
@@ -440,16 +544,32 @@ async function fetchSynthesis(githubData, userProfile, categoryScores, onChunk =
     .map(([k, v]) => `  ${k}: ${v?.score ?? "?"}  — ${v?.notes ?? ""}`)
     .join("\n");
 
-  const prompt = `Using the pre-computed category scores below, generate the summary, recommendations, and insights for this GitHub profile.
+  // Build the authoritative level block so the AI never has to guess
+  let levelBlock = '';
+  if (preComputedLevel) {
+    levelBlock = `\n## FINAL COMPUTED LEVEL (authoritative — use this exact level name)
+- Cooked Level: ${preComputedLevel.cookedLevel}/10
+- Level Name: "${preComputedLevel.levelName}"
+- Scale (worst → best): Burnt (1-2) → Well-Done (3-4) → Cooked (5-6) → Toasted (7-8) → Cooking (9-10)
+- IMPORTANT: Your summary MUST use the level name "${preComputedLevel.levelName}" when referring to the user's level. Do NOT use any other level name.\n`;
+  }
+
+  // Include memory context for past analysis references (growth/setback)
+  let memorySection = '';
+  if (memoryBlock) {
+    memorySection = `\n## PAST ANALYSIS MEMORY\n${memoryBlock}\nUse this to reference growth or setback compared to past analyses. Always ground references in the CURRENT analysis level above.\n`;
+  }
+
+  const prompt = `Using the pre-computed category scores and final computed level below, generate the summary, recommendations, and insights for this GitHub profile.
 
 ## PRE-COMPUTED CATEGORY SCORES (do NOT re-score)
 ${scoresBlock}
-
+${levelBlock}${memorySection}
 ${metricsBlock}
 
 Return ONLY this JSON (no extra text):
 {
-  "summary": "<1-2 sentence honest assessment>",
+  "summary": "<2-3 sentence honest assessment — MUST reference the exact level name from FINAL COMPUTED LEVEL above>",
   "recommendations": ["<specific task with tech + timeline>", "<task 2>", "<task 3>"],
   "projectsInsight": "<1 sentence on how recommended projects help>",
   "languageInsight": "<1 sentence on their language stack>",
@@ -475,16 +595,33 @@ Return ONLY this JSON (no extra text):
  * @param {string} [nickname=''] - User's chosen nickname for personalized addressing
  * @returns {Promise<Object>} - { cookedLevel, levelName, summary, recommendations, categoryScores, ... }
  */
-export async function analyzeCookedLevel(githubData, userProfile, onSynthesisChunk = null, model = DEFAULT_MODEL, intensityId, nickname = '') {
+export async function analyzeCookedLevel(githubData, userProfile, onSynthesisChunk = null, model = DEFAULT_MODEL, intensityId, nickname = '', planId = 'free', memoryBlock = '') {
   try {
     // Phase 1 — Scoring
-    const rawCategoryScores = await fetchCategoryScores(githubData, userProfile, model);
+    const scoringResult = await fetchCategoryScores(githubData, userProfile, model, planId);
+    const rawCategoryScores = scoringResult.categoryScores || scoringResult;
+
+    // Pre-compute the authoritative level from Phase 1 scores BEFORE Phase 2
+    // so the synthesis prompt can reference the correct level name.
+    const preNormalized = normalizeAnalysis({
+      categoryScores: rawCategoryScores,
+      ...(scoringResult.categoryWeights ? { categoryWeights: scoringResult.categoryWeights } : {}),
+    });
+    const preComputedLevel = {
+      cookedLevel: preNormalized.cookedLevel,
+      levelName: preNormalized.levelName,
+    };
 
     // Phase 2 — Synthesis (summary, recommendations, insights) with optional streaming
-    const synthesis = await fetchSynthesis(githubData, userProfile, rawCategoryScores, onSynthesisChunk, model, intensityId, nickname);
+    // Pass pre-computed level so the AI uses the exact correct level name in the summary.
+    const synthesis = await fetchSynthesis(githubData, userProfile, rawCategoryScores, onSynthesisChunk, model, intensityId, nickname, preComputedLevel, memoryBlock);
 
-    // Combine and normalize
-    const combined = { ...synthesis, categoryScores: rawCategoryScores };
+    // Combine and normalize (final normalization is deterministic and will produce the same level)
+    const combined = {
+      ...synthesis,
+      categoryScores: rawCategoryScores,
+      ...(scoringResult.categoryWeights ? { categoryWeights: scoringResult.categoryWeights } : {}),
+    };
     return normalizeAnalysis(combined);
   } catch (error) {
     console.error("AI analysis error:", error);
@@ -507,7 +644,8 @@ export async function getRecommendedProjects(githubData, userProfile, onChunk = 
 
 ${formatGitHubMetrics(githubData, userProfile)}
 
-Return ONLY a JSON array of exactly 4 projects matching the format in your instructions. No trailing commas. Double quotes only.`;
+Return ONLY a JSON array of exactly 4 projects matching the format in your instructions. No trailing commas. Double quotes only.
+REMINDER: skill1, skill2, skill3 must be specific technologies/frameworks (e.g. "React", "PostgreSQL", "Docker"), NOT broad topics like "Fullstack Development" or "API Development".`;
 
   try {
     const response = await callOpenRouter(prompt, systemPrompt, onChunk, model);

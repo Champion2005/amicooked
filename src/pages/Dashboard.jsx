@@ -12,8 +12,10 @@ import { getRecommendedProjects } from '@/services/openrouter';
 import { getUserProfile, getAnalysisResults, saveAnalysisResults, getUserPreferences } from '@/services/userProfile';
 import { checkLimit, incrementUsage } from '@/services/usage';
 import { USAGE_TYPES, formatLimit } from '@/config/plans';
-import { Loader2, Flame, User, Edit2, RefreshCw, ArrowRight, BarChart2 } from 'lucide-react';
+import { getFormattedMemoryForSynthesis } from '@/services/agent';
+import { Loader2, Flame, User, Edit2, RefreshCw, ArrowRight, BarChart2, Clock } from 'lucide-react';
 import { formatEducation } from '@/utils/formatEducation';
+import { timeAgo } from '@/utils/timeAgo';
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(false);
@@ -23,6 +25,7 @@ export default function Dashboard() {
   const [status, setStatus] = useState('');
   const [tipIndex, setTipIndex] = useState(0);
   const [reanalyzeUsage, setReanalyzeUsage] = useState(null); // { current, limit }
+  const [lastAnalyzedAt, setLastAnalyzedAt] = useState(null); // ISO string from Firestore
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
@@ -72,6 +75,9 @@ export default function Dashboard() {
     if (forceReanalyze) {
       checkLimit(user.uid, USAGE_TYPES.REANALYZE)
         .then(({ current, limit }) => setReanalyzeUsage({ current, limit }))
+        .catch(() => {});
+      getAnalysisResults(user.uid)
+        .then((saved) => { if (saved?.analyzedAt) setLastAnalyzedAt(saved.analyzedAt); })
         .catch(() => {});
     }
   }, [navigate]);
@@ -128,6 +134,7 @@ export default function Dashboard() {
       // Check reanalyze limit before running
       const userId = auth.currentUser?.uid;
       let analysisModel;
+      let userPlanId = 'free';
       if (userId) {
         const limitCheck = await checkLimit(userId, USAGE_TYPES.REANALYZE);
         if (!limitCheck.allowed) {
@@ -138,6 +145,7 @@ export default function Dashboard() {
           return;
         }
         analysisModel = limitCheck.model;
+        userPlanId = limitCheck.plan || 'free';
         if (limitCheck.usingFallback) {
           toast.info('Free model active for this analysis — upgrade for better results.');
         }
@@ -153,7 +161,9 @@ export default function Dashboard() {
       await new Promise(r => setTimeout(r, 400));
 
       setStatus('AI is evaluating your profile — this may take a moment...');
-      const analysis = await analyzeCookedLevel(data, userProfile, null, analysisModel, userPreferences.roastIntensity, userPreferences.devNickname);
+      // Fetch past analysis memory so the synthesis can reference growth/setback
+      const memoryBlock = await getFormattedMemoryForSynthesis(userId, userPlanId);
+      const analysis = await analyzeCookedLevel(data, userProfile, null, analysisModel, userPreferences.roastIntensity, userPreferences.devNickname, userPlanId, memoryBlock);
 
       setStatus('Generating personalized project recommendations...');
       let recommendedProjects = null;
@@ -213,7 +223,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="max-w-3xl w-full bg-card border-border">
+      <Card className="max-w-3xl w-full bg-background border-border">
         <CardHeader className="px-4 sm:px-6">
           <div className="flex justify-center mb-4">
             <button
@@ -233,27 +243,42 @@ export default function Dashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 px-4 sm:px-6">
-          {/* Reanalyze usage */}
-          {forceReanalyze && reanalyzeUsage && (
-            <div className="flex items-center justify-between bg-surface border border-border rounded-lg px-3 sm:px-4 py-2.5 text-sm">
-              <span className="flex items-center gap-2 text-muted-foreground">
-                <BarChart2 className="w-4 h-4 text-accent" />
-                Reanalyses used this period
-              </span>
-              <span className="font-semibold text-foreground">
-                {reanalyzeUsage.current}
-                {reanalyzeUsage.limit !== null && (
-                  <span className="text-muted-foreground font-normal"> / {reanalyzeUsage.limit}</span>
-                )}
-                {reanalyzeUsage.limit === null && (
-                  <span className="text-muted-foreground font-normal"> / ∞</span>
-                )}
-              </span>
+          {/* Reanalyze info — merged card */}
+          {forceReanalyze && (reanalyzeUsage || lastAnalyzedAt) && (
+            <div className="bg-background border border-border rounded-lg px-3 sm:px-4 py-2.5 text-sm space-y-2">
+              {reanalyzeUsage && (
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <BarChart2 className="w-4 h-4 text-accent" />
+                    Reanalyses used this period
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {reanalyzeUsage.limit === null
+                      ? 'Unlimited'
+                      : `${Math.round(Math.min(100, (reanalyzeUsage.current / reanalyzeUsage.limit) * 100))}% used`
+                    }
+                  </span>
+                </div>
+              )}
+              {reanalyzeUsage && lastAnalyzedAt && (
+                <div className="border-t border-border" />
+              )}
+              {lastAnalyzedAt && (
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <Clock className="w-4 h-4 text-accent" />
+                    Last analyzed
+                  </span>
+                  <span className="font-semibold text-foreground" title={new Date(lastAnalyzedAt).toLocaleString()}>
+                    {timeAgo(lastAnalyzedAt)}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
           {/* Profile Summary */}
-          <div className="bg-surface p-3 sm:p-4 rounded-lg border border-border space-y-2">
+          <div className="bg-background p-3 sm:p-4 rounded-lg border border-border space-y-2">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-foreground flex items-center text-sm sm:text-base">
                 <User className="w-4 h-4 mr-2 text-accent" />
@@ -290,7 +315,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="bg-surface p-3 sm:p-4 rounded-lg border border-border">
+          <div className="bg-background p-3 sm:p-4 rounded-lg border border-border">
             <h3 className="font-semibold mb-2 text-yellow-500">⚠️ Fair Warning</h3>
             <p className="text-sm text-foreground">
               Our AI will be brutally honest. If your profile has gaps, we'll call them out. 

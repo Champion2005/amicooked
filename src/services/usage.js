@@ -180,6 +180,25 @@ export async function incrementUsage(userId, usageType) {
 }
 
 /**
+ * Increment a usage counter by a custom amount (e.g. 0.5 for partial regenerations).
+ * Uses Firestore's atomic increment so concurrent writes don't race.
+ *
+ * @param {string} userId
+ * @param {string} usageType  One of USAGE_TYPES.*
+ * @param {number} amount     Amount to increment by (default 1)
+ */
+export async function incrementUsageBy(userId, usageType, amount = 1) {
+  try {
+    const ref = doc(db, 'users', userId);
+    await updateDoc(ref, {
+      [`usage.${usageType}`]: firestoreIncrement(amount),
+    });
+  } catch (err) {
+    console.warn('[usage] incrementUsageBy failed:', err.message);
+  }
+}
+
+/**
  * Fetch the full usage summary for display (e.g. Profile page).
  *
  * @param {string} userId

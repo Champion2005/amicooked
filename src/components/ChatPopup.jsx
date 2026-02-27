@@ -241,6 +241,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       setActiveChat(prev => ({ ...prev, messages: [...prev.messages, errorMsg] }));
     } finally {
       setLoading(false);
+      if (window.innerWidth > 768) inputRef.current?.focus();
     }
   };
 
@@ -305,7 +306,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col">
       {/* Chat Header */}
-      <header className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
+      <header className="border-b border-border bg-background-dark px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {!showSidebar && (
             <button 
@@ -344,7 +345,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar - Chat History */}
         {showSidebar && (
-          <div className="absolute inset-0 sm:relative sm:inset-auto w-full sm:w-80 border-r border-border bg-card flex flex-col shrink-0 z-10">
+          <div className="absolute inset-0 sm:relative sm:inset-auto w-full sm:w-80 border-r border-border bg-background flex flex-col shrink-0 z-10">
             <div className="p-4 border-b border-border">
               <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Chat History</h2>
             </div>
@@ -427,7 +428,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
               </div>
 
               {/* Input */}
-              <div className="border-t border-border bg-card p-3 sm:p-4">
+              <div className="border-t border-border bg-background p-3 sm:p-4">
                 {/* Fallback model notice */}
                 {usingFallback && (
                   <div className="max-w-4xl mx-auto mb-2 flex items-center gap-2 text-xs text-amber-400/80 bg-amber-400/5 border border-amber-400/20 rounded-md px-3 py-1.5">
@@ -473,7 +474,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                       />
                     </div>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {usageSummary.usage[USAGE_TYPES.MESSAGE] ?? 0} / {usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE]} messages
+                      {Math.round(((usageSummary.usage[USAGE_TYPES.MESSAGE] ?? 0) / usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE]) * 100)}% used
                     </span>
                   </div>
                 )}
@@ -484,7 +485,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
             <div className="flex-1 flex flex-col min-w-0">
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="w-20 h-20 rounded-full bg-card border border-border flex items-center justify-center mx-auto mb-4">
+                  <div className="w-20 h-20 rounded-full bg-background border border-border flex items-center justify-center mx-auto mb-4">
                     <MessageSquare className="w-10 h-10 text-muted-foreground" />
                   </div>
                   <h2 className="text-xl font-semibold text-foreground mb-2">Ask your Agent anything</h2>
@@ -502,7 +503,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                         key={idx}
                         onClick={() => handleNewChatWithQuery(suggestion)}
                         disabled={loading}
-                        className="text-left px-4 py-3 rounded-lg border border-border bg-card hover:bg-surface text-sm text-gray-300 hover:text-foreground transition-colors disabled:opacity-50"
+                        className="text-left px-4 py-3 rounded-lg border border-border bg-background hover:bg-surface text-sm text-gray-300 hover:text-foreground transition-colors disabled:opacity-50"
                       >
                         {suggestion}
                       </button>
@@ -511,7 +512,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                 </div>
               </div>
               {/* New chat input */}
-              <div className="border-t border-border bg-card p-3 sm:p-4">
+              <div className="border-t border-border bg-background p-3 sm:p-4">
                 {/* Fallback model notice */}
                 {usingFallback && (
                   <div className="max-w-4xl mx-auto mb-2 flex items-center gap-2 text-xs text-amber-400/80 bg-amber-400/5 border border-amber-400/20 rounded-md px-3 py-1.5">
@@ -568,7 +569,7 @@ export default function ChatPopup({ isOpen, onClose, initialQuery, githubData, u
                       />
                     </div>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {usageSummary.usage[USAGE_TYPES.MESSAGE] ?? 0} / {usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE]} messages
+                      {Math.round(((usageSummary.usage[USAGE_TYPES.MESSAGE] ?? 0) / usageSummary.planConfig.limits[USAGE_TYPES.MESSAGE]) * 100)}% used
                     </span>
                   </div>
                 )}

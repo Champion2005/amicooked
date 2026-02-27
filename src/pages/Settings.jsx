@@ -194,6 +194,14 @@ export default function Settings() {
       .finally(() => setAgentLoading(false));
   }, [user, usageSummary]);
 
+  // ── Scroll to #usage anchor on mount ──────────────────────────────────────
+  useEffect(() => {
+    if (window.location.hash === '#usage') {
+      const el = document.getElementById('usage');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
+
   // ── Handlers ───────────────────────────────────────────────────────────────
 
   /** Auto-save roast intensity when the user picks a new level */
@@ -388,7 +396,7 @@ export default function Settings() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-background-dark">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-background-dark">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-4">
@@ -420,7 +428,7 @@ export default function Settings() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* ─── Account ──────────────────────────────────────────────────────── */}
-        <section className="bg-card/50 rounded-xl border border-border p-5 md:col-span-2">
+        <section className="bg-background rounded-xl border border-border p-5 md:col-span-2">
           <div className="flex items-center gap-2 mb-4">
             <User className="w-5 h-5 text-accent" />
             <h2 className="text-lg font-semibold text-foreground">Account</h2>
@@ -480,7 +488,7 @@ export default function Settings() {
         </section>
 
         {/* ─── AI Agent ─────────────────────────────────────────────────────── */}
-        <section className="bg-card/50 rounded-xl border border-border p-5 md:col-span-2">
+        <section className="bg-background rounded-xl border border-border p-5 md:col-span-2">
           <div className="flex items-center gap-2 mb-4">
             <BrainCircuit className="w-5 h-5 text-accent" />
             <h2 className="text-lg font-semibold text-foreground">Your AI Agent</h2>
@@ -886,19 +894,10 @@ export default function Settings() {
         </section>
 
         {/* ─── Usage ────────────────────────────────────────────────────────── */}
-        <section className="bg-card/50 rounded-xl border border-border p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-accent" />
-              <h2 className="text-lg font-semibold text-foreground">AI Usage</h2>
-            </div>
-            <button
-              onClick={() => navigate("/pricing")}
-              className="text-xs text-accent hover:underline flex items-center gap-1"
-            >
-              <CreditCard className="w-3.5 h-3.5" />
-              View Pricing
-            </button>
+        <section id="usage" className="bg-background rounded-xl border border-border p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Zap className="w-5 h-5 text-accent" />
+            <h2 className="text-lg font-semibold text-foreground">AI Usage</h2>
           </div>
           {usageSummary && !usageLoading && (
             <p className="text-sm text-muted-foreground mb-4">
@@ -916,7 +915,7 @@ export default function Settings() {
                 {[
                   [USAGE_TYPES.MESSAGE, "AI Messages"],
                   [USAGE_TYPES.REANALYZE, "Profile Re-Analyses"],
-                  [USAGE_TYPES.PROJECT_CHAT, "Project Chats"],
+                  [USAGE_TYPES.PROJECT_CHAT, "Saved Projects"],
                 ].map(([type, label]) => {
                   const limit = usageSummary.planConfig.limits[type] ?? null;
                   const current = usageSummary.usage[type] ?? 0;
@@ -934,7 +933,7 @@ export default function Settings() {
                               : "text-muted-foreground"
                           }
                         >
-                          {current} / {formatLimit(limit)}
+                          {limit === null ? 'Unlimited' : `${Math.round(pct)}% used`}
                         </span>
                       </div>
                       {limit !== null && (
@@ -951,6 +950,38 @@ export default function Settings() {
                     </div>
                   );
                 })}
+
+                {/* Agent Memory usage */}
+                {(() => {
+                    const memLimit = getMemoryLimit(planId);
+                    if (memLimit <= 0) return null;
+                    const memCurrent = agentState?.memory?.length ?? 0;
+                    const memPct = Math.min(100, (memCurrent / memLimit) * 100);
+                    const memAtLimit = memCurrent >= memLimit;
+                    return (
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-foreground">Agent Memory</span>
+                                <span className={memAtLimit ? "text-red-400 font-semibold" : "text-muted-foreground"}>
+                                    {Math.round(memPct)}% used
+                                </span>
+                            </div>
+                            <div className="h-2 rounded-full bg-background overflow-hidden">
+                                <div
+                                    className={`h-full rounded-full transition-all ${memAtLimit ? "bg-red-500" : "bg-accent"}`}
+                                    style={{ width: `${memPct}%` }}
+                                />
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                {/* Memory disclaimer */}
+                {getMemoryLimit(planId) > 0 && (
+                  <p className="text-xs text-muted-foreground/60 leading-relaxed">
+                    Memory is self-managed by the agent. You can delete individual or all memories in the AI Agent section.
+                  </p>
+                )}
 
                 {usageSummary.plan === "free" && (
                   <div className="pt-2 border-t border-border">
@@ -974,7 +1005,7 @@ export default function Settings() {
         </section>
 
         {/* ─── Billing ──────────────────────────────────────────────────────── */}
-        <section className="bg-card/50 rounded-xl border border-border p-5">
+        <section className="bg-background rounded-xl border border-border p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <CreditCard className="w-5 h-5 text-accent" />
@@ -1067,7 +1098,7 @@ export default function Settings() {
         </section>
 
         {/* ─── Danger Zone ──────────────────────────────────────────────────── */}
-        <section className="bg-card/50 rounded-xl border border-red-900/40 p-5 md:col-span-2">
+        <section className="bg-background rounded-xl border border-red-900/40 p-5 md:col-span-2">
           <div className="flex items-center gap-2 mb-4">
             <Trash2 className="w-5 h-5 text-red-400" />
             <h2 className="text-lg font-semibold text-red-400">Danger Zone</h2>

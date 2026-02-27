@@ -7,8 +7,8 @@ import { useToast } from '@/components/ui/Toast';
 import { useGitHubSignIn } from '@/hooks/useGitHubSignIn';
 import { auth, db } from '@/config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { PLANS, USAGE_TYPES, PLAN_ORDER, FAQS, getIcon, formatLimit, getFeatures, getExclusiveFeatures } from '@/config/plans';
-import { Github, Check, ArrowRight, MessageSquare, RefreshCw, Sparkles, Info, BarChart2, Zap } from 'lucide-react';
+import { PLANS, USAGE_TYPES, PLAN_ORDER, FAQS, getIcon, formatLimit, getFeatures, getExclusiveFeatures, getPlanPricing } from '@/config/plans';
+import { Github, Check, ArrowRight, MessageSquare, RefreshCw, Sparkles, Info, BarChart2, Zap, Bookmark, BrainCircuit } from 'lucide-react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -19,7 +19,7 @@ const buildPlansArray = () => {
     return PLAN_ORDER.map((id, idx) => {
         const plan = PLANS[id];
         const ui = plan.ui;
-        const pricing = plan.pricing;
+        const pricing = getPlanPricing(id);
         const prevId = idx > 0 ? PLAN_ORDER[idx - 1] : null;
         const previousPlanName = prevId ? PLANS[prevId].name : null;
         const features = getFeatures(id);
@@ -30,6 +30,8 @@ const buildPlansArray = () => {
             description: plan.description,
             aiMessages: formatLimit(plan.limits[USAGE_TYPES.MESSAGE]),
             regenerations: formatLimit(plan.limits[USAGE_TYPES.REANALYZE]),
+            savedProjects: formatLimit(plan.limits[USAGE_TYPES.PROJECT_CHAT]),
+            memoryLimit: plan.memoryLimit,
             hasFallback: plan.hasFallback,
             isPaid: pricing.monthlyPrice > 0,
             icon: ui.icon,
@@ -135,16 +137,14 @@ export default function Pricing() {
             {/* Hero */}
             <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-14 sm:pt-20 pb-8 text-center">
                 <div className="inline-block mb-4 px-3 py-1.5 rounded-md border border-border bg-card text-xs sm:text-sm text-muted-foreground">
-                    🔥 Stop being cooked. Start getting hired.
+                    🔥 Stop guessing. Start getting hired.
                 </div>
                 <h1 className="text-3xl sm:text-5xl font-bold leading-tight mb-4">
-                    Simple, honest pricing.
-                    <br />
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">
-                        No hidden nonsense.
-                    </span>
+                    Go from <span className="text-transparent bg-clip-text bg-gradient-to-r from-level-burnt to-level-cooked">Cooked</span> to <span className="text-transparent bg-clip-text bg-gradient-to-r from-level-toasted to-level-cooking">Cooking.</span>
+                    <div className="mb-2" />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-500">Supercharge</span> your portfolio.
                 </h1>
-                <p className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed mb-8">
+                <p className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed my-8">
                     Whether you're just starting out or grinding hard for your next offer — there's a plan for where you are right now.
                 </p>
             </section>
@@ -191,6 +191,11 @@ export default function Pricing() {
                                         <RefreshCw className="w-3.5 h-3.5 text-accent shrink-0" />
                                         <span className="text-muted-foreground">Regenerations:</span>
                                         <span className="font-semibold text-foreground">{plan.regenerations}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Bookmark className="w-3.5 h-3.5 text-accent shrink-0" />
+                                        <span className="text-muted-foreground">Saved Projects:</span>
+                                        <span className="font-semibold text-foreground">{plan.savedProjects}</span>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm">
                                         <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
@@ -250,7 +255,7 @@ export default function Pricing() {
                                     : 'text-muted-foreground hover:text-foreground'
                             }`}
                         >
-                            Bi-annual
+                            Bi-Annual
                         </button>
                         <button
                             onClick={() => setBillingCycle('yearly')}
@@ -388,6 +393,36 @@ export default function Pricing() {
                                             {plan.regenerations} /month
                                         </span>
                                     </div>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-sm text-foreground">
+                                            <Bookmark className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+                                            Saved Projects
+                                        </div>
+                                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                            plan.id === 'ultimate'
+                                                ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-300 border border-orange-500/20'
+                                                : plan.id === 'pro' ? 'bg-green-500/15 text-green-400 border border-green-500/20'
+                                                : 'bg-plan-student-bg text-accent border border-accent/20'
+                                        }`}>
+                                            {plan.savedProjects} /month
+                                        </span>
+                                    </div>
+                                    {plan.memoryLimit > 0 && (
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2 text-sm text-foreground">
+                                                <BrainCircuit className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+                                                Agent Memory
+                                            </div>
+                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                                plan.id === 'ultimate'
+                                                    ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-300 border border-orange-500/20'
+                                                    : plan.id === 'pro' ? 'bg-green-500/15 text-green-400 border border-green-500/20'
+                                                    : 'bg-plan-student-bg text-accent border border-accent/20'
+                                            }`}>
+                                                {plan.memoryLimit} slots
+                                            </span>
+                                        </div>
+                                    )}
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2 text-sm text-foreground">
                                             <Sparkles className="w-3.5 h-3.5 text-accent flex-shrink-0" />

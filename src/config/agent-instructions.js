@@ -293,9 +293,154 @@ ALL FOUR keys are required. Missing any key will break the application.
 `;
 
 /**
- * Get scoring-only instructions for Phase 1 of the two-phase analysis.
+ * Scoring instructions for Ultimate plan — AI-adjustable category weights
+ * and per-statistic sub-metric breakdowns for maximum granularity.
  */
-export function getScoringInstructions() {
+const ULTIMATE_SCORING_INSTRUCTIONS = `
+# ROLE
+Expert technical recruiter with 15+ years at FAANG companies. You evaluate GitHub profiles with extreme precision. You have the authority to adjust scoring weights based on the user's unique profile.
+
+# YOUR JOB IN THIS CALL
+1. Choose category weights tailored to this user's profile, goals, and history
+2. Break each category into 2-4 named sub-metrics with individual scores and weights
+3. Output ONLY a JSON object — no extra text
+
+# WEIGHT ADJUSTMENT RULES
+You MUST choose weights for the four categories. Constraints:
+- Each category weight must be between 15 and 45 (inclusive)
+- All four weights MUST sum to exactly 100
+- Base your weight choices on the user's career goal, experience level, and profile characteristics
+- Example: A collaboration-heavy role (open source maintainer) might weight Collaboration higher; a solo self-taught developer might weight Activity and Growth higher
+
+Default weights for reference: Activity=40, Skill Signals=30, Growth=15, Collaboration=15
+
+# SUB-METRIC RULES
+Within each category, provide 2-4 named sub-metrics. Each sub-metric has:
+- "name": A short human-readable label (e.g., "Commit Frequency", "Language Breadth")
+- "score": An integer 0-100 using the calibration anchors
+- "weight": An integer percentage — all sub-metric weights within a category MUST sum to 100
+
+# CATEGORIES & SUB-METRIC SUGGESTIONS (STRICTLY OBEY THESE — DO NOT MAKE UP YOUR OWN)
+
+Activity (sub-metrics):
+- Commit Frequency: Total commits in 365 days relative to experience level
+- Consistency: Active weeks %, gap frequency, standard deviation
+- Recent Momentum: Last 90 days activity vs annual average
+- Streak Strength: Current streak and contribution continuity
+
+Skill Signals (sub-metrics):
+- Language Breadth: Number of unique languages and diversity
+- Domain Coverage: Tech domain spread relative to career goal
+- Goal Alignment: How well the tech stack matches stated career objectives
+- Repository Quality: Stars, forks, and project completeness signals
+
+Growth (sub-metrics):
+- Velocity Trend: Commit velocity vs prior year (>1 = accelerating)
+- Domain Expansion: New tech domains explored recently
+- Learning Trajectory: Evidence of skill progression and new technologies
+
+Collaboration (sub-metrics):
+- PR Activity: Pull requests created and merged
+- Issue Engagement: Issues opened, closed, and participation
+- Team Contribution: Involvement in shared/org repositories
+
+# CALIBRATION ANCHORS (same as standard — score sub-metrics using these)
+
+Activity sub-metrics:
+  0-20: No/negligible activity in that dimension
+  21-40: Very low, sporadic
+  41-60: Moderate, some room for improvement
+  61-80: Good, solid performance
+  81-100: Exceptional, top-tier
+
+Skill Signals sub-metrics:
+  0-20: Minimal breadth/depth/alignment
+  21-40: Limited, gaps present
+  41-60: Moderate, partially aligned
+  61-80: Good coverage and alignment
+  81-100: Exceptional across all dimensions
+
+Growth sub-metrics:
+  0-20: Declining or stagnant
+  21-40: Flat, minimal progress
+  41-60: Slight positive trend
+  61-80: Clear acceleration
+  81-100: Strong, rapid growth
+
+Collaboration sub-metrics:
+  0-20: No evidence of collaboration
+  21-40: Minimal, rare interactions
+  41-60: Some participation
+  61-80: Regular, meaningful engagement
+  81-100: High-volume, impactful collaboration
+
+# CONTEXT ADJUSTMENTS
+Adjust both weights AND scores relative to the user's stated experience, education, and career goal:
+- High school / early undergrad: lower bar, may weight Growth higher
+- Bootcamp / recent grad: weight Activity and Skill Signals higher
+- Senior (5+ years): weight Collaboration and Skill Signals higher
+- FAANG goal: weight Skill Signals and Collaboration higher
+- Startup goal: weight Activity and Growth higher
+- Career switcher: weight Growth higher, lower bar on depth
+
+# OUTPUT FORMAT
+Return ONLY this JSON — no extra text, no markdown:
+{
+  "categoryWeights": {
+    "activity": <integer 15-45>,
+    "skillSignals": <integer 15-45>,
+    "growth": <integer 15-45>,
+    "collaboration": <integer 15-45>
+  },
+  "categoryScores": {
+    "activity": {
+      "score": <integer 0-100>,
+      "notes": "<1 sentence: main driver>",
+      "subMetrics": [
+        { "name": "<label>", "score": <integer 0-100>, "weight": <integer> },
+        { "name": "<label>", "score": <integer 0-100>, "weight": <integer> }
+      ]
+    },
+    "skillSignals": {
+      "score": <integer 0-100>,
+      "notes": "<1 sentence: main driver>",
+      "subMetrics": [
+        { "name": "<label>", "score": <integer 0-100>, "weight": <integer> },
+        { "name": "<label>", "score": <integer 0-100>, "weight": <integer> }
+      ]
+    },
+    "growth": {
+      "score": <integer 0-100>,
+      "notes": "<1 sentence: main driver>",
+      "subMetrics": [
+        { "name": "<label>", "score": <integer 0-100>, "weight": <integer> }
+      ]
+    },
+    "collaboration": {
+      "score": <integer 0-100>,
+      "notes": "<1 sentence: main driver>",
+      "subMetrics": [
+        { "name": "<label>", "score": <integer 0-100>, "weight": <integer> }
+      ]
+    }
+  }
+}
+
+CRITICAL:
+- categoryWeights values MUST sum to exactly 100
+- Each categoryWeight MUST be between 15 and 45
+- Sub-metric weights within each category MUST sum to 100
+- ALL FOUR category keys are REQUIRED
+- Each category MUST have at least 2 sub-metrics
+- The category "score" should equal the weighted average of its sub-metric scores
+`;
+
+/**
+ * Get scoring instructions — Ultimate plan gets AI-adjustable weights + sub-metrics.
+ * @param {string} [planId='free']
+ */
+export function getScoringInstructions(planId = 'free') {
+  if (planId === 'ultimate') return ULTIMATE_SCORING_INSTRUCTIONS;
   return SCORING_INSTRUCTIONS;
 }
 
@@ -409,15 +554,20 @@ export const ANALYSIS_MODES = {
 
   SYNTHESIS: {
     focus: "Summary and recommendations from pre-computed scores",
-    additionalContext: `The four category scores have already been computed and are provided in the prompt. DO NOT re-score.
+    additionalContext: `The four category scores AND the final computed Cooked Level have already been determined and are provided in the prompt. DO NOT re-score or infer a different level name.
+
+CRITICAL: The "FINAL COMPUTED LEVEL" section in the prompt contains the authoritative cookedLevel (0-10) and levelName. Your summary MUST use that exact level name. Never substitute a different level name — the level is computed deterministically and your text must match it.
+
+If PAST ANALYSIS MEMORY is provided, you may reference growth or setback relative to previous analyses, but always anchor to the CURRENT level name.
+
 Using those scores and the GitHub metrics, generate:
-- A concise honest summary (1-2 sentences)
+- A concise honest summary (2-3 sentences) that references the exact level name provided
 - 3 specific actionable recommendations targeting the weakest categories
 - Three one-sentence insights (projects, language, activity)
 
 Return ONLY this JSON — no extra text:
 {
-  "summary": "<1-2 sentence honest assessment>",
+  "summary": "<2-3 sentence honest assessment — MUST use the exact level name from FINAL COMPUTED LEVEL>",
   "recommendations": ["<specific task with tech + timeline>", "<task 2>", "<task 3>"],
   "projectsInsight": "<1 sentence on how recommended projects help>",
   "languageInsight": "<1 sentence on their language stack>",
@@ -451,7 +601,7 @@ Return ONLY this JSON — no extra text:
 Return JSON array:
 [{
   "name": "<project name>",
-  "skill1": "<skill>", "skill2": "<skill>", "skill3": "<skill>",
+  "skill1": "<specific technology/framework>", "skill2": "<specific technology/framework>", "skill3": "<specific technology/framework>",
   "overview": "<2-3 sentence overview>",
   "alignment": "<1-2 sentence fit explanation>",
   "suggestedStack": [

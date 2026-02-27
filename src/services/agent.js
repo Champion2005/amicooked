@@ -156,9 +156,17 @@ class AgentMemory {
       ctx += `\n- Scale reminder: Burnt < Well-Done < Cooked < Toasted < Cooking (higher = better)`;
       ctx += `\n- Summary: ${analysis.summary}`;
       if (analysis.categoryScores) {
+        if (analysis.categoryWeights) {
+          ctx += `\n- AI-Adjusted Category Weights: ${Object.entries(analysis.categoryWeights).map(([k, w]) => `${k}=${w}%`).join(', ')}`;
+        }
         ctx += `\n- Category Scores:`;
         for (const [key, cat] of Object.entries(analysis.categoryScores)) {
           ctx += `\n  - ${key}: ${cat.score}/100 (${cat.weight}% weight) — ${cat.notes}`;
+          if (cat.subMetrics?.length) {
+            for (const sm of cat.subMetrics) {
+              ctx += `\n    · ${sm.name}: ${sm.score}/100 (${sm.weight}% within category)`;
+            }
+          }
         }
       }
       if (analysis.recommendations?.length) {
@@ -580,6 +588,44 @@ Even for short conversations, extract any useful information. If the conversatio
  */
 export function createAgent() {
   return new AnalysisAgent();
+}
+
+/**
+ * Standalone helper: load long-term memory from Firestore and return it
+ * as a formatted string suitable for injection into synthesis prompts.
+ * Returns empty string when memory is unavailable or empty.
+ *
+ * @param {string} uid - Firebase Auth UID
+ * @param {string} planId - Current plan ID
+ * @returns {Promise<string>} Formatted memory block or empty string
+ */
+export async function getFormattedMemoryForSynthesis(uid, planId) {
+  if (!uid || !hasAgentMemory(planId)) return '';
+  try {
+    const state = await loadAgentState(uid, planId);
+    if (!state?.memory?.length || state.memoryEnabled === false) return '';
+
+    const sections = {
+      insight: [], goal: [], action: [], summary: [],
+      preference: [], skill: [], feedback: [], milestone: [], context: [],
+    };
+    for (const item of state.memory) {
+      const bucket = sections[item.type];
+      if (bucket) bucket.push(item.content);
+    }
+
+    // Only include sections relevant to analysis continuity
+    let out = '';
+    if (sections.insight.length) out += '\n### Past Analysis Insights\n' + sections.insight.map(i => `- ${i}`).join('\n');
+    if (sections.goal.length) out += '\n### User Goals\n' + sections.goal.map(g => `- ${g}`).join('\n');
+    if (sections.action.length) out += '\n### Tracked Actions\n' + sections.action.map(a => `- ${a}`).join('\n');
+    if (sections.milestone.length) out += '\n### Milestones & Progress\n' + sections.milestone.map(m => `- ${m}`).join('\n');
+    if (sections.summary.length) out += '\n### Past Session Summaries\n' + sections.summary.map(s => `- ${s}`).join('\n');
+
+    return out || '';
+  } catch {
+    return '';
+  }
 }
 
 /**
