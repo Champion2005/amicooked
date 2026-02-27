@@ -54,17 +54,17 @@ export const ALL_FEATURES = [
   { name: 'Increased Usage Limits I', availableFrom: 'student' },
   { name: 'In-Depth Statistics', availableFrom: 'student' },
   { name: 'Richer AI Analysis Data', availableFrom: 'student' },
-  { name: 'Score History', availableFrom: 'student' },
+  { name: 'Score History (Coming Soon)', availableFrom: 'student' },
 
   // Pro plan exclusives
   { name: 'Increased Usage Limits II', availableFrom: 'pro' },
-  { name: 'Advanced Project Insights (Coming soon)', availableFrom: 'pro' },
+  { name: 'Advanced Project Insights (Coming Soon)', availableFrom: 'pro' },
   { name: 'Custom Agent Identity', availableFrom: 'pro' },
   
   // Ultimate plan exclusives
   { name: 'Increased Usage Limits III', availableFrom: 'ultimate' },
   { name: 'Adaptive Score Weights', availableFrom: 'ultimate' },
-  { name: 'Interactive Growth Roadmap (coming soon)', availableFrom: 'ultimate' },
+  { name: 'Interactive Growth Roadmap (Coming Soon)', availableFrom: 'ultimate' },
 ];
 
 /**
